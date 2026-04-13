@@ -1,0 +1,27 @@
+# Ambiente local
+.env
+*.local
+
+# Dependências Node
+node_modules/
+backend/node_modules/
+
+# Build artifacts
+dist/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Supabase CLI
+.supabase/
+
+# Nunca versionar chaves reais!
+*.pem
+*.key
+secrets.json

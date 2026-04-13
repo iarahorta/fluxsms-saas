@@ -1,0 +1,22 @@
+{
+  "servers": {
+    "mercadopago": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mercadopago/mcp-server",
+        "--access-token",
+        "${input:mpAccessToken}"
+      ],
+      "inputs": [
+        {
+          "id": "mpAccessToken",
+          "type": "promptString",
+          "description": "Mercado Pago Access Token (APP_USR-...)",
+          "password": true
+        }
+      ]
+    }
+  }
+}

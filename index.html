@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS | Elite Virtual Numbers</title>
+    <meta name="description" content="FluxSMS - Receba códigos SMS de verificação com chips físicos reais. Alta taxa de aprovação para WhatsApp, Telegram, Google e mais.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+    <!-- Overlay para fechar sidebar no mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="logo-area">
+                    <img src="assets/logo.png" alt="FluxSMS" class="logo-img" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                    <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></span>
+                </div>
+                <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+            </div>
+
+            <!-- Saldo no mobile (dentro da sidebar) -->
+            <div class="balance-mobile">
+                <div class="balance-label">SALDO DISPONÍVEL</div>
+                <div class="balance-value" id="balance-display-mobile">R$ 150,00</div>
+                <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
+            </div>
+
+            <nav class="main-nav">
+                <a href="#" class="nav-item active"><span class="icon">⚡</span> Dashboard</a>
+                <a href="#" class="nav-item"><span class="icon">💼</span> Meus Números</a>
+                <div class="nav-separator"></div>
+                <a href="#" class="nav-item" onclick="abrirRecarga()"><span class="icon">💰</span> Recarregar Saldo</a>
+                <a href="#" class="nav-item"><span class="icon">📊</span> Histórico</a>
+                <a href="#" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="badge-premium">
+                    ◆ 100% PRIVATE SIMCARD INFRASTRUCTURE
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <!-- Hamburger (mobile) + Search -->
+                <div class="header-left">
+                    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+                    <div class="search-bar">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Buscar serviço..." id="service-search">
+                    </div>
+                </div>
+
+                <!-- User Controls (desktop) -->
+                <div class="user-controls">
+                    <!-- Botão Recarregar (incentivo rápido) -->
+                    <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
+
+                    <!-- Saldo + Avatar agrupados -->
+                    <div class="user-profile">
+                        <div class="balance-inline">
+                            <span class="balance-label-sm">SALDO</span>
+                            <span class="balance-value-sm" id="balance-display">R$ 150,00</span>
+                        </div>
+                        <div class="user-avatar" title="Minha Conta">
+                            <span class="avatar-letters">AF</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Grid -->
+            <section class="content-grid">
+                <!-- Services Panel -->
+                <div class="services-container">
+                    <div class="section-header">
+                        <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
+                        <span class="count-badge" id="services-count">Carregando...</span>
+                    </div>
+
+                    <div class="services-header-row">
+                        <span>SERVIÇO</span>
+                        <span>PREÇO</span>
+                        <span>AÇÃO</span>
+                    </div>
+                    <div class="services-list" id="services-grid"></div>
+                </div>
+
+                <!-- Active Sessions Panel -->
+                <div class="active-sessions">
+                    <h2 class="section-title">NÚMEROS ATIVOS</h2>
+                    <div class="sessions-list" id="active-numbers">
+                        <div class="empty-state">Nenhum número solicitado no momento.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Recarga -->
+    <div class="modal-overlay" id="modalRecarga" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span>RECARREGAR SALDO</span>
+                <button onclick="fecharRecarga()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="recharge-options">
+                    <button class="recharge-opt" onclick="selecionarValor(10)">R$ 10</button>
+                    <button class="recharge-opt" onclick="selecionarValor(25)">R$ 25</button>
+                    <button class="recharge-opt" onclick="selecionarValor(50)">R$ 50</button>
+                    <button class="recharge-opt" onclick="selecionarValor(100)">R$ 100</button>
+                </div>
+                <div style="text-align:center; margin: 20px 0; color: #666; font-size: 12px;">ou escolha outro valor</div>
+                <input type="number" class="custom-value" id="custom-recharge" placeholder="R$ Valor personalizado">
+                <button class="btn-pix" onclick="gerarPix()">⚡ GERAR PIX AGORA</button>
+                <p style="text-align:center; font-size:10px; color:#555; margin-top:10px;">Saldo creditado em até 60 segundos após pagamento</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        function abrirRecarga() {
+            document.getElementById('modalRecarga').style.display = 'flex';
+        }
+
+        function fecharRecarga() {
+            document.getElementById('modalRecarga').style.display = 'none';
+        }
+
+        function selecionarValor(val) {
+            document.getElementById('custom-recharge').value = val;
+            document.querySelectorAll('.recharge-opt').forEach(b => b.classList.remove('selected'));
+            event.target.classList.add('selected');
+        }
+
+        function gerarPix() {
+            const val = document.getElementById('custom-recharge').value;
+            if(!val || val < 5) { alert('Valor mínimo: R$ 5,00'); return; }
+            alert('Integração Pix em breve! Valor: R$ ' + parseFloat(val).toFixed(2));
+        }
+    </script>
+</body>
+</html>

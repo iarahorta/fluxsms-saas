@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mercadopago": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mercadopago/mcp-server",
+        "--access-token",
+        "${MP_ACCESS_TOKEN}"
+      ]
+    }
+  }
+}
