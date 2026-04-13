@@ -116,27 +116,76 @@
                 <span>RECARREGAR SALDO</span>
                 <button onclick="fecharRecarga()">✕</button>
             </div>
-            <div class="modal-body">
-                <div class="recharge-options">
-                    <button class="recharge-opt" onclick="selecionarValor(10)">R$ 10</button>
-                    <button class="recharge-opt" onclick="selecionarValor(25)">R$ 25</button>
-                    <button class="recharge-opt" onclick="selecionarValor(50)">R$ 50</button>
-                    <button class="recharge-opt" onclick="selecionarValor(100)">R$ 100</button>
+    <!-- MODAL RECARGA PIX -->
+    <div id="modalRecarga" class="modal">
+        <div class="modal-content">
+            <h2 class="section-title">RECARREGAR SALDO</h2>
+            <div class="input-group">
+                <label>Valor da recarga (R$)</label>
+                <input type="number" id="valorRecarga" placeholder="Mínimo R$ 5,00" min="5" step="1">
+            </div>
+            <button class="btn-buy" style="margin-top: 15px; width: 100%;" onclick="gerarPix()">GERAR QR CODE PIX</button>
+            
+            <div id="pixArea" style="display:none; margin-top:20px; text-align:center;">
+                <p style="font-size: 10px; color: #888; margin-bottom: 10px;">Pague via PIX para crédito instantâneo:</p>
+                <div id="qrCodeContainer" style="background:white; padding:10px; border-radius:10px; display:inline-block;"></div>
+            </div>
+            
+            <button class="btn-cancel" style="margin-top: 15px; border: none; background: transparent; color: #888;" onclick="fecharRecarga()">CANCELAR</button>
+        </div>
+    </div>
+
+    <!-- MODAL AUTH -->
+    <div id="authModal" class="modal" style="display: flex;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="logo-area" style="justify-content: center; margin-bottom: 30px;">
+                <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
+            </div>
+            
+            <div id="loginForm">
+                <h2 class="section-title" style="text-align: center; font-size: 1.2rem; margin-bottom: 25px;">ACESSO À PLATAFORMA</h2>
+                <div class="input-group">
+                    <label>E-mail</label>
+                    <input type="email" id="auth-email" placeholder="seu@email.com">
                 </div>
-                <div style="text-align:center; margin: 20px 0; color: #666; font-size: 12px;">ou escolha outro valor</div>
-                <input type="number" class="custom-value" id="custom-recharge" placeholder="R$ Valor personalizado">
-                <button class="btn-pix" onclick="gerarPix()">⚡ GERAR PIX AGORA</button>
-                <p style="text-align:center; font-size:10px; color:#555; margin-top:10px;">Saldo creditado em até 60 segundos após pagamento</p>
+                <div class="input-group">
+                    <label>Senha</label>
+                    <input type="password" id="auth-password" placeholder="••••••••">
+                </div>
+                <button class="btn-buy" style="margin-top: 10px; width: 100%;" onclick="handleAuth('login')">ENTRAR</button>
+                <p style="text-align: center; font-size: 0.8rem; margin-top: 20px; color: #666;">
+                    Não tem conta? <a href="javascript:toggleAuthView()" style="color: var(--gold); text-decoration: none;">Cadastre-se</a>
+                </p>
+            </div>
+
+            <div id="signupForm" style="display: none;">
+                <h2 class="section-title" style="text-align: center; font-size: 1.2rem; margin-bottom: 25px;">CRIAR CONTA ELITE</h2>
+                <div class="input-group">
+                    <label>Nome Completo</label>
+                    <input type="text" id="reg-name" placeholder="Nome Sobrenome">
+                </div>
+                <div class="input-group">
+                    <label>E-mail</label>
+                    <input type="email" id="reg-email" placeholder="seu@email.com">
+                </div>
+                <div class="input-group">
+                    <label>Senha</label>
+                    <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres">
+                </div>
+                <button class="btn-buy" style="margin-top: 10px; width: 100%;" onclick="handleAuth('signup')">CADASTRAR GRATUITAMENTE</button>
+                <p style="text-align: center; font-size: 0.8rem; margin-top: 20px; color: #666;">
+                    Já tem conta? <a href="javascript:toggleAuthView()" style="color: var(--gold); text-decoration: none;">Faça Login</a>
+                </p>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- SCRIPTS -->
     <script>
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
+            const sb = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('open');
+            sb.classList.toggle('active');
             overlay.classList.toggle('active');
         }
 
@@ -148,13 +197,6 @@
             document.getElementById('modalRecarga').style.display = 'none';
         }
 
-        function selecionarValor(val) {
-            document.getElementById('custom-recharge').value = val;
-            document.querySelectorAll('.recharge-opt').forEach(b => b.classList.remove('selected'));
-            event.target.classList.add('selected');
-        }
-
-        function gerarPix() {
             const val = document.getElementById('custom-recharge').value;
             if(!val || val < 5) { alert('Valor mínimo: R$ 5,00'); return; }
             alert('Integração Pix em breve! Valor: R$ ' + parseFloat(val).toFixed(2));

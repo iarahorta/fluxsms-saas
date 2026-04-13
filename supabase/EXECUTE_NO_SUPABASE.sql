@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS public.activations (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── COUPONS (Novo: Crédito via código) ──────────────────────
+CREATE TABLE IF NOT EXISTS public.coupons (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code            TEXT NOT NULL UNIQUE,
+    amount          NUMERIC(10, 2) NOT NULL,
+    uses_limit      INTEGER NOT NULL DEFAULT 1,
+    used_count      INTEGER NOT NULL DEFAULT 0,
+    expires_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE public.coupons IS 'Cupons de crédito promocional';
+
 -- ─── TRANSACTIONS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.transactions (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -172,6 +184,31 @@ BEGIN
     RETURN jsonb_build_object('ok',true);
 END; $$;
 
+-- USUÁRIO: Aplicar Cupom de Crédito
+CREATE OR REPLACE FUNCTION public.rpc_usar_cupom(
+    p_code TEXT, p_user_id UUID
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_coupon RECORD; v_already_used BOOLEAN;
+BEGIN
+    SELECT * INTO v_coupon FROM coupons WHERE code = p_code FOR UPDATE;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'error','cupom_invalido'); END IF;
+    IF v_coupon.expires_at < NOW() THEN RETURN jsonb_build_object('ok',false,'error','cupom_expirado'); END IF;
+    IF v_coupon.used_count >= v_coupon.uses_limit THEN RETURN jsonb_build_object('ok',false,'error','cupom_esgotado'); END IF;
+    
+    -- Verifica se este usuário já usou este cupom (log na transactions)
+    SELECT EXISTS(SELECT 1 FROM transactions WHERE user_id = p_user_id AND description = 'Cupom: '||p_code) INTO v_already_used;
+    IF v_already_used THEN RETURN jsonb_build_object('ok',false,'error','ja_utilizado'); END IF;
+
+    -- Aplica crédito
+    UPDATE profiles SET balance = balance + v_coupon.amount WHERE id = p_user_id;
+    UPDATE coupons SET used_count = used_count + 1 WHERE id = v_coupon.id;
+    
+    INSERT INTO transactions (user_id, type, amount, description)
+    VALUES (p_user_id, 'credit', v_coupon.amount, 'Cupom: '||p_code);
+    
+    RETURN jsonb_build_object('ok',true, 'creditado', v_coupon.amount);
+END; $$;
+
 -- USUÁRIO: Solicitar SMS com Preço Dinâmico (Leva em conta custom_price)
 CREATE OR REPLACE FUNCTION public.rpc_solicitar_sms_v2(
     p_user_id UUID, p_service TEXT, p_service_name TEXT, p_default_price NUMERIC
@@ -210,6 +247,7 @@ END; $$;
 GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms_v2    TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_admin_adjust_balance TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_admin_set_user_status TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_usar_cupom           TO authenticated;
 
 -- Garantir que custom_prices e transactions também estão no Realtime para o Admin
 ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_prices;

@@ -1,18 +1,21 @@
+/**
+ * FluxSMS - Frontend Business Logic (Realtime & Supabase Integration)
+ */
+
 // === SUPABASE CLIENT ===
 // Em produção: __SUPABASE_URL__ e __SUPABASE_ANON_KEY__ são substituídos pelo GitHub Actions
-// Em desenvolvimento: use os valores reais direto aqui
 const SUPABASE_URL  = '__SUPABASE_URL__';
 const SUPABASE_ANON = '__SUPABASE_ANON_KEY__';
 
 let supabase = null;
 let currentUser = null;
 
-// Inicializa Supabase apenas se as chaves estiverem presentes (produção)
+// Inicializa Supabase
 if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
     supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
-// === LISTA COMPLETA DE SERVIÇOS ===
+// === LISTA DE SERVIÇOS (Tabela Padrão) ===
 const SERVICES = [
     { id: 'whatsapp',    name: 'WhatsApp',      price: 6.10 },
     { id: 'telegram',    name: 'Telegram',      price: 4.00 },
@@ -22,48 +25,156 @@ const SERVICES = [
     { id: 'gov',         name: 'GOV.BR',        price: 5.00 },
     { id: 'ifood',       name: 'iFood',         price: 0.90 },
     { id: 'instagram',   name: 'Instagram',     price: 2.00 },
-    { id: 'facebook',    name: 'Facebook',      price: 1.80 },
     { id: 'tiktok',      name: 'TikTok',        price: 1.50 },
-    { id: 'microsoft',   name: 'Microsoft',     price: 1.20 },
     { id: 'apple',       name: 'Apple ID',      price: 3.00 },
-    { id: 'discord',     name: 'Discord',       price: 1.00 },
     { id: 'shopee',      name: 'Shopee',        price: 0.80 },
-    { id: 'amazon',      name: 'Amazon',        price: 1.10 },
     { id: 'mercadolivre',name: 'Mercado Livre', price: 1.20 },
     { id: 'nubank',      name: 'Nubank',        price: 2.50 },
     { id: 'twitter',     name: 'X (Twitter)',   price: 1.00 },
-    { id: 'linkedin',    name: 'LinkedIn',      price: 1.50 },
-    { id: 'snapchat',    name: 'Snapchat',      price: 1.50 },
-    { id: 'paypal',      name: 'PayPal',        price: 2.00 },
-    { id: 'kwai',        name: 'Kwai',          price: 0.80 },
-    { id: 'badoo',       name: 'Badoo',         price: 1.50 },
-    { id: 'bumble',      name: 'Bumble',        price: 1.50 }
+    { id: 'paypal',      name: 'PayPal',        price: 2.00 }
 ];
 
 // === ESTADO GLOBAL ===
-// IMPORTANTE: Em produção, cada usuário só verá SUAS sessões (isolamento por token/login)
-// O 'sessionStore' simula esse isolamento: cada entrada é vinculada a um sessionId único
-let sessionStore = {}; // { sessionId: { service, number, status, code } }
-let modemsDisponiveis = 10;
+let activeSessions = {}; // { activation_id: { ...data } }
+let chipsDisponiveis = 0;
 
 const servicesGrid = document.getElementById('services-grid');
 const activeNumbers = document.getElementById('active-numbers');
-const searchInput = document.getElementById('service-search');
+const searchInput   = document.getElementById('service-search');
 
 // === INICIALIZAÇÃO ===
-function init() {
+async function init() {
+    if (!supabase) {
+        console.warn('Supabase não configurado. Rodando em modo simulação.');
+        renderServices(SERVICES);
+        return;
+    }
+
+    // 1. Verifica Sessão
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        updateUIForUser();
+        loadActiveSessions();
+        setupRealtime();
+    } else {
+        // Redireciona para login ou mostra modal (em um app real)
+        console.log('Usuário deslogado. Mostrando serviços padrão.');
+    }
+
+    // 2. Carrega disponibilidade de chips
+    loadChipsCount();
+
+    // 3. Renderiza
     renderServices(SERVICES);
     document.getElementById('services-count').innerText = `${SERVICES.length} Serviços`;
     
+    // 4. Listeners
     searchInput.addEventListener('input', () => {
         const q = searchInput.value.toLowerCase();
         const filtered = SERVICES.filter(s => s.name.toLowerCase().includes(q));
         renderServices(filtered);
     });
+
+    // 5. Verifica evento de login bem-sucedido
+    supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN') {
+            currentUser = session.user;
+            document.getElementById('authModal').style.display = 'none';
+            updateUIForUser();
+            loadActiveSessions();
+            setupRealtime();
+        } else if (event === 'SIGNED_OUT') {
+            window.location.reload();
+        }
+    });
+}
+
+// === AUTHENTICATION ===
+async function handleAuth(type) {
+    if (type === 'login') {
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) alert('Erro no login: ' + error.message);
+    } else {
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        const name = document.getElementById('reg-name').value;
+        const { error } = await supabase.auth.signUp({ 
+            email, 
+            password,
+            options: { data: { full_name: name } }
+        });
+        if (error) alert('Erro no cadastro: ' + error.message);
+        else alert('Verifique seu e-mail para confirmar o cadastro!');
+    }
+}
+
+async function logout() {
+    await supabase.auth.signOut();
+}
+
+// === PIX RECHARGE ===
+async function gerarPix() {
+    const amount = parseFloat(document.getElementById('valorRecarga').value);
+    if (!amount || amount < 5) { alert('Valor mínimo: R$ 5,00'); return; }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    try {
+        const res = await fetch(`${window.location.origin}/webhook/criar-pix`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ amount })
+        });
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+
+        // Exibe QR Code (Base64 vindo do backend)
+        const qrContent = document.getElementById('qrCodeContainer');
+        qrContent.innerHTML = `<img src="data:image/png;base64,${data.qr_code_b64}" style="width: 200px;">`;
+        document.getElementById('pixArea').style.display = 'block';
+
+    } catch (err) {
+        alert('Erro ao gerar Pix: ' + err.message);
+    }
+}
+
+async function loadChipsCount() {
+    const { count } = await supabase.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
+    chipsDisponiveis = count || 0;
+    renderServices(SERVICES);
+}
+
+async function updateUIForUser() {
+    if (!currentUser) return;
+
+    // Atualiza saldo real do profiles
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (profile) {
+        document.getElementById('user-balance').innerText = `R$ ${profile.balance.toFixed(2)}`;
+        
+        // Se for admin, mostra link do painel no menu (mock por enquanto, o ideal é injetar no DOM)
+        if (profile.is_admin && !document.getElementById('btn-admin-link')) {
+             const sidebar = document.querySelector('.sb-menu');
+             const adminLink = document.createElement('a');
+             adminLink.id = 'btn-admin-link';
+             adminLink.href = 'admin.html';
+             adminLink.className = 'menu-item';
+             adminLink.style.color = '#D4AF37';
+             adminLink.innerHTML = `<span class="icon">⚙️</span> Painel Admin`;
+             sidebar.appendChild(adminLink);
+        }
+    }
 }
 
 function renderServices(list) {
-    const sem_estoque = modemsDisponiveis <= 0;
+    const sem_estoque = chipsDisponiveis <= 0;
     servicesGrid.innerHTML = list.map(s => `
         <div class="service-row">
             <div class="name">${s.name}</div>
@@ -71,7 +182,7 @@ function renderServices(list) {
             <div class="action">
                 <button class="btn-buy" 
                         onclick="requestNumber('${s.id}', '${s.name}', ${s.price})"
-                        ${sem_estoque ? 'disabled title="Sem números disponíveis no momento"' : ''}>
+                        ${sem_estoque ? 'disabled' : ''}>
                     ${sem_estoque ? 'SEM ESTOQUE' : 'SOLICITAR'}
                 </button>
             </div>
@@ -79,118 +190,146 @@ function renderServices(list) {
     `).join('');
 }
 
-// === SOLICITAR NÚMERO ===
-// TRAVA DE ISOLAMENTO: Cada clique gera um sessionId único.
-// O usuário X que comprou WhatsApp só verá o código do WhatsApp.
-// O usuário Y que comprou Telegram só verá o código do Telegram.
-// Os códigos NUNCA se cruzam porque são filtrados por sessionId.
-function requestNumber(serviceId, serviceName, price) {
-    if(modemsDisponiveis <= 0) return;
+// === SOLICITAR NÚMERO (REAL) ===
+async function requestNumber(serviceId, serviceName, defaultPrice) {
+    if (!currentUser) {
+        alert('Faça login para solicitar números.');
+        return;
+    }
 
-    modemsDisponiveis--;
-    renderServices(SERVICES);
+    // Chama a RPC V2 (que lida com preços customizados e saldos)
+    const { data, error } = await supabase.rpc('rpc_solicitar_sms_v2', {
+        p_user_id:       currentUser.id,
+        p_service:       serviceId,
+        p_service_name:  serviceName,
+        p_default_price: defaultPrice
+    });
 
-    // Gera um ID único para esta transação (em produção, vem do backend)
-    const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-    const fakeNumber = '+55 47 9' + Math.floor(10000000 + Math.random() * 89999999);
+    if (error) {
+        alert('Erro ao solicitar: ' + (error.message || 'Sem conexão'));
+        return;
+    }
 
-    // Registra a sessão no store local (isolamento)
-    sessionStore[sessionId] = {
-        serviceId,
-        serviceName,
-        price,
-        number: fakeNumber,
-        status: 'aguardando',
-        code: null
-    };
+    if (!data.ok) {
+        alert('Falha: ' + data.error);
+        return;
+    }
 
-    if(activeNumbers.querySelector('.empty-state')) activeNumbers.innerHTML = '';
+    const activationId = data.activation_id;
+    const number       = data.numero;
+    const finalPrice   = data.preco_aplicado;
+
+    // Adiciona ao DOM imediatamente com skeleton
+    renderActivationCard({
+        id: activationId,
+        phone_number: number,
+        service_name: serviceName,
+        status: 'waiting',
+        sms_code: null,
+        created_at: new Date().toISOString()
+    });
+
+    await updateUIForUser(); // Atualiza saldo subtraído
+}
+
+function renderActivationCard(act) {
+    if (document.getElementById(act.id)) return;
+
+    if (activeNumbers.querySelector('.empty-state')) activeNumbers.innerHTML = '';
 
     const sessionHTML = `
-        <div class="session-card" id="${sessionId}">
+        <div class="session-card" id="${act.id}">
             <div class="session-info">
-                <span class="number">${fakeNumber}</span>
-                <span class="status" id="status-${sessionId}">Aguardando SMS...</span>
+                <span class="number">${act.phone_number}</span>
+                <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando SMS...'}</span>
             </div>
-            <div style="font-size: 10px; color: #666; margin-bottom: 12px;">${serviceName}</div>
-            <div class="sms-code-display" id="code-${sessionId}">------</div>
-            <div class="session-actions" id="actions-${sessionId}">
-                <button class="btn-cancel" disabled id="cancel-${sessionId}">CANCELAR (120s)</button>
+            <div style="font-size: 10px; color: #666; margin-bottom: 12px;">${act.service_name}</div>
+            <div class="sms-code-display" id="code-${act.id}">${act.sms_code || '------'}</div>
+            <div class="session-actions" id="actions-${act.id}">
+                ${act.status === 'waiting' ? 
+                    `<button class="btn-cancel" onclick="cancelActivation('${act.id}')" id="cancel-${act.id}">CANCELAR</button>` 
+                    : `<div style="color: #D4AF37; font-size: 10px; font-weight: 800; text-align: center;">✓ CONCLUÍDO</div>`
+                }
             </div>
-            <div class="countdown-timer" id="timer-${sessionId}">Cancelamento liberado em 2 minutos.</div>
         </div>
     `;
 
     activeNumbers.insertAdjacentHTML('afterbegin', sessionHTML);
-    startSessionLogic(sessionId);
 }
 
-// === LÓGICA DE CRONÔMETRO E TRAVA ===
-function startSessionLogic(sessionId) {
-    let timeLeft = 120;
-    const cancelBtn = document.getElementById(`cancel-${sessionId}`);
-    const timerEl = document.getElementById(`timer-${sessionId}`);
+async function cancelActivation(id) {
+    const { data, error } = await supabase.rpc('rpc_cancelar_ativacao', {
+        p_user_id: currentUser.id,
+        p_activation_id: id
+    });
 
-    const countdown = setInterval(() => {
-        timeLeft--;
-        if(timeLeft > 0) {
-            cancelBtn.innerText = `CANCELAR (${timeLeft}s)`;
-        } else {
-            clearInterval(countdown);
-            // Só libera cancelamento se o código AINDA não chegou
-            if(sessionStore[sessionId] && sessionStore[sessionId].status !== 'concluido') {
-                cancelBtn.disabled = false;
-                cancelBtn.innerText = "CANCELAR E PEDIR REEMBOLSO";
-                timerEl.innerText = "Código não chegou? Cancele agora.";
+    if (error) {
+        alert('Erro ao cancelar: ' + error.message);
+    } else if (!data.ok) {
+        alert('Não foi possível cancelar: ' + data.error);
+    } else {
+        document.getElementById(id).remove();
+        updateUIForUser(); // Saldo devolvido
+    }
+}
+
+// === REALTIME & SYNC ===
+
+async function loadActiveSessions() {
+    const { data: acts } = await supabase
+        .from('activations')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .in('status', ['waiting', 'received'])
+        .order('created_at', { ascending: false });
+
+    if (acts && acts.length > 0) {
+        activeNumbers.innerHTML = '';
+        acts.forEach(renderActivationCard);
+    }
+}
+
+function setupRealtime() {
+    // 1. Escuta atualizações de SMS Recebido
+    supabase.channel('my-activations')
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'activations',
+            filter: `user_id=eq.${currentUser.id}` 
+        }, payload => {
+            const act = payload.new;
+            if (act.status === 'received' && act.sms_code) {
+                updateCardWithSMS(act.id, act.sms_code);
+            } else if (act.status === 'cancelled' || act.status === 'expired') {
+                document.getElementById(act.id)?.remove();
             }
-        }
-    }, 1000);
+        })
+        .subscribe();
 
-    // SIMULAÇÃO: SMS chega entre 15 e 45 segundos
-    const arrivalTime = (Math.floor(Math.random() * 30) + 15) * 1000;
-    setTimeout(() => {
-        if(document.getElementById(sessionId) && sessionStore[sessionId]) {
-            const fakeCode = Math.floor(100000 + Math.random() * 900000).toString();
-            deliverSMS(sessionId, fakeCode, countdown);
-        }
-    }, arrivalTime);
+    // 2. Escuta mudanças de saldo (Admin ou Recarga)
+    supabase.channel('my-profile')
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles',
+            filter: `id=eq.${currentUser.id}` 
+        }, updateUIForUser)
+        .subscribe();
 }
 
-// === ENTREGA DO SMS (TRAVA TOTAL DE REEMBOLSO) ===
-// ISOLAMENTO GARANTIDO: o código é gravado APENAS no elemento com o sessionId específico.
-// Nenhum outro usuário/sessão tem acesso a este elemento.
-function deliverSMS(sessionId, code, countdownTimer) {
-    if(!sessionStore[sessionId]) return;
+function updateCardWithSMS(id, code) {
+    const codeDisplay = document.getElementById(`code-${id}`);
+    const statusEl = document.getElementById(`status-${id}`);
+    const actionsArea = document.getElementById(`actions-${id}`);
 
-    clearInterval(countdownTimer);
-
-    // Marca como concluído no store (impede cancelamento pós-entrega)
-    sessionStore[sessionId].status = 'concluido';
-    sessionStore[sessionId].code = code;
-
-    const codeDisplay = document.getElementById(`code-${sessionId}`);
-    const actionsArea = document.getElementById(`actions-${sessionId}`);
-    const statusEl = document.getElementById(`status-${sessionId}`);
-    const card = document.getElementById(sessionId);
-    const timerEl = document.getElementById(`timer-${sessionId}`);
-
-    // Exibe o código APENAS nesta sessão
-    codeDisplay.innerText = code;
-    codeDisplay.style.color = '#D4AF37';
-    card.style.borderColor = '#D4AF37';
-    statusEl.innerText = 'FINALIZADO';
-    statusEl.style.color = '#D4AF37';
-
-    // REMOVE BOTÕES DE CANCELAR E REEMBOLSO (TRAVA TOTAL conforme os vídeos)
-    actionsArea.innerHTML = `
-        <div style="color: #D4AF37; font-size: 10px; font-weight: 800; text-align: center; border: 1px solid #D4AF3355; padding: 8px; width: 100%; border-radius: 4px;">
-            ✓ SMS RECEBIDO — TRANSAÇÃO CONCLUÍDA
-        </div>`;
-    if(timerEl) timerEl.remove();
-
-    // Libera um slot de modem de volta
-    modemsDisponiveis++;
-    renderServices(SERVICES);
+    if (codeDisplay) {
+        codeDisplay.innerText = code;
+        codeDisplay.style.color = '#D4AF37';
+        statusEl.innerText = 'RECEBIDO';
+        statusEl.style.color = '#D4AF37';
+        actionsArea.innerHTML = `<div style="color: #D4AF37; font-size: 10px; font-weight: 800; text-align: center;">✓ SMS RECEBIDO</div>`;
+    }
 }
 
 init();
