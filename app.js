@@ -4,8 +4,8 @@
 
 // === SUPABASE CLIENT ===
 // Em produção: __SUPABASE_URL__ e __SUPABASE_ANON_KEY__ são substituídos pelo GitHub Actions
-const SUPABASE_URL  = '__SUPABASE_URL__';
-const SUPABASE_ANON = '__SUPABASE_ANON_KEY__';
+const SUPABASE_URL  = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
 
 let supabase = null;
 let currentUser = null;
