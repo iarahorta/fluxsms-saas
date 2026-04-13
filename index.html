@@ -3,203 +3,276 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FluxSMS | Elite Virtual Numbers</title>
-    <meta name="description" content="FluxSMS - Receba códigos SMS de verificação com chips físicos reais. Alta taxa de aprovação para WhatsApp, Telegram, Google e mais.">
+    <title>FluxSMS | Números Virtuais de Elite</title>
+    <meta name="description" content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="assets/icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
-    <!-- Overlay para fechar sidebar no mobile -->
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-    <div class="app-wrapper">
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-top">
+    <!-- LANDING PAGE VIEW -->
+    <div id="landing-view">
+        <header class="lp-header">
+            <div class="container lp-container-flex">
                 <div class="logo-area">
-                    <img src="assets/logo.png" alt="FluxSMS" class="logo-img" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
-                    <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></span>
+                    <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
                 </div>
-                <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+                <nav class="lp-nav">
+                    <a href="#vantagens">Vantagens</a>
+                    <a href="#como-funciona">Como Funciona</a>
+                    <a href="#servicos">Diferenciais</a>
+                    <button class="btn-auth-nav" onclick="abrirAuth()">ACESSAR PAINEL</button>
+                </nav>
             </div>
+        </header>
 
-            <!-- Saldo no mobile (dentro da sidebar) -->
-            <div class="balance-mobile">
-                <div class="balance-label">SALDO DISPONÍVEL</div>
-                <div class="balance-value" id="balance-display-mobile">R$ 150,00</div>
-                <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
-            </div>
-
-            <nav class="main-nav">
-                <a href="#" class="nav-item active"><span class="icon">⚡</span> Dashboard</a>
-                <a href="#" class="nav-item"><span class="icon">💼</span> Meus Números</a>
-                <div class="nav-separator"></div>
-                <a href="#" class="nav-item" onclick="abrirRecarga()"><span class="icon">💰</span> Recarregar Saldo</a>
-                <a href="#" class="nav-item"><span class="icon">📊</span> Histórico</a>
-                <a href="#" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="badge-premium">
-                    ◆ 100% PRIVATE SIMCARD INFRASTRUCTURE
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Header -->
-            <header class="top-header">
-                <!-- Hamburger (mobile) + Search -->
-                <div class="header-left">
-                    <button class="hamburger" onclick="toggleSidebar()">☰</button>
-                    <div class="search-bar">
-                        <span class="search-icon">🔍</span>
-                        <input type="text" placeholder="Buscar serviço..." id="service-search">
+        <section class="hero">
+            <div class="container hero-grid">
+                <div class="hero-text">
+                    <div class="tag-premium">◆ INFRAESTRUTURA DE ELITE</div>
+                    <h1>O Padrão Ouro para Ativações via <span class="text-gold">Chips Reais</span></h1>
+                    <p>Utilizamos apenas chips físicos brasileiros genuínos. Garanta a maior taxa de aprovação para WhatsApp, Telegram, Google e centenas de outros serviços.</p>
+                    <div class="hero-actions">
+                        <button class="btn-primary-lp" onclick="abrirAuth()">COMEÇAR AGORA</button>
+                        <button class="btn-secondary-lp" onclick="document.getElementById('vantagens').scrollIntoView({behavior:'smooth'})">CONHECER VANTAGENS</button>
                     </div>
                 </div>
+                <div class="hero-image">
+                    <img src="assets/hero_luxury.png" alt="FluxSMS Luxury SIM" id="hero-img-main">
+                </div>
+            </div>
+        </section>
 
-                <!-- User Controls (desktop) -->
-                <div class="user-controls">
-                    <!-- Botão Recarregar (incentivo rápido) -->
-                    <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
+        <section id="vantagens" class="lp-features">
+            <div class="container">
+                <div class="lp-section-header">
+                    <h2>POR QUE A FLUXSMS É DIFERENTE?</h2>
+                    <p>Não somos apenas números virtuais. Somos uma infraestrutura física dedicada.</p>
+                </div>
+                <div class="lp-features-grid">
+                    <div class="lp-feature-card">
+                        <div class="lp-f-icon">🇧🇷</div>
+                        <h3>Chips 100% Brasileiros</h3>
+                        <p>Diferente de sistemas estrangeiros, usamos operadoras nacionais (Vivo, Tim, Claro) para evitar banimentos.</p>
+                    </div>
+                    <div class="lp-feature-card">
+                        <div class="lp-f-icon">⚡</div>
+                        <h3>Entrega Instantânea</h3>
+                        <p>Nosso sistema de modems processa seu código em segundos. Receba direto no painel sem esperas.</p>
+                    </div>
+                    <div class="lp-feature-card">
+                        <div class="lp-f-icon">🛡️</div>
+                        <h3>Privacidade de Elite</h3>
+                        <p>Zero logs. Após a ativação bem-sucedida, seus dados são protegidos e o número descartado com segurança.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-                    <!-- Saldo + Avatar agrupados -->
-                    <div class="user-profile">
-                        <div class="balance-inline">
-                            <span class="balance-label-sm">SALDO</span>
-                            <span class="balance-value-sm" id="balance-display">R$ 150,00</span>
+        <section id="como-funciona" class="lp-steps">
+            <div class="container">
+                <div class="lp-steps-grid">
+                    <div class="lp-step-item">
+                        <span class="step-num">01</span>
+                        <h4>Faça uma recarga</h4>
+                        <p>Adicione saldo via Pix a partir de R$ 5,00 de maneira automática.</p>
+                    </div>
+                    <div class="lp-step-item">
+                        <span class="step-num">02</span>
+                        <h4>Escolha o serviço</h4>
+                        <p>Selecione o aplicativo que deseja ativar da nossa lista completa.</p>
+                    </div>
+                    <div class="lp-step-item">
+                        <span class="step-num">03</span>
+                        <h4>Receba o código</h4>
+                        <p>O SMS chegará instantaneamente no seu painel de controle.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="lp-cta-bottom">
+            <div class="container">
+                <div class="cta-box">
+                    <h2>Pronto para elevar suas ativações?</h2>
+                    <p>Crie sua conta gratuita agora e tenha acesso imediato à maior rede de chips reais do Brasil.</p>
+                    <button class="btn-primary-lp" onclick="abrirAuth()">CADASTRAR GRATUITAMENTE</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="lp-footer">
+            <div class="container">
+                <div class="footer-grid">
+                    <div class="footer-brand">
+                        <div class="logo-area">
+                            <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
                         </div>
-                        <div class="user-avatar" title="Minha Conta">
-                            <span class="avatar-letters">AF</span>
-                        </div>
+                        <p>O padrão ouro em ativações via SMS. Tecnologia russa, alma brasileira.</p>
+                    </div>
+                    <div class="footer-copy">
+                        © 2026 FluxSMS. Todos os direitos reservados.
                     </div>
                 </div>
-            </header>
-
-            <!-- Content Grid -->
-            <section class="content-grid">
-                <!-- Services Panel -->
-                <div class="services-container">
-                    <div class="section-header">
-                        <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
-                        <span class="count-badge" id="services-count">Carregando...</span>
-                    </div>
-
-                    <div class="services-header-row">
-                        <span>SERVIÇO</span>
-                        <span>PREÇO</span>
-                        <span>AÇÃO</span>
-                    </div>
-                    <div class="services-list" id="services-grid"></div>
-                </div>
-
-                <!-- Active Sessions Panel -->
-                <div class="active-sessions">
-                    <h2 class="section-title">NÚMEROS ATIVOS</h2>
-                    <div class="sessions-list" id="active-numbers">
-                        <div class="empty-state">Nenhum número solicitado no momento.</div>
-                    </div>
-                </div>
-            </section>
-        </main>
+            </div>
+        </footer>
     </div>
 
-    <!-- Modal Recarga -->
-    <div class="modal-overlay" id="modalRecarga" style="display:none;">
+    <!-- DASHBOARD VIEW (Visible after login) -->
+    <div id="dashboard-view" style="display:none;">
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        <div class="app-wrapper">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-top">
+                    <div class="logo-area">
+                        <img src="assets/logo.png" alt="FluxSMS" class="logo-img" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                        <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></span>
+                    </div>
+                    <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+                </div>
+                <div class="balance-mobile">
+                    <div class="balance-label">SALDO DISPONÍVEL</div>
+                    <div class="balance-value" id="balance-display-mobile">R$ 0,00</div>
+                    <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
+                </div>
+                <nav class="main-nav">
+                    <a href="#" class="nav-item active"><span class="icon">⚡</span> Dashboard</a>
+                    <a href="#" class="nav-item"><span class="icon">💼</span> Meus Números</a>
+                    <div class="nav-separator"></div>
+                    <a href="#" class="nav-item" onclick="abrirRecarga()"><span class="icon">💰</span> Recarregar Saldo</a>
+                    <a href="#" class="nav-item"><span class="icon">📊</span> Histórico</a>
+                    <a href="#" class="nav-item" onclick="handleLogout()"><span class="icon">🚪</span> Sair</a>
+                </nav>
+                <div class="sidebar-footer">
+                    <div class="badge-premium">◆ 100% PRIVATE SIMCARD INFRASTRUCTURE</div>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <header class="top-header">
+                    <div class="header-left">
+                        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+                        <div class="search-bar">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" placeholder="Buscar serviço..." id="service-search">
+                        </div>
+                    </div>
+                    <div class="user-controls">
+                        <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
+                        <div class="user-profile">
+                            <div class="balance-inline">
+                                <span class="balance-label-sm">SALDO</span>
+                                <span class="balance-value-sm" id="balance-display">R$ 0,00</span>
+                            </div>
+                            <div class="user-avatar" title="Minha Conta">
+                                <span class="avatar-letters" id="user-initials">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <section class="content-grid">
+                    <div class="services-container">
+                        <div class="section-header">
+                            <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
+                            <span class="count-badge" id="services-count">Carregando...</span>
+                        </div>
+                        <div class="services-header-row">
+                            <span>SERVIÇO</span>
+                            <span>PREÇO</span>
+                            <span>AÇÃO</span>
+                        </div>
+                        <div class="services-list" id="services-grid"></div>
+                    </div>
+                    <div class="active-sessions">
+                        <h2 class="section-title">NÚMEROS ATIVOS</h2>
+                        <div class="sessions-list" id="active-numbers">
+                            <div class="empty-state">Nenhum número solicitado no momento.</div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modalRecarga" class="modal-overlay" style="display:none;">
         <div class="modal-box">
             <div class="modal-header">
                 <span>RECARREGAR SALDO</span>
                 <button onclick="fecharRecarga()">✕</button>
             </div>
-    <!-- MODAL RECARGA PIX -->
-    <div id="modalRecarga" class="modal">
-        <div class="modal-content">
-            <h2 class="section-title">RECARREGAR SALDO</h2>
-            <div class="input-group">
-                <label>Valor da recarga (R$)</label>
-                <input type="number" id="valorRecarga" placeholder="Mínimo R$ 5,00" min="5" step="1">
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>Valor da recarga (R$)</label>
+                    <input type="number" id="valorRecarga" class="custom-value" placeholder="Mínimo R$ 5,00" min="5">
+                </div>
+                <button class="btn-pix" onclick="gerarPix()">GERAR QR CODE PIX</button>
+                <div id="pixArea" style="display:none; margin-top:20px; text-align:center;">
+                    <div id="qrCodeContainer" style="background:white; padding:10px; border-radius:10px; display:inline-block; margin-bottom:10px;"></div>
+                    <p style="font-size: 11px; color: #888;">Pague para o saldo subir na hora.</p>
+                </div>
             </div>
-            <button class="btn-buy" style="margin-top: 15px; width: 100%;" onclick="gerarPix()">GERAR QR CODE PIX</button>
-            
-            <div id="pixArea" style="display:none; margin-top:20px; text-align:center;">
-                <p style="font-size: 10px; color: #888; margin-bottom: 10px;">Pague via PIX para crédito instantâneo:</p>
-                <div id="qrCodeContainer" style="background:white; padding:10px; border-radius:10px; display:inline-block;"></div>
-            </div>
-            
-            <button class="btn-cancel" style="margin-top: 15px; border: none; background: transparent; color: #888;" onclick="fecharRecarga()">CANCELAR</button>
         </div>
     </div>
 
-    <!-- MODAL AUTH -->
-    <div id="authModal" class="modal" style="display: flex;">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="logo-area" style="justify-content: center; margin-bottom: 30px;">
-                <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="logo-area" style="font-size: 18px;">
+                    <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
+                </div>
+                <button onclick="fecharAuth()">✕</button>
             </div>
-            
-            <div id="loginForm">
-                <h2 class="section-title" style="text-align: center; font-size: 1.2rem; margin-bottom: 25px;">ACESSO À PLATAFORMA</h2>
-                <div class="input-group">
-                    <label>E-mail</label>
-                    <input type="email" id="auth-email" placeholder="seu@email.com">
+            <div class="modal-body">
+                <div id="loginForm">
+                    <h2 class="section-title" style="text-align:center; margin-bottom:20px;">ACESSO À PLATAFORMA</h2>
+                    <div class="input-group">
+                        <label>E-mail</label>
+                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Senha</label>
+                        <input type="password" id="auth-password" class="custom-value" placeholder="••••••••">
+                    </div>
+                    <button class="btn-pix" onclick="handleAuth('login')">ENTRAR</button>
+                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Novo aqui? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Criar conta</a></p>
                 </div>
-                <div class="input-group">
-                    <label>Senha</label>
-                    <input type="password" id="auth-password" placeholder="••••••••">
+                <div id="signupForm" style="display:none;">
+                    <h2 class="section-title" style="text-align:center; margin-bottom:20px;">CRIAR CONTA ELITE</h2>
+                    <div class="input-group">
+                        <label>Nome Completo</label>
+                        <input type="text" id="reg-name" class="custom-value" placeholder="Nome Sobrenome">
+                    </div>
+                    <div class="input-group">
+                        <label>E-mail</label>
+                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Senha</label>
+                        <input type="password" id="reg-password" class="custom-value" placeholder="Mínimo 6 dígitos">
+                    </div>
+                    <button class="btn-pix" onclick="handleAuth('signup')">CADASTRAR GRATUITAMENTE</button>
+                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Já tem conta? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Entrar</a></p>
                 </div>
-                <button class="btn-buy" style="margin-top: 10px; width: 100%;" onclick="handleAuth('login')">ENTRAR</button>
-                <p style="text-align: center; font-size: 0.8rem; margin-top: 20px; color: #666;">
-                    Não tem conta? <a href="javascript:toggleAuthView()" style="color: var(--gold); text-decoration: none;">Cadastre-se</a>
-                </p>
-            </div>
-
-            <div id="signupForm" style="display: none;">
-                <h2 class="section-title" style="text-align: center; font-size: 1.2rem; margin-bottom: 25px;">CRIAR CONTA ELITE</h2>
-                <div class="input-group">
-                    <label>Nome Completo</label>
-                    <input type="text" id="reg-name" placeholder="Nome Sobrenome">
-                </div>
-                <div class="input-group">
-                    <label>E-mail</label>
-                    <input type="email" id="reg-email" placeholder="seu@email.com">
-                </div>
-                <div class="input-group">
-                    <label>Senha</label>
-                    <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres">
-                </div>
-                <button class="btn-buy" style="margin-top: 10px; width: 100%;" onclick="handleAuth('signup')">CADASTRAR GRATUITAMENTE</button>
-                <p style="text-align: center; font-size: 0.8rem; margin-top: 20px; color: #666;">
-                    Já tem conta? <a href="javascript:toggleAuthView()" style="color: var(--gold); text-decoration: none;">Faça Login</a>
-                </p>
             </div>
         </div>
     </div>
 
     <!-- SCRIPTS -->
+    <script src="app.js"></script>
     <script>
-        function toggleSidebar() {
-            const sb = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sb.classList.toggle('active');
-            overlay.classList.toggle('active');
-        }
-
-        function abrirRecarga() {
-            document.getElementById('modalRecarga').style.display = 'flex';
-        }
-
-        function fecharRecarga() {
-            document.getElementById('modalRecarga').style.display = 'none';
-        }
-
-            const val = document.getElementById('custom-recharge').value;
-            if(!val || val < 5) { alert('Valor mínimo: R$ 5,00'); return; }
-            alert('Integração Pix em breve! Valor: R$ ' + parseFloat(val).toFixed(2));
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
+        function abrirAuth() { document.getElementById('authModal').style.display = 'flex'; }
+        function fecharAuth() { document.getElementById('authModal').style.display = 'none'; }
+        function toggleAuthView() { 
+            const login = document.getElementById('loginForm');
+            const signup = document.getElementById('signupForm');
+            if(login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
+            else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
     </script>
 </body>

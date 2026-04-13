@@ -38,7 +38,12 @@ const SERVICES = [
 let activeSessions = {}; // { activation_id: { ...data } }
 let chipsDisponiveis = 0;
 
-const servicesGrid = document.getElementById('services-grid');
+// === ELEMENTOS DE NAVEGAÇÃO ===
+// === ELEMENTOS DE NAVEGAÇÃO ===
+const landingView   = document.getElementById('landing-view');
+const dashboardView = document.getElementById('dashboard-view');
+const authModal     = document.getElementById('authModal');
+const servicesGrid  = document.getElementById('services-grid');
 const activeNumbers = document.getElementById('active-numbers');
 const searchInput   = document.getElementById('service-search');
 
@@ -52,14 +57,13 @@ async function init() {
 
     // 1. Verifica Sessão
     const { data: { session } } = await supabase.auth.getSession();
+    toggleViews(session);
+
     if (session) {
         currentUser = session.user;
         updateUIForUser();
         loadActiveSessions();
         setupRealtime();
-    } else {
-        // Redireciona para login ou mostra modal (em um app real)
-        console.log('Usuário deslogado. Mostrando serviços padrão.');
     }
 
     // 2. Carrega disponibilidade de chips
@@ -78,16 +82,32 @@ async function init() {
 
     // 5. Verifica evento de login bem-sucedido
     supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN') {
-            currentUser = session.user;
-            document.getElementById('authModal').style.display = 'none';
-            updateUIForUser();
-            loadActiveSessions();
-            setupRealtime();
+        console.log('Auth Event:', event);
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+            currentUser = session?.user;
+            authModal.style.display = 'none';
+            toggleViews(session);
+            if (session) {
+                updateUIForUser();
+                loadActiveSessions();
+                setupRealtime();
+            }
         } else if (event === 'SIGNED_OUT') {
+            currentUser = null;
+            toggleViews(null);
             window.location.reload();
         }
     });
+}
+
+function toggleViews(session) {
+    if (session) {
+        landingView.style.display = 'none';
+        dashboardView.style.display = 'block';
+    } else {
+        landingView.style.display = 'block';
+        dashboardView.style.display = 'none';
+    }
 }
 
 // === AUTHENTICATION ===
@@ -157,18 +177,29 @@ async function updateUIForUser() {
     // Atualiza saldo real do profiles
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile) {
-        document.getElementById('user-balance').innerText = `R$ ${profile.balance.toFixed(2)}`;
+        // Atualiza saldos nos dois lugares possíveis
+        const balDesktop = document.getElementById('balance-display');
+        const balMobile = document.getElementById('balance-display-mobile');
+        const initials = document.getElementById('user-initials');
+
+        const balanceFormatted = `R$ ${profile.balance.toFixed(2)}`;
+        if (balDesktop) balDesktop.innerText = balanceFormatted;
+        if (balMobile) balMobile.innerText = balanceFormatted;
         
-        // Se for admin, mostra link do painel no menu (mock por enquanto, o ideal é injetar no DOM)
+        if (initials && profile.full_name) {
+            initials.innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+        
+        // Se for admin, mostra link do painel no menu
         if (profile.is_admin && !document.getElementById('btn-admin-link')) {
-             const sidebar = document.querySelector('.sb-menu');
+             const sidebarNav = document.querySelector('.main-nav');
              const adminLink = document.createElement('a');
              adminLink.id = 'btn-admin-link';
              adminLink.href = 'admin.html';
-             adminLink.className = 'menu-item';
-             adminLink.style.color = '#D4AF37';
+             adminLink.className = 'nav-item';
+             adminLink.style.color = 'var(--flux-gold)';
              adminLink.innerHTML = `<span class="icon">⚙️</span> Painel Admin`;
-             sidebar.appendChild(adminLink);
+             sidebarNav.insertBefore(adminLink, sidebarNav.firstChild);
         }
     }
 }
