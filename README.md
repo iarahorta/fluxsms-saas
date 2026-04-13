@@ -1,4 +1,5 @@
-# FluxSMS — Estrutura Completa
+# FluxSMS — Estrutura Completa 🚀
+![Deployment Status](https://img.shields.io/badge/Status-Online-gold?style=for-the-badge)
 
 **SaaS de recebimento de SMS com chips físicos reais**
 
