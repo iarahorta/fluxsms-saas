@@ -15,10 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject Supabase env into app.js
+      - name: Inject Supabase env into app.js and admin.js
         run: |
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" app.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" app.js
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" admin.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" admin.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

@@ -1,10 +1,8 @@
 -- ============================================================
--- FluxSMS - Script Único de Setup Completo
--- COLE ESTE ARQUIVO NO SQL EDITOR DO SUPABASE E EXECUTE
--- Supabase Dashboard > SQL Editor > New Query > Cole e Run
+-- FluxSMS - Script de Setup Completo (Admin + Robustez)
+-- VERSÃO IDEMPOTENTE: PODE SER EXECUTADO MÚLTIPLAS VEZES
 -- ============================================================
 
--- Configuração de timezone para São Paulo
 SET timezone = 'America/Sao_Paulo';
 
 -- ============================================================
@@ -16,7 +14,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- PARTE 2: TABELAS
 -- ============================================================
 
--- ─── PROFILES (vinculado ao auth.users) ──────────────────────
+-- ─── PROFILES ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.profiles (
     id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email       TEXT NOT NULL,
@@ -27,9 +25,19 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.profiles IS 'Perfis dos usuários do FluxSMS com saldo em Real (BRL)';
 
--- ─── CHIPS (Modems físicos) ───────────────────────────────────
+-- ─── CUSTOM PRICES (Novo: Preços por usuário) ───────────────
+CREATE TABLE IF NOT EXISTS public.custom_prices (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    service     TEXT NOT NULL, -- ex: 'whatsapp', 'telegram'
+    price       NUMERIC(8, 2) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, service)
+);
+COMMENT ON TABLE public.custom_prices IS 'Preços customizados para usuários específicos (revendedores)';
+
+-- ─── CHIPS (Modems GSM) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.chips (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     porta       TEXT NOT NULL UNIQUE,
@@ -39,9 +47,8 @@ CREATE TABLE IF NOT EXISTS public.chips (
     last_seen   TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.chips IS 'Modems GSM físicos disponíveis para venda de SMS';
 
--- ─── ACTIVATIONS (Solicitações de SMS — histórico de mensagens) ──
+-- ─── ACTIVATIONS (SMS) ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.activations (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -51,176 +58,170 @@ CREATE TABLE IF NOT EXISTS public.activations (
     price           NUMERIC(8, 2) NOT NULL,
     phone_number    TEXT,
     sms_code        TEXT,
-    status          TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending','waiting','received','cancelled','expired')),
+    status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','waiting','received','cancelled','expired')),
     expires_at      TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '20 minutes'),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.activations IS 'Histórico de mensagens SMS solicitadas e recebidas';
 
--- ─── TRANSACTIONS (Histórico financeiro de saldo) ─────────────
+-- ─── TRANSACTIONS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.transactions (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     activation_id   UUID REFERENCES public.activations(id),
-    type            TEXT NOT NULL CHECK (type IN ('credit','debit','refund')),
+    type            TEXT NOT NULL CHECK (type IN ('credit','debit','refund', 'admin_adj')),
     amount          NUMERIC(10, 2) NOT NULL,
     description     TEXT,
     mp_payment_id   TEXT,
     mp_status       TEXT,
+    admin_id        UUID REFERENCES auth.users(id), -- Quem fez o ajuste se for admin_adj
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.transactions IS 'Histórico financeiro: recargas Pix, compras de SMS e reembolsos';
 
 -- ============================================================
--- PARTE 3: TRIGGERS
+-- PARTE 3: TRIGGERS & FUNCTIONS (Automáticos)
 -- ============================================================
 
--- Updated_at automático
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION public.set_updated_at() RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trg_profiles_updated_at
-    BEFORE UPDATE ON public.profiles
-    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+-- Dropar triggers se existirem antes de recriar
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
+CREATE TRIGGER trg_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-CREATE OR REPLACE TRIGGER trg_activations_updated_at
-    BEFORE UPDATE ON public.activations
-    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+DROP TRIGGER IF EXISTS trg_activations_updated_at ON public.activations;
+CREATE TRIGGER trg_activations_updated_at BEFORE UPDATE ON public.activations FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Criar profile automaticamente no cadastro
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+-- Criar profile automaticamente no Auth.SignUp
+CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, email, full_name)
+    INSERT INTO public.profiles (id, email, full_name, is_admin)
     VALUES (
         NEW.id,
         NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email,'@',1))
+        COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email,'@',1)),
+        (NEW.email = 'iarachorta@gmail.com') -- Define admin automaticamente para o seu email
     );
     RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
--- PARTE 4: ROW LEVEL SECURITY (RLS)
+-- PARTE 4: ROW LEVEL SECURITY (RLS) - REVISADO
 -- ============================================================
 ALTER TABLE public.profiles     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chips        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activations  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.custom_prices ENABLE ROW LEVEL SECURITY;
 
--- Profiles: cada usuário vê apenas seus dados
-CREATE POLICY "profiles_select_own" ON public.profiles
-    FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "profiles_update_own" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-
--- Chips: todos autenticados veem (para mostrar disponibilidade)
-CREATE POLICY "chips_select_authenticated" ON public.chips
-    FOR SELECT TO authenticated USING (TRUE);
-CREATE POLICY "chips_all_service_role" ON public.chips
-    FOR ALL TO service_role USING (TRUE);
-
--- Activations: usuário vê apenas as suas
-CREATE POLICY "activations_select_own" ON public.activations
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "activations_insert_service" ON public.activations
-    FOR INSERT TO service_role WITH CHECK (TRUE);
-CREATE POLICY "activations_update_service" ON public.activations
-    FOR UPDATE TO service_role USING (TRUE);
-
--- Transactions: usuário vê apenas as suas
-CREATE POLICY "transactions_select_own" ON public.transactions
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "transactions_insert_service" ON public.transactions
-    FOR INSERT TO service_role WITH CHECK (TRUE);
-
--- ============================================================
--- PARTE 5: FUNÇÕES RPC (Controle de Saldo Seguro)
--- ============================================================
-
--- CREDITAR SALDO (Webhook MP → service_role only)
-CREATE OR REPLACE FUNCTION public.rpc_creditar_saldo(
-    p_user_id UUID, p_amount NUMERIC, p_mp_payment_id TEXT, p_mp_status TEXT
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_exists BOOLEAN;
+-- Ajuda: função para checar se é Admin do FluxSMS
+CREATE OR REPLACE FUNCTION public.is_flux_admin() RETURNS BOOLEAN AS $$
 BEGIN
-    SELECT EXISTS(SELECT 1 FROM transactions WHERE mp_payment_id = p_mp_payment_id) INTO v_exists;
-    IF v_exists THEN RETURN jsonb_build_object('ok',false,'error','ja_processado'); END IF;
-    IF p_mp_status != 'approved' THEN RETURN jsonb_build_object('ok',false,'error','nao_aprovado','status',p_mp_status); END IF;
+    RETURN (auth.jwt() ->> 'email' = 'iarachorta@gmail.com');
+END; $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- PROFILES
+DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
+CREATE POLICY "profiles_select_own" ON public.profiles FOR SELECT USING (auth.uid() = id OR is_flux_admin());
+
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
+CREATE POLICY "profiles_update_own" ON public.profiles FOR UPDATE USING (auth.uid() = id OR is_flux_admin());
+
+-- CHIPS
+DROP POLICY IF EXISTS "chips_select_authenticated" ON public.chips;
+CREATE POLICY "chips_select_authenticated" ON public.chips FOR SELECT TO authenticated USING (TRUE);
+
+DROP POLICY IF EXISTS "chips_all_admin" ON public.chips;
+CREATE POLICY "chips_all_admin" ON public.chips FOR ALL USING (is_flux_admin());
+
+-- CUSTOM PRICES
+DROP POLICY IF EXISTS "custom_prices_select_own" ON public.custom_prices;
+CREATE POLICY "custom_prices_select_own" ON public.custom_prices FOR SELECT USING (auth.uid() = user_id OR is_flux_admin());
+
+DROP POLICY IF EXISTS "custom_prices_admin" ON public.custom_prices;
+CREATE POLICY "custom_prices_admin" ON public.custom_prices FOR ALL USING (is_flux_admin());
+
+-- ============================================================
+-- PARTE 5: FUNÇÕES RPC ADMIN (Ações Seguras)
+-- ============================================================
+
+-- ADMIN: Ajustar Saldo Manual
+CREATE OR REPLACE FUNCTION public.rpc_admin_adjust_balance(
+    p_user_id UUID, p_amount NUMERIC, p_description TEXT
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    IF NOT is_flux_admin() THEN RETURN jsonb_build_object('ok',false,'error','Unauthorized'); END IF;
+    
     UPDATE profiles SET balance = balance + p_amount WHERE id = p_user_id;
-    INSERT INTO transactions (user_id,type,amount,description,mp_payment_id,mp_status)
-    VALUES (p_user_id,'credit',p_amount,'Recarga Pix',p_mp_payment_id,p_mp_status);
-    RETURN jsonb_build_object('ok',true,'creditado',p_amount);
+    INSERT INTO transactions (user_id, type, amount, description, admin_id)
+    VALUES (p_user_id, 'admin_adj', p_amount, p_description, auth.uid());
+    
+    RETURN jsonb_build_object('ok',true);
 END; $$;
 
--- SOLICITAR SMS (Anti race-condition com FOR UPDATE)
-CREATE OR REPLACE FUNCTION public.rpc_solicitar_sms(
-    p_user_id UUID, p_service TEXT, p_service_name TEXT, p_price NUMERIC
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_balance NUMERIC; v_chip RECORD; v_activation_id UUID;
+-- ADMIN: Banir/Desbanir Usuário
+CREATE OR REPLACE FUNCTION public.rpc_admin_set_user_status(
+    p_user_id UUID, p_active BOOLEAN
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
+    IF NOT is_flux_admin() THEN RETURN jsonb_build_object('ok',false,'error','Unauthorized'); END IF;
+    UPDATE profiles SET is_active = p_active WHERE id = p_user_id;
+    RETURN jsonb_build_object('ok',true);
+END; $$;
+
+-- USUÁRIO: Solicitar SMS com Preço Dinâmico (Leva em conta custom_price)
+CREATE OR REPLACE FUNCTION public.rpc_solicitar_sms_v2(
+    p_user_id UUID, p_service TEXT, p_service_name TEXT, p_default_price NUMERIC
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_balance NUMERIC; v_chip RECORD; v_activation_id UUID; v_final_price NUMERIC;
+BEGIN
+    -- 1. Determina o preço final (Custom se existir, senão o Default enviado)
+    SELECT COALESCE((SELECT price FROM custom_prices WHERE user_id = p_user_id AND service = p_service), p_default_price) 
+    INTO v_final_price;
+
+    -- 2. Verifica saldo
     SELECT balance INTO v_balance FROM profiles WHERE id = p_user_id FOR UPDATE;
-    IF v_balance < p_price THEN RETURN jsonb_build_object('ok',false,'error','saldo_insuficiente','saldo',v_balance); END IF;
+    IF v_balance < v_final_price THEN RETURN jsonb_build_object('ok',false,'error','saldo_insuficiente','saldo',v_balance); END IF;
+    
+    -- 3. Busca chip disponível
     SELECT * INTO v_chip FROM chips WHERE status='idle' LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'error','sem_chips'); END IF;
+    
+    -- 4. Processa
     UPDATE chips SET status='busy' WHERE id = v_chip.id;
-    UPDATE profiles SET balance = balance - p_price WHERE id = p_user_id;
+    UPDATE profiles SET balance = balance - v_final_price WHERE id = p_user_id;
+    
     INSERT INTO activations (user_id,chip_id,service,service_name,price,phone_number,status)
-    VALUES (p_user_id,v_chip.id,p_service,p_service_name,p_price,COALESCE(v_chip.numero,'+55 XX XXXX-XXXX'),'waiting')
+    VALUES (p_user_id, v_chip.id, p_service, p_service_name, v_final_price, COALESCE(v_chip.numero,'AGUARDANDO'), 'waiting')
     RETURNING id INTO v_activation_id;
-    INSERT INTO transactions (user_id,activation_id,type,amount,description)
-    VALUES (p_user_id,v_activation_id,'debit',p_price,'SMS: '||p_service_name);
-    RETURN jsonb_build_object('ok',true,'activation_id',v_activation_id,'numero',v_chip.numero);
-END; $$;
-
--- CANCELAR (Trava: SMS recebido = sem reembolso)
-CREATE OR REPLACE FUNCTION public.rpc_cancelar_ativacao(
-    p_user_id UUID, p_activation_id UUID
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_act RECORD;
-BEGIN
-    SELECT * INTO v_act FROM activations WHERE id=p_activation_id AND user_id=p_user_id FOR UPDATE;
-    IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'error','nao_encontrado'); END IF;
-    IF v_act.status = 'received' THEN RETURN jsonb_build_object('ok',false,'error','sms_recebido_sem_reembolso'); END IF;
-    IF v_act.status NOT IN ('pending','waiting') THEN RETURN jsonb_build_object('ok',false,'error','status_invalido'); END IF;
-    UPDATE activations SET status='cancelled' WHERE id=p_activation_id;
-    UPDATE chips SET status='idle' WHERE id=v_act.chip_id;
-    UPDATE profiles SET balance = balance + v_act.price WHERE id=p_user_id;
-    INSERT INTO transactions (user_id,activation_id,type,amount,description)
-    VALUES (p_user_id,p_activation_id,'refund',v_act.price,'Reembolso: '||v_act.service_name);
-    RETURN jsonb_build_object('ok',true,'reembolsado',v_act.price);
+    
+    INSERT INTO transactions (user_id, activation_id, type, amount, description)
+    VALUES (p_user_id, v_activation_id, 'debit', v_final_price, 'SMS: '||p_service_name);
+    
+    RETURN jsonb_build_object('ok',true, 'activation_id', v_activation_id, 'numero', v_chip.numero, 'preco_aplicado', v_final_price);
 END; $$;
 
 -- ============================================================
--- PARTE 6: PERMISSÕES
+-- PARTE 6: PERMISSÕES & REALTIME
 -- ============================================================
-GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms      TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_cancelar_ativacao  TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_creditar_saldo     TO service_role;
+GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms_v2    TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_admin_adjust_balance TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_admin_set_user_status TO authenticated;
 
--- ============================================================
--- PARTE 7: REALTIME (SMS em tempo real)
--- ============================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.activations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+-- Garantir que custom_prices e transactions também estão no Realtime para o Admin
+ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_prices;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chips;
 
 -- ============================================================
 -- VERIFICAÇÃO FINAL
 -- ============================================================
 SELECT 
-    schemaname,
-    tablename,
-    tableowner
-FROM pg_tables
-WHERE schemaname = 'public'
-  AND tablename IN ('profiles','chips','activations','transactions')
+    schemaname, tablename, 
+    (SELECT count(*) FROM pg_policies WHERE tablename = pt.tablename) as policies_count
+FROM pg_tables pt
+WHERE schemaname = 'public' AND tablename IN ('profiles','chips','activations','transactions','custom_prices')
 ORDER BY tablename;

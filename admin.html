@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS | Admin Master Control</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --dark-bg: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+            padding-bottom: 20px;
+        }
+
+        .admin-header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #fff, var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--glass);
+            border: 1px solid rgba(212, 175, 55, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--gold);
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--gold);
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        .admin-section {
+            background: var(--glass);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .admin-section h2 {
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .admin-section h2::before {
+            content: '';
+            width: 4px;
+            height: 25px;
+            background: var(--gold);
+            display: inline-block;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th {
+            text-align: left;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.02);
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-online { background: rgba(0, 255, 0, 0.1); color: #00ff00; }
+        .status-offline { background: rgba(255, 0, 0, 0.1); color: #ff0000; }
+        .status-busy { background: rgba(255, 255, 0, 0.1); color: #ffff00; }
+
+        .btn-action {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 0.8rem;
+        }
+
+        .btn-action:hover {
+            background: var(--gold);
+            color: black;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #111;
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid var(--gold);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(212,175,55,0.2);
+            padding: 12px;
+            border-radius: 10px;
+            color: white;
+            outline: none;
+        }
+
+        /* Access Denied Overlay */
+        #access-denied {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        @media (max-width: 1024px) {
+            .admin-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="access-denied">
+        <h1 style="color: var(--gold); font-size: 3rem;">ACESSO NEGADO</h1>
+        <p>Esta área é restrita apenas ao administrador mestre.</p>
+        <button onclick="window.location.href='index.html'" class="btn-action" style="margin-top: 20px;">Voltar ao Dashboard</button>
+    </div>
+
+    <div class="admin-container">
+        <header class="admin-header">
+            <div>
+                <h1>FluxSMS Admin Hub</h1>
+                <p style="color: rgba(255,255,255,0.4)">Bem-vindo mestre, gerencie seu império SMS.</p>
+            </div>
+            <div id="admin-user-info" style="text-align: right;">
+                <p id="admin-mail" style="font-weight: 700; color: var(--gold);"></p>
+                <button onclick="window.location.href='index.html'" class="btn-action" style="margin-top: 5px;">Sair do Admin</button>
+            </div>
+        </header>
+
+        <section class="admin-stats">
+            <div class="stat-card">
+                <h3>Total Usuários</h3>
+                <p id="stat-users">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Saldo Global (BRL)</h3>
+                <p id="stat-balance">R$ 0,00</p>
+            </div>
+            <div class="stat-card">
+                <h3>Chips Ativos</h3>
+                <p id="stat-chips">0/0</p>
+            </div>
+            <div class="stat-card">
+                <h3>SMS Hoje</h3>
+                <p id="stat-sms">0</p>
+            </div>
+        </section>
+
+        <div class="admin-grid">
+            <!-- Gestão de Usuários -->
+            <section class="admin-section">
+                <h2>Gestão de Usuários</h2>
+                <div style="margin-bottom: 20px;">
+                    <input type="text" id="user-search" placeholder="Buscar usuário por e-mail..." 
+                           style="width: 100%; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 10px; color: white;">
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="table-users">
+                        <thead>
+                            <tr>
+                                <th>E-mail</th>
+                                <th>Saldo</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Monitoramento de Chips -->
+            <section class="admin-section">
+                <h2>Status dos Modems</h2>
+                <div style="overflow-x: auto;">
+                    <table id="table-chips">
+                        <thead>
+                            <tr>
+                                <th>Porta</th>
+                                <th>Número</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 style="margin-top: 30px;">Ajuste Rápido de Preço</h2>
+                <p style="font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-bottom: 15px;">Defina preço customizado para um usuário.</p>
+                <form id="form-custom-price">
+                    <div class="input-group">
+                        <input type="text" id="price-user-id" placeholder="ID do Usuário (UUID)" required>
+                    </div>
+                    <div class="input-group">
+                        <select id="price-service">
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="google">Google</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">TikTok</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="price-value" step="0.01" placeholder="Novo Preço (R$)" required>
+                    </div>
+                    <button type="submit" class="btn-action" style="width: 100%;">Salvar Preço Customizado</button>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar Saldo -->
+    <div id="modal-balance" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title" style="margin-bottom: 20px;">Ajustar Saldo</h2>
+            <form id="form-balance">
+                <input type="hidden" id="balance-target-id">
+                <div class="input-group">
+                    <label>Valor (negativo para remover)</label>
+                    <input type="number" id="balance-amount" step="0.01" required>
+                </div>
+                <div class="input-group">
+                    <label>Motivo/Descrição</label>
+                    <input type="text" id="balance-note" placeholder="Ex: Brinde revendedor" required>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn-action" style="flex: 1;">Confirmar</button>
+                    <button type="button" onclick="closeModal()" class="btn-action" style="flex: 1; border-color: #ff0000; color: #ff0000;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
