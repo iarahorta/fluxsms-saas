@@ -31,6 +31,7 @@ async function init() {
     loadStats();
     loadUsers();
     loadChips();
+    loadPolos();
 
     // 4. Inicia Listeners Realtime
     setupRealtime();
@@ -180,8 +181,87 @@ function setupRealtime() {
     db.channel('admin-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, loadStats)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, loadChips)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'polos' }, loadPolos)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activations' }, loadStats)
         .subscribe();
+}
+
+// === GERENCIAMENTO DE POLOS (WORKERS) ===
+async function loadPolos() {
+    const { data: polos, error } = await db.from('polos').select('*').order('criado_em', { ascending: false });
+    if (error) {
+        console.error("Erro carregando polos:", error);
+        return;
+    }
+    
+    const tbody = document.querySelector('#table-polos tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    polos.forEach(p => {
+        const lastSeen = p.ultima_comunicacao ? new Date(p.ultima_comunicacao).toLocaleString('pt-BR') : 'Sem Conexão';
+        const isOnline = p.status === 'ONLINE';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight:bold; color: white;">${p.nome}</td>
+            <td>
+                <div style="background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 5px; font-family: monospace; display: flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:12px; color:var(--gold);">${p.chave_acesso.substring(0, 20)}...</span>
+                    <button class="btn-action" style="padding: 2px 10px; font-size: 11px;" onclick="navigator.clipboard.writeText('${p.chave_acesso}')">COPIAR</button>
+                </div>
+            </td>
+            <td style="text-align:center; font-weight: 800;">${p.chips_ativos}</td>
+            <td>
+                <span class="status-badge ${isOnline ? 'status-online' : (p.status === 'INSTALL_PENDING' ? 'status-busy' : 'status-offline')}">
+                    ${p.status === 'INSTALL_PENDING' ? 'Aguardando Instalação' : p.status}
+                </span><br>
+                <span style="font-size:10px; color: rgba(255,255,255,0.4);">Visto: ${lastSeen}</span>
+            </td>
+            <td>
+                <button class="btn-action" style="border-color: #ff4444; color: #ff4444;" onclick="deletarPolo('${p.id}')">Excluir</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function gerarChaveAleatoria() {
+    return 'FLUX_' + Math.random().toString(36).substr(2, 9).toUpperCase() + '_' + Date.now().toString(36).toUpperCase();
+}
+
+window.gerarPolo = async function() {
+    const nome = document.getElementById('polo-nome-input').value.trim();
+    if (!nome) {
+        alert("Digite um nome para o local (Ex: Casa Ju).");
+        return;
+    }
+    const btn = event.target;
+    btn.innerText = "GERANDO...";
+    
+    const chave = gerarChaveAleatoria();
+    
+    // Inserir no Supabase (Assegure que RLS policy permite insert)
+    const { data, error } = await db.from('polos').insert([
+        { nome: nome, chave_acesso: chave, status: 'INSTALL_PENDING' }
+    ]);
+    
+    btn.innerText = "+ CRIAR POLO AGORA";
+
+    if (error) {
+        alert("Erro ao criar polo no banco: " + error.message);
+    } else {
+        alert("Polo criado com sucesso! Copie a chave exibida e envie para o operador local.");
+        document.getElementById('polo-nome-input').value = '';
+        loadPolos(); // Força load caso realtime sinta atraso
+    }
+}
+
+window.deletarPolo = async function(id) {
+    if(!confirm("⚠️ AVISO CRÍTICO: Excluir este Polo vai DESCONECTAR a máquina física associada a ele. O Worker irá parar de enviar dados.\\n\\nTem certeza que deseja excluir o Polo?")) return;
+    
+    const { error } = await db.from('polos').delete().eq('id', id);
+    if(error) alert("Erro ao excluir polo: " + error.message);
+    else loadPolos();
 }
 
 init();

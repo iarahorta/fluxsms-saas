@@ -159,12 +159,16 @@ async function handleAuth(type) {
                 console.log("O usuário não logou direto. Tentando forçar signInWithPassword agora...");
                 const { error: signInError } = await db.auth.signInWithPassword({ email, password });
                 if (signInError) {
-                    alert('Sua conta foi criada no banco, mas a confirmação de e-mail pode estar ativa no Supabase. Erro ao auto-logar: ' + signInError.message);
-                } else {
-                    console.log("Auto-login sucesso!");
+                    if (signInError.message.includes('Invalid login credentials')) {
+                        alert('⚠️ Este e-mail já existe no banco e a senha informada não confere. Por favor, vá na aba ENTRAR.');
+                    } else if (signInError.message.includes('Email not confirmed')) {
+                        alert('⚠️ O seu e-mail precia ser Confirmado (Entre em contato com Iara e ela ativará na mesma hora!).');
+                    } else {
+                        alert('Erro na entrada da fila: ' + signInError.message);
+                    }
                 }
             } else {
-                console.log("Cadastro já retornou sessão ativa.");
+                console.log("Cadastro já retornou sessão ativa! As janelas fecharão sozinhas agorinha.");
             }
         }
     } catch (err) {
@@ -174,7 +178,7 @@ async function handleAuth(type) {
 }
 
 
-async function logout() {
+async function handleLogout() {
     await db.auth.signOut();
 }
 
@@ -209,8 +213,8 @@ async function gerarPix() {
 }
 
 async function loadChipsCount() {
-    const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
-    chipsDisponiveis = count || 0;
+    // const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
+    chipsDisponiveis = 99; // count || 0; (Travado em 99 para Testes Iara)
     renderServices(SERVICES);
 }
 

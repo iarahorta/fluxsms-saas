@@ -255,6 +255,34 @@
         </section>
 
         <div class="admin-grid">
+
+            <!-- Gerenciamento de Polos (Workers Físicos) -->
+            <section class="admin-section" style="grid-column: 1 / -1;">
+                <h2>Gestão de Polos (Modem Hubs Máster)</h2>
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <input type="text" id="polo-nome-input" placeholder="Nome do Local (Ex: Casa Ju)" 
+                           style="flex: 1; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 10px; color: white;">
+                    <button onclick="gerarPolo()" class="btn-action" style="white-space: nowrap; font-weight: bold;">+ CRIAR POLO AGORA</button>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table id="table-polos">
+                        <thead>
+                            <tr>
+                                <th>Nome do Polo</th>
+                                <th>Chave Mestra (Copie para a Ju/Jo)</th>
+                                <th>Chips Ativos</th>
+                                <th>Status/Último Ping</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via admin.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Gestão de Usuários -->
             <section class="admin-section">
                 <h2>Gestão de Usuários</h2>
