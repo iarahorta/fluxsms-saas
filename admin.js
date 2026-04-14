@@ -18,17 +18,6 @@ async function init() {
 
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-    // 1. Verifica Autenticação e Segurança
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user || user.email !== ADMIN_EMAIL) {
-        document.getElementById('access-denied').style.display = 'flex';
-        return;
-    }
-
-    // 2. Verifica Flag Admin no Profile (Segunda camada)
-    const { data: profile } = await supabase
-        .from('profiles')
         .select('is_admin')
         .eq('id', user.id)
         .single();
