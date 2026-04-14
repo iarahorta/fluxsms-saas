@@ -228,8 +228,14 @@ async function gerarPix() {
         pixArea.style.display = 'block';
 
     } catch (err) {
-        console.error('[PIX]', err);
-        alert('Erro ao gerar Pix: ' + err.message + '\n\nEntre em contato com o suporte ou tente em alguns minutos.');
+        console.group('[PIX ERROR DEBUG]');
+        console.error('Mensagem:', err.message);
+        console.error('Stack:', err);
+        console.groupEnd();
+        
+        const errorMsg = `❌ Erro ao gerar Pix: ${err.message}\n\n` +
+                         `DEBUG: Verifique se o Backend no Railway (${BACKEND_URL}) está online e se as chaves MP estão corretas.`;
+        alert(errorMsg);
     } finally {
         if (btnPix) { btnPix.innerText = 'Gerar QR Code'; btnPix.disabled = false; }
     }

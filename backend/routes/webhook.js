@@ -54,6 +54,8 @@ router.post('/mercadopago', async (req, res) => {
     // ─── Valida assinatura secreta do MP (anti-fraude) ────────
     if (!validarAssinaturaMP(req)) {
         console.warn('[WEBHOOK MP] Assinatura inválida — requisição rejeitada');
+        console.debug('[WEBHOOK MP] Headers:', JSON.stringify(req.headers));
+        console.debug('[WEBHOOK MP] Body:', JSON.stringify(req.body));
         return res.status(401).json({ error: 'invalid_signature' });
     }
 
@@ -93,8 +95,9 @@ router.post('/mercadopago', async (req, res) => {
         return res.status(200).json({ ok: true, result: rpcResult });
 
     } catch (err) {
-        console.error('[WEBHOOK MP] Erro:', err.message);
-        return res.status(500).json({ ok: false });
+        const detail = err.response?.data || err.message;
+        console.error('[WEBHOOK MP] Falha crítica:', detail);
+        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 
