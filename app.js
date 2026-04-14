@@ -182,11 +182,56 @@ async function handleLogout() {
     await db.auth.signOut();
 }
 
+// === PIX RECHARGE ===
+const MP_PUBLIC_KEY = 'APP_USR-8a7f3297-2140-41e3-b958-1c1e2d3ff8b9';
+const BACKEND_URL   = 'https://api.fluxsms.com.br';
+
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
-    if (!amount || amount < 5) { alert('⚠️ Valor mínimo para recarga é de R$ 5,00'); return; }
+    if (!amount || amount < 5) { alert('\u26a0\ufe0f Valor m\u00ednimo: R$ 5,00'); return; }
 
-    alert(`🪙 As recargas automáticas via Gateway estão temporariamente desabilitadas para manutenção.\n\nPara inserir R$ ${amount.toFixed(2)} na sua conta, por favor envie um Pix direto e informe o seu e-mail ao nosso Suporte (WhatsApp). Seu saldo cairá na mesma hora assim que acionarmos o seu painel!`);
+    const btnPix = document.getElementById('btn-gerar-pix');
+    if (btnPix) { btnPix.innerText = 'Gerando...'; btnPix.disabled = true; }
+
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) { alert('Fa\u00e7a login para recarregar.'); return; }
+
+        const res = await fetch(`${BACKEND_URL}/webhook/criar-pix`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ amount })
+        });
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || data.details || 'Erro desconhecido');
+
+        // Exibe QR Code e c\u00f3digo copia-e-cola
+        const pixArea = document.getElementById('pixArea');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        qrContainer.innerHTML = `
+            <div style="text-align:center">
+                <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px; border-radius:12px; border: 2px solid var(--flux-gold);" alt="QR Code Pix"><br>
+                <p style="margin:12px 0 6px; color: rgba(255,255,255,0.6); font-size:12px;">Ou copie o c\u00f3digo Pix abaixo:</p>
+                <div style="background: rgba(255,255,255,0.05); border:1px solid rgba(212,175,55,0.3); border-radius:8px; padding:10px; word-break:break-all; font-size:11px; color: #ccc;">${data.qr_code}</div>
+                <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('\u2705 C\u00f3digo copiado!'))" 
+                    style="margin-top:10px; background: var(--flux-gold); color:black; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; width:100%;">
+                    \ud83d\udccb COPIAR C\u00d3DIGO PIX
+                </button>
+                <p style="margin-top:10px; color: rgba(255,255,255,0.4); font-size:10px;">\u26a0\ufe0f O QR expira em 30 minutos. O saldo cai autom\u00e1tico ap\u00f3s a confirma\u00e7\u00e3o.</p>
+            </div>
+        `;
+        pixArea.style.display = 'block';
+
+    } catch (err) {
+        console.error('[PIX]', err);
+        alert('Erro ao gerar Pix: ' + err.message + '\n\nVerifique se o backend est\u00e1 online em api.fluxsms.com.br');
+    } finally {
+        if (btnPix) { btnPix.innerText = 'Gerar QR Code'; btnPix.disabled = false; }
+    }
 }
 
 async function loadChipsCount() {
