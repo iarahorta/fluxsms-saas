@@ -116,15 +116,14 @@
 
         <footer class="lp-footer">
             <div class="container">
-                <div class="footer-grid">
-                    <div class="footer-brand">
-                        <div class="logo-area">
-                            <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
+                        <div class="footer-links">
+                            <h4>Institucional</h4>
+                            <a href="javascript:abrirModal('modalTermos')">Termos de Uso</a>
+                            <a href="javascript:abrirModal('modalPrivacidade')">Privacidade & Casos de Uso</a>
                         </div>
-                        <p>O padrão ouro em ativações via SMS. Tecnologia russa, alma brasileira.</p>
-                    </div>
-                    <div class="footer-copy">
-                        © 2026 FluxSMS. Todos os direitos reservados.
+                        <div class="footer-copy">
+                            © 2026 FluxSMS. Todos os direitos reservados.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -273,12 +272,55 @@
         </div>
     </div>
 
+    <!-- MODAL: TERMOS DE USO -->
+    <div id="modalTermos" class="modal-overlay" style="display:none;">
+        <div class="modal-box modal-legal">
+            <div class="modal-header">
+                <span>TERMOS DE USO</span>
+                <button onclick="fecharModal('modalTermos')">✕</button>
+            </div>
+            <div class="modal-body legal-content">
+                <h3>1. Responsabilidade do Usuário</h3>
+                <p>O FluxSMS é um provedor de infraestrutura tecnológica para recebimento de SMS via hardware próprio. O usuário é o <strong>único e exclusivo responsável</strong> por toda e qualquer atividade realizada com os números fornecidos, incluindo a criação e gestão de contas em plataformas terceiras (WhatsApp, Telegram, etc).</p>
+                <p class="warning-text">É estritamente proibido o uso da plataforma para atividades ilícitas, spam, golpes, assédio ou qualquer prática que viole as leis brasileiras.</p>
+
+                <h3>2. Política de Reembolso</h3>
+                <p>Nosso compromisso é com a entrega. O saldo do usuário só será debitado se o código de verificação for entregue com sucesso no painel. Caso o código não seja recebido dentro do tempo estipulado, o valor é <strong>estornado automaticamente</strong> para o saldo da conta.</p>
+
+                <h3>3. Propriedade e Temporalidade</h3>
+                <p>Os números fornecidos são temporários e destinados exclusivamente à verificação de contas. O uso do serviço não garante a posse permanente ou a titularidade do chip físico ao usuário final.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PRIVACIDADE & CASOS DE USO -->
+    <div id="modalPrivacidade" class="modal-overlay" style="display:none;">
+        <div class="modal-box modal-legal">
+            <div class="modal-header">
+                <span>PRIVACIDADE & CASOS DE USO</span>
+                <button onclick="fecharModal('modalPrivacidade')">✕</button>
+            </div>
+            <div class="modal-body legal-content">
+                <h3>Privacidade (LGPD)</h3>
+                <p>Em conformidade com a Lei Geral de Proteção de Dados (LGPD), coletamos apenas o e-mail para fins de autenticação e o histórico de transações para suporte ao cliente. Não armazenamos o conteúdo das mensagens recebidas após o período de ativação.</p>
+
+                <h3>Casos de Uso Permitidos</h3>
+                <ul class="usage-list">
+                    <li>✓ Verificação de contas secundárias para fins profissionais e marketing.</li>
+                    <li>✓ Recuperação de acesso a plataformas digitais e redes sociais.</li>
+                    <li>✓ Testes de software e sistemas de automação que exigem validação por SMS.</li>
+                    <li>✓ Proteção de privacidade ao evitar o uso do número pessoal em sites diversos.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script src="app.js"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
-        function abrirAuth() { document.getElementById('authModal').style.display = 'flex'; }
-        function fecharAuth() { document.getElementById('authModal').style.display = 'none'; }
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function toggleAuthView() { 
             const login = document.getElementById('loginForm');
             const signup = document.getElementById('signupForm');
