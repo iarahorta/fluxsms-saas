@@ -16,20 +16,8 @@ async function init() {
         return;
     }
 
-    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-    const { data: { session } } = await db.auth.getSession();
-    
-    if (!session) {
-        window.location.href = '../index.html';
-        return;
-    }
-    
-    const user = session.user;
-    const adminMailBox = document.getElementById('admin-mail');
-    if (adminMailBox) adminMailBox.innerText = user.email;
-
-    const { data: profile } = await db.from('profiles')
         .select('is_admin')
         .eq('id', user.id)
         .single();
@@ -63,7 +51,7 @@ async function loadStats() {
     // SMS Hoje
     const today = new Date();
     today.setHours(0,0,0,0);
-    const { count: smsCount } = await db
+    const { count: smsCount } = await supabase
         .from('activations')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', today.toISOString());
