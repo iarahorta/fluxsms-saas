@@ -229,7 +229,7 @@ async function gerarPix() {
 
     } catch (err) {
         console.error('[PIX]', err);
-        alert('Erro ao gerar Pix: ' + err.message + '\n\nVerifique se o backend est\u00e1 online em api.fluxsms.com.br');
+        alert('Erro ao gerar Pix: ' + err.message + '\n\nEntre em contato com o suporte ou tente em alguns minutos.');
     } finally {
         if (btnPix) { btnPix.innerText = 'Gerar QR Code'; btnPix.disabled = false; }
     }

@@ -21,7 +21,7 @@ app.set('supabase', supabase);
 
 // ─── Middlewares de Segurança ─────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10kb' })); // Limita body size
 app.use(rateLimiter);    // Rate limiting global
 app.use(validateInput);  // Sanitização de inputs
