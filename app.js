@@ -7,12 +7,12 @@
 const SUPABASE_URL  = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
 
-let supabase = null;
+let db = null;
 let currentUser = null;
 
 // Inicializa Supabase
 if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
-    supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
+    db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
 // === LISTA DE SERVIÇOS (Tabela Padrão) ===
@@ -49,14 +49,14 @@ const searchInput   = document.getElementById('service-search');
 
 // === INICIALIZAÇÃO ===
 async function init() {
-    if (!supabase) {
+    if (!db) {
         console.warn('Supabase não configurado. Rodando em modo simulação.');
         renderServices(SERVICES);
         return;
     }
 
     // 1. Verifica Sessão
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
 
     if (session) {
@@ -81,7 +81,7 @@ async function init() {
     });
 
     // 5. Verifica evento de login bem-sucedido
-    supabase.auth.onAuthStateChange((event, session) => {
+    db.auth.onAuthStateChange((event, session) => {
         console.log('Auth Event:', event);
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
             currentUser = session?.user;
@@ -113,14 +113,14 @@ function toggleViews(session) {
 // === AUTHENTICATION ===
 async function handleAuth(type) {
     try {
-        if (!supabase) throw new Error("A conexão com o banco de dados (Supabase) não foi iniciada. Verifique sua conexão com a internet ou adblocker.");
+        if (!db) throw new Error("A conexão com o banco de dados (Supabase) não foi iniciada. Verifique sua conexão com a internet ou adblocker.");
 
         if (type === 'login') {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
             console.log("Tentando login para:", email);
             
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await db.auth.signInWithPassword({ email, password });
             
             if (error) {
                 console.error("Supabase Login Error:", error);
@@ -140,7 +140,7 @@ async function handleAuth(type) {
                 return;
             }
 
-            const { data, error } = await supabase.auth.signUp({ 
+            const { data, error } = await db.auth.signUp({ 
                 email, 
                 password,
                 options: { data: { full_name: name } }
@@ -157,7 +157,7 @@ async function handleAuth(type) {
             // Login automático imediato
             if (!data.session) {
                 console.log("O usuário não logou direto. Tentando forçar signInWithPassword agora...");
-                const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+                const { error: signInError } = await db.auth.signInWithPassword({ email, password });
                 if (signInError) {
                     alert('Sua conta foi criada no banco, mas a confirmação de e-mail pode estar ativa no Supabase. Erro ao auto-logar: ' + signInError.message);
                 } else {
@@ -175,7 +175,7 @@ async function handleAuth(type) {
 
 
 async function logout() {
-    await supabase.auth.signOut();
+    await db.auth.signOut();
 }
 
 // === PIX RECHARGE ===
@@ -183,7 +183,7 @@ async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
     if (!amount || amount < 5) { alert('Valor mínimo: R$ 5,00'); return; }
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await db.auth.getSession();
     
     try {
         const res = await fetch(`${window.location.origin}/webhook/criar-pix`, {
@@ -209,7 +209,7 @@ async function gerarPix() {
 }
 
 async function loadChipsCount() {
-    const { count } = await supabase.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
+    const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
     chipsDisponiveis = count || 0;
     renderServices(SERVICES);
 }
@@ -218,7 +218,7 @@ async function updateUIForUser() {
     if (!currentUser) return;
 
     // Atualiza saldo real do profiles
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    const { data: profile } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile) {
         // Atualiza saldos nos dois lugares possíveis
         const balDesktop = document.getElementById('balance-display');
@@ -272,7 +272,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     }
 
     // Chama a RPC V2 (que lida com preços customizados e saldos)
-    const { data, error } = await supabase.rpc('rpc_solicitar_sms_v2', {
+    const { data, error } = await db.rpc('rpc_solicitar_sms_v2', {
         p_user_id:       currentUser.id,
         p_service:       serviceId,
         p_service_name:  serviceName,
@@ -332,7 +332,7 @@ function renderActivationCard(act) {
 }
 
 async function cancelActivation(id) {
-    const { data, error } = await supabase.rpc('rpc_cancelar_ativacao', {
+    const { data, error } = await db.rpc('rpc_cancelar_ativacao', {
         p_user_id: currentUser.id,
         p_activation_id: id
     });
@@ -365,7 +365,7 @@ async function loadActiveSessions() {
 
 function setupRealtime() {
     // 1. Escuta atualizações de SMS Recebido
-    supabase.channel('my-activations')
+    db.channel('my-activations')
         .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 
@@ -382,7 +382,7 @@ function setupRealtime() {
         .subscribe();
 
     // 2. Escuta mudanças de saldo (Admin ou Recarga)
-    supabase.channel('my-profile')
+    db.channel('my-profile')
         .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 

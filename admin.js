@@ -6,7 +6,7 @@
 const SUPABASE_URL  = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
 
-let supabase = null;
+let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 
 // Inicialização
@@ -40,12 +40,12 @@ async function init() {
 
 async function loadStats() {
     // Total Usuários
-    const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+    const { count: userCount } = await db.from('profiles').select('*', { count: 'exact', head: true });
     // Saldo Global
-    const { data: balances } = await supabase.from('profiles').select('balance');
+    const { data: balances } = await db.from('profiles').select('balance');
     const totalBalance = balances.reduce((acc, curr) => acc + (curr.balance || 0), 0);
     // Chips
-    const { data: chips } = await supabase.from('chips').select('status');
+    const { data: chips } = await db.from('chips').select('status');
     const onlineChips = chips.filter(c => c.status !== 'offline').length;
     // SMS Hoje
     const today = new Date();
@@ -62,7 +62,7 @@ async function loadStats() {
 }
 
 async function loadUsers(search = '') {
-    let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    let query = db.from('profiles').select('*').order('created_at', { ascending: false });
     
     if (search) {
         query = query.ilike('email', `%${search}%`);
@@ -94,7 +94,7 @@ async function loadUsers(search = '') {
 }
 
 async function loadChips() {
-    const { data: chips } = await supabase.from('chips').select('*').order('porta');
+    const { data: chips } = await db.from('chips').select('*').order('porta');
     const tbody = document.querySelector('#table-chips tbody');
     tbody.innerHTML = '';
 
@@ -116,7 +116,7 @@ async function loadChips() {
 async function toggleUserStatus(userId, currentStatus) {
     if (!confirm(`Tem certeza que deseja ${currentStatus ? 'BANIR' : 'REATIVAR'} este usuário?`)) return;
     
-    const { data, error } = await supabase.rpc('rpc_admin_set_user_status', {
+    const { data, error } = await db.rpc('rpc_admin_set_user_status', {
         p_user_id: userId,
         p_active: !currentStatus
     });
@@ -141,7 +141,7 @@ document.getElementById('form-balance').onsubmit = async (e) => {
     const amount = parseFloat(document.getElementById('balance-amount').value);
     const desc = document.getElementById('balance-note').value;
 
-    const { data, error } = await supabase.rpc('rpc_admin_adjust_balance', {
+    const { data, error } = await db.rpc('rpc_admin_adjust_balance', {
         p_user_id: userId,
         p_amount: amount,
         p_description: desc
@@ -162,7 +162,7 @@ document.getElementById('form-custom-price').onsubmit = async (e) => {
     const service = document.getElementById('price-service').value;
     const price = parseFloat(document.getElementById('price-value').value);
 
-    const { error } = await supabase.from('custom_prices').upsert({
+    const { error } = await db.from('custom_prices').upsert({
         user_id: userId,
         service: service,
         price: price
@@ -177,7 +177,7 @@ document.getElementById('user-search').oninput = (e) => loadUsers(e.target.value
 
 // Realtime
 function setupRealtime() {
-    supabase.channel('admin-changes')
+    db.channel('admin-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, loadStats)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, loadChips)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activations' }, loadStats)
