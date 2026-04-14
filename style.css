@@ -491,7 +491,11 @@ body {
     border-radius: 4px;
     letter-spacing: 0.5px;
     transition: 0.2s;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
 }
+.btn-pix:active { transform: scale(0.98); }
 .btn-pix:hover { filter: brightness(1.1); }
 
 /* ============================
@@ -828,6 +832,16 @@ body {
     margin-bottom: 10px;
     position: relative;
     z-index: 1;
+    transition: 0.3s;
+}
+
+.lp-step-item:hover .step-num {
+    color: rgba(212, 175, 55, 0.25);
+    transform: scale(1.1);
+}
+
+.lp-step-item:hover h4 {
+    transform: translateX(10px);
 }
 
 .lp-step-item p {
