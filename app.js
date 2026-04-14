@@ -112,32 +112,67 @@ function toggleViews(session) {
 
 // === AUTHENTICATION ===
 async function handleAuth(type) {
-    if (type === 'login') {
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) alert('Erro no login: ' + error.message);
-    } else {
-        const email = document.getElementById('reg-email').value;
-        const password = document.getElementById('reg-password').value;
-        const name = document.getElementById('reg-name').value;
-        const { data, error } = await supabase.auth.signUp({ 
-            email, 
-            password,
-            options: { data: { full_name: name } }
-        });
-        if (error) {
-            alert('Erro no cadastro: ' + error.message);
+    try {
+        if (!supabase) throw new Error("A conexão com o banco de dados (Supabase) não foi iniciada. Verifique sua conexão com a internet ou adblocker.");
+
+        if (type === 'login') {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            console.log("Tentando login para:", email);
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                console.error("Supabase Login Error:", error);
+                alert('Falha no login: ' + error.message);
+            } else {
+                console.log("Login SUCESSO!");
+            }
         } else {
-            // No Supabase, se o e-mail não precisar de confirmação, o usuário já está logado.
-            // Se precisar, o session virá nulo. Forçamos uma tentativa de login imediata.
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const name = document.getElementById('reg-name').value;
+            
+            console.log("Tentando cadastro para:", email);
+            
+            if (!email || !password || !name) {
+                alert("Preencha todos os campos antes de cadastrar.");
+                return;
+            }
+
+            const { data, error } = await supabase.auth.signUp({ 
+                email, 
+                password,
+                options: { data: { full_name: name } }
+            });
+            
+            if (error) {
+                console.error("Supabase SignUp Error:", error);
+                alert('Recusado pelo sistema: ' + error.message);
+                return; // Para a execução
+            } 
+            
+            console.log("Cadastro inicial feito com sucesso:", data);
+            
+            // Login automático imediato
             if (!data.session) {
-                alert('Conta criada com sucesso! Redirecionando...');
-                await supabase.auth.signInWithPassword({ email, password });
+                console.log("O usuário não logou direto. Tentando forçar signInWithPassword agora...");
+                const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+                if (signInError) {
+                    alert('Sua conta foi criada no banco, mas a confirmação de e-mail pode estar ativa no Supabase. Erro ao auto-logar: ' + signInError.message);
+                } else {
+                    console.log("Auto-login sucesso!");
+                }
+            } else {
+                console.log("Cadastro já retornou sessão ativa.");
             }
         }
+    } catch (err) {
+        console.error("Erro crítico no handleAuth:", err);
+        alert("Erro Crítico no sistema de botões: " + err.message);
     }
 }
+
 
 async function logout() {
     await supabase.auth.signOut();
