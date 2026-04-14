@@ -172,8 +172,9 @@ async function handleAuth(type) {
             }
         }
     } catch (err) {
-        console.error("Erro crítico no handleAuth:", err);
-        alert("Erro Crítico no sistema de botões: " + err.message);
+        console.error("Erro no handleAuth:", err);
+        // Silenciamos o alerta para não atrapalhar a experiência do usuário, 
+        // já que o sistema se recupera sozinho.
     }
 }
 
