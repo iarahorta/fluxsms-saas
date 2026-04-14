@@ -109,7 +109,7 @@
                 <div class="cta-box">
                     <h2>Pronto para elevar suas ativações?</h2>
                     <p>Crie sua conta gratuita agora e tenha acesso imediato à maior rede de chips reais do Brasil.</p>
-                    <button class="lp-btn-primary" type="submit" onclick="abrirModal('authModal')">CADASTRAR</button>
+                    <button class="btn-primary-lp" type="button" onclick="abrirModal('authModal')">CADASTRAR</button>
                 </div>
             </div>
         </section>
@@ -246,7 +246,7 @@
                         <label>Senha</label>
                         <input type="password" id="auth-password" class="custom-value" placeholder="••••••••">
                     </div>
-                    <button class="btn-pix" onclick="handleAuth('login')">ENTRAR</button>
+                    <button class="btn-primary-lp" type="button" onclick="handleAuth('login')" style="width:100%; margin-top: 10px;">ENTRAR</button>
                     <p style="text-align:center; font-size: 12px; margin-top:15px;">Novo aqui? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Criar conta</a></p>
                 </div>
                 <div id="signupForm" style="display:none;">
@@ -263,7 +263,7 @@
                         <label>Senha</label>
                         <input type="password" id="reg-password" class="custom-value" placeholder="Mínimo 6 dígitos">
                     </div>
-                    <button class="btn-pix" onclick="handleAuth('signup')">CADASTRAR GRATUITAMENTE</button>
+                    <button class="btn-primary-lp" type="button" onclick="handleAuth('signup')" style="width:100%; margin-top: 10px;">CADASTRAR GRATUITAMENTE</button>
                     <p style="text-align:center; font-size: 12px; margin-top:15px;">Já tem conta? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Entrar</a></p>
                 </div>
             </div>
@@ -279,6 +279,12 @@
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function abrirAuth() { abrirModal('authModal'); }
         function fecharAuth() { fecharModal('authModal'); }
+        function toggleAuthView() { 
+            const login = document.getElementById('loginForm');
+            const signup = document.getElementById('signupForm');
+            if(login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
+            else { login.style.display = 'none'; signup.style.display = 'block'; }
+        }
     </script>
 </body>
 </html>

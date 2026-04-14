@@ -121,13 +121,21 @@ async function handleAuth(type) {
         const email = document.getElementById('reg-email').value;
         const password = document.getElementById('reg-password').value;
         const name = document.getElementById('reg-name').value;
-        const { error } = await supabase.auth.signUp({ 
+        const { data, error } = await supabase.auth.signUp({ 
             email, 
             password,
             options: { data: { full_name: name } }
         });
-        if (error) alert('Erro no cadastro: ' + error.message);
-        else alert('Verifique seu e-mail para confirmar o cadastro!');
+        if (error) {
+            alert('Erro no cadastro: ' + error.message);
+        } else {
+            // No Supabase, se o e-mail não precisar de confirmação, o usuário já está logado.
+            // Se precisar, o session virá nulo. Forçamos uma tentativa de login imediata.
+            if (!data.session) {
+                alert('Conta criada com sucesso! Redirecionando...');
+                await supabase.auth.signInWithPassword({ email, password });
+            }
+        }
     }
 }
 
