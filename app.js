@@ -184,7 +184,7 @@ async function handleLogout() {
 
 // === PIX RECHARGE ===
 const MP_PUBLIC_KEY = 'APP_USR-8a7f3297-2140-41e3-b958-1c1e2d3ff8b9';
-const BACKEND_URL   = 'https://api.fluxsms.com.br';
+const BACKEND_URL   = 'https://fluxsms-saas-production.up.railway.app';
 
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
