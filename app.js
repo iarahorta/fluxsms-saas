@@ -354,7 +354,7 @@ async function cancelActivation(id) {
 // === REALTIME & SYNC ===
 
 async function loadActiveSessions() {
-    const { data: acts } = await supabase
+    const { data: acts } = await db
         .from('activations')
         .select('*')
         .eq('user_id', currentUser.id)
@@ -367,7 +367,12 @@ async function loadActiveSessions() {
     }
 }
 
+let isRealtimeActive = false;
+
 function setupRealtime() {
+    if (isRealtimeActive) return;
+    isRealtimeActive = true;
+
     // 1. Escuta atualizações de SMS Recebido
     db.channel('my-activations')
         .on('postgres_changes', { 
