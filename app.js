@@ -182,34 +182,11 @@ async function handleLogout() {
     await db.auth.signOut();
 }
 
-// === PIX RECHARGE ===
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
-    if (!amount || amount < 5) { alert('Valor mínimo: R$ 5,00'); return; }
+    if (!amount || amount < 5) { alert('⚠️ Valor mínimo para recarga é de R$ 5,00'); return; }
 
-    const { data: { session } } = await db.auth.getSession();
-    
-    try {
-        const res = await fetch(`${window.location.origin}/webhook/criar-pix`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({ amount })
-        });
-
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error);
-
-        // Exibe QR Code (Base64 vindo do backend)
-        const qrContent = document.getElementById('qrCodeContainer');
-        qrContent.innerHTML = `<img src="data:image/png;base64,${data.qr_code_b64}" style="width: 200px;">`;
-        document.getElementById('pixArea').style.display = 'block';
-
-    } catch (err) {
-        alert('Erro ao gerar Pix: ' + err.message);
-    }
+    alert(`🪙 As recargas automáticas via Gateway estão temporariamente desabilitadas para manutenção.\n\nPara inserir R$ ${amount.toFixed(2)} na sua conta, por favor envie um Pix direto e informe o seu e-mail ao nosso Suporte (WhatsApp). Seu saldo cairá na mesma hora assim que acionarmos o seu painel!`);
 }
 
 async function loadChipsCount() {
@@ -242,7 +219,7 @@ async function updateUIForUser() {
              const sidebarNav = document.querySelector('.main-nav');
              const adminLink = document.createElement('a');
              adminLink.id = 'btn-admin-link';
-             adminLink.href = 'admin.html';
+             adminLink.href = 'admindiretoria/index.html';
              adminLink.className = 'nav-item';
              adminLink.style.color = 'var(--flux-gold)';
              adminLink.innerHTML = `<span class="icon">⚙️</span> Painel Admin`;
