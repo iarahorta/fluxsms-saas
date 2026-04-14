@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FluxSMS | Números Virtuais de Elite</title>
     <meta name="description" content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="assets/icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -23,8 +23,8 @@
                     <a href="#vantagens">Diferenciais</a>
                     <a href="#passo-a-passo">Como Funciona</a>
                     <div class="header-auth-group">
-                        <button class="btn-login-header" onclick="abrirAuth()">Entrar</button>
-                        <button class="btn-auth-nav" onclick="abrirAuth()">COMEÇAR AGORA</button>
+                        <button class="btn-login-header" onclick="abrirModal('authModal')">Entrar</button>
+                        <button class="btn-auth-nav" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
                     </div>
                 </nav>
             </div>
@@ -37,7 +37,7 @@
                     <h1>O Padrão Ouro para Ativações via <span class="text-gold">Chips Reais</span></h1>
                     <p>Utilizamos apenas chips físicos brasileiros genuínos. Garanta a maior taxa de aprovação para WhatsApp, Telegram, Google e centenas de outros serviços.</p>
                     <div class="hero-actions">
-                        <button class="btn-primary-lp" onclick="abrirAuth()">COMEÇAR AGORA</button>
+                        <button class="btn-primary-lp" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
                         <button class="btn-secondary-lp" onclick="document.getElementById('vantagens').scrollIntoView({behavior:'smooth'})">CONHECER VANTAGENS</button>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
                 <div class="cta-box">
                     <h2>Pronto para elevar suas ativações?</h2>
                     <p>Crie sua conta gratuita agora e tenha acesso imediato à maior rede de chips reais do Brasil.</p>
-                    <button class="lp-btn-primary" type="submit" onclick="abrirAuth()">CADASTRAR</button>
+                    <button class="lp-btn-primary" type="submit" onclick="abrirModal('authModal')">CADASTRAR</button>
                 </div>
             </div>
         </section>
@@ -277,12 +277,8 @@
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
-        function toggleAuthView() { 
-            const login = document.getElementById('loginForm');
-            const signup = document.getElementById('signupForm');
-            if(login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
-            else { login.style.display = 'none'; signup.style.display = 'block'; }
-        }
+        function abrirAuth() { abrirModal('authModal'); }
+        function fecharAuth() { fecharModal('authModal'); }
     </script>
 </body>
 </html>

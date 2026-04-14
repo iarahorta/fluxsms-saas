@@ -1226,3 +1226,4 @@ overflow-y: auto;
         padding-top: 120px;
     }
 }
+.lp-header { pointer-events: none !important; } .lp-header .container, .lp-header .logo-area, .lp-header .lp-nav, .lp-header .header-auth-group, .lp-header a, .lp-header button { pointer-events: auto !important; } .lp-btn-primary, .lp-btn-outline { position: relative; z-index: 1001 !important; pointer-events: auto !important; cursor: pointer !important; } #authModal, .modal-overlay { z-index: 99999 !important; pointer-events: auto !important; }
