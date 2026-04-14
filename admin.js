@@ -38,8 +38,6 @@ async function init() {
         return;
     }
 
-    document.getElementById('admin-mail').innerText = user.email;
-
     // 3. Carrega Dados Iniciais
     loadStats();
     loadUsers();
