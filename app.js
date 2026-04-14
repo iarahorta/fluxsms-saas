@@ -63,7 +63,7 @@ async function init() {
         currentUser = session.user;
         updateUIForUser();
         loadActiveSessions();
-        setupRealtime();
+        // setupRealtime já será chamado pelo onAuthStateChange abaixo
     }
 
     // 2. Carrega disponibilidade de chips
