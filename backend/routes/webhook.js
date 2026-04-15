@@ -127,6 +127,10 @@ router.post('/criar-pix', async (req, res) => {
             payment_method_id: 'pix',
             payer: { email: user.email },
             metadata: { user_id: user.id }  // CRÍTICO: Identificação no webhook
+        }, {
+            headers: {
+                'X-Idempotency-Key': crypto.randomUUID()
+            }
         });
 
         return res.status(200).json({
