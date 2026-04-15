@@ -49,7 +49,7 @@ jobs:
         working-directory: ./backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --detach
+        run: railway up --detach --service fluxsms-saas
 
   # ─── 3. APPLY SUPABASE MIGRATIONS ────────────────────────
   migrate-db:
