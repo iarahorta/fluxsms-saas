@@ -4,7 +4,7 @@
 
 // === SUPABASE CLIENT ===
 // Em produção: __SUPABASE_URL__ e __SUPABASE_ANON_KEY__ são substituídos pelo GitHub Actions
-const SUPABASE_URL  = '__SUPABASE_URL__';
+const SUPABASE_URL = '__SUPABASE_URL__';
 const SUPABASE_ANON = '__SUPABASE_ANON_KEY__';
 
 let db = null;
@@ -17,21 +17,21 @@ if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
 
 // === LISTA DE SERVIÇOS (Tabela Padrão) ===
 const SERVICES = [
-    { id: 'whatsapp',    name: 'WhatsApp',      price: 6.10 },
-    { id: 'telegram',    name: 'Telegram',      price: 4.00 },
-    { id: 'google',      name: 'Google',        price: 1.50 },
-    { id: 'uber',        name: 'Uber',          price: 1.20 },
-    { id: 'tinder',      name: 'Tinder',        price: 4.50 },
-    { id: 'gov',         name: 'GOV.BR',        price: 5.00 },
-    { id: 'ifood',       name: 'iFood',         price: 0.90 },
-    { id: 'instagram',   name: 'Instagram',     price: 2.00 },
-    { id: 'tiktok',      name: 'TikTok',        price: 1.50 },
-    { id: 'apple',       name: 'Apple ID',      price: 3.00 },
-    { id: 'shopee',      name: 'Shopee',        price: 0.80 },
-    { id: 'mercadolivre',name: 'Mercado Livre', price: 1.20 },
-    { id: 'nubank',      name: 'Nubank',        price: 2.50 },
-    { id: 'twitter',     name: 'X (Twitter)',   price: 1.00 },
-    { id: 'paypal',      name: 'PayPal',        price: 2.00 }
+    { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
+    { id: 'telegram', name: 'Telegram', price: 4.00 },
+    { id: 'google', name: 'Google', price: 1.50 },
+    { id: 'uber', name: 'Uber', price: 1.20 },
+    { id: 'tinder', name: 'Tinder', price: 4.50 },
+    { id: 'gov', name: 'GOV.BR', price: 5.00 },
+    { id: 'ifood', name: 'iFood', price: 0.90 },
+    { id: 'instagram', name: 'Instagram', price: 2.00 },
+    { id: 'tiktok', name: 'TikTok', price: 1.50 },
+    { id: 'apple', name: 'Apple ID', price: 3.00 },
+    { id: 'shopee', name: 'Shopee', price: 0.80 },
+    { id: 'mercadolivre', name: 'Mercado Livre', price: 1.20 },
+    { id: 'nubank', name: 'Nubank', price: 2.50 },
+    { id: 'twitter', name: 'X (Twitter)', price: 1.00 },
+    { id: 'paypal', name: 'PayPal', price: 2.00 }
 ];
 
 // === ESTADO GLOBAL ===
@@ -40,12 +40,12 @@ let chipsDisponiveis = 0;
 
 // === ELEMENTOS DE NAVEGAÇÃO ===
 // === ELEMENTOS DE NAVEGAÇÃO ===
-const landingView   = document.getElementById('landing-view');
+const landingView = document.getElementById('landing-view');
 const dashboardView = document.getElementById('dashboard-view');
-const authModal     = document.getElementById('authModal');
-const servicesGrid  = document.getElementById('services-grid');
+const authModal = document.getElementById('authModal');
+const servicesGrid = document.getElementById('services-grid');
 const activeNumbers = document.getElementById('active-numbers');
-const searchInput   = document.getElementById('service-search');
+const searchInput = document.getElementById('service-search');
 
 // === INICIALIZAÇÃO ===
 async function init() {
@@ -72,7 +72,7 @@ async function init() {
     // 3. Renderiza
     renderServices(SERVICES);
     document.getElementById('services-count').innerText = `${SERVICES.length} Serviços`;
-    
+
     // 4. Listeners
     searchInput.addEventListener('input', () => {
         const q = searchInput.value.toLowerCase();
@@ -119,9 +119,9 @@ async function handleAuth(type) {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
             console.log("Tentando login para:", email);
-            
+
             const { data, error } = await db.auth.signInWithPassword({ email, password });
-            
+
             if (error) {
                 console.error("Supabase Login Error:", error);
                 alert('Falha no login: ' + error.message);
@@ -132,28 +132,28 @@ async function handleAuth(type) {
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const name = document.getElementById('reg-name').value;
-            
+
             console.log("Tentando cadastro para:", email);
-            
+
             if (!email || !password || !name) {
                 alert("Preencha todos os campos antes de cadastrar.");
                 return;
             }
 
-            const { data, error } = await db.auth.signUp({ 
-                email, 
+            const { data, error } = await db.auth.signUp({
+                email,
                 password,
                 options: { data: { full_name: name } }
             });
-            
+
             if (error) {
                 console.error("Supabase SignUp Error:", error);
                 alert('Recusado pelo sistema: ' + error.message);
                 return; // Para a execução
-            } 
-            
+            }
+
             console.log("Cadastro inicial feito com sucesso:", data);
-            
+
             // Login automático imediato
             if (!data.session) {
                 console.log("O usuário não logou direto. Tentando forçar signInWithPassword agora...");
@@ -185,7 +185,7 @@ async function handleLogout() {
 
 // === PIX RECHARGE ===
 const MP_PUBLIC_KEY = 'APP_USR-8a7f3297-2140-41e3-b958-1c1e2d3ff8b9';
-const BACKEND_URL   = 'https://fluxsms-saas-production.up.railway.app';
+const BACKEND_URL = 'https://fluxsms-saas-production.up.railway.app';
 
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
@@ -232,9 +232,9 @@ async function gerarPix() {
         console.error('Mensagem:', err.message);
         console.error('Stack:', err);
         console.groupEnd();
-        
+
         const errorMsg = `❌ Erro ao gerar Pix: ${err.message}\n\n` +
-                         `DEBUG: Verifique se o Backend no Railway (${BACKEND_URL}) está online e se as chaves MP estão corretas.`;
+            `DEBUG: Verifique se o Backend no Railway (${BACKEND_URL}) está online e se as chaves MP estão corretas.`;
         alert(errorMsg);
     } finally {
         if (btnPix) { btnPix.innerText = 'Gerar QR Code'; btnPix.disabled = false; }
@@ -261,21 +261,21 @@ async function updateUIForUser() {
         const balanceFormatted = `R$ ${profile.balance.toFixed(2)}`;
         if (balDesktop) balDesktop.innerText = balanceFormatted;
         if (balMobile) balMobile.innerText = balanceFormatted;
-        
+
         if (initials && profile.full_name) {
             initials.innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         }
-        
+
         // Se for admin, mostra link do painel no menu
         if (profile.is_admin && !document.getElementById('btn-admin-link')) {
-             const sidebarNav = document.querySelector('.main-nav');
-             const adminLink = document.createElement('a');
-             adminLink.id = 'btn-admin-link';
-             adminLink.href = 'admindiretoria/index.html';
-             adminLink.className = 'nav-item';
-             adminLink.style.color = 'var(--flux-gold)';
-             adminLink.innerHTML = `<span class="icon">⚙️</span> Painel Admin`;
-             sidebarNav.insertBefore(adminLink, sidebarNav.firstChild);
+            const sidebarNav = document.querySelector('.main-nav');
+            const adminLink = document.createElement('a');
+            adminLink.id = 'btn-admin-link';
+            adminLink.href = 'admindiretoria/index.html';
+            adminLink.className = 'nav-item';
+            adminLink.style.color = 'var(--flux-gold)';
+            adminLink.innerHTML = `<span class="icon">⚙️</span> Painel Admin`;
+            sidebarNav.insertBefore(adminLink, sidebarNav.firstChild);
         }
     }
 }
@@ -306,9 +306,9 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 
     // Chama a RPC V2 (que lida com preços customizados e saldos)
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', {
-        p_user_id:       currentUser.id,
-        p_service:       serviceId,
-        p_service_name:  serviceName,
+        p_user_id: currentUser.id,
+        p_service: serviceId,
+        p_service_name: serviceName,
         p_default_price: defaultPrice
     });
 
@@ -323,8 +323,8 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     }
 
     const activationId = data.activation_id;
-    const number       = data.numero;
-    const finalPrice   = data.preco_aplicado;
+    const number = data.numero;
+    const finalPrice = data.preco_aplicado;
 
     // Adiciona ao DOM imediatamente com skeleton
     renderActivationCard({
@@ -353,10 +353,10 @@ function renderActivationCard(act) {
             <div style="font-size: 10px; color: #666; margin-bottom: 12px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${act.sms_code || '------'}</div>
             <div class="session-actions" id="actions-${act.id}">
-                ${act.status === 'waiting' ? 
-                    `<button class="btn-cancel" onclick="cancelActivation('${act.id}')" id="cancel-${act.id}">CANCELAR</button>` 
-                    : `<div style="color: #D4AF37; font-size: 10px; font-weight: 800; text-align: center;">✓ CONCLUÍDO</div>`
-                }
+                ${act.status === 'waiting' ?
+            `<button class="btn-cancel" onclick="cancelActivation('${act.id}')" id="cancel-${act.id}">CANCELAR</button>`
+            : `<div style="color: #D4AF37; font-size: 10px; font-weight: 800; text-align: center;">✓ CONCLUÍDO</div>`
+        }
             </div>
         </div>
     `;
@@ -404,11 +404,11 @@ function setupRealtime() {
 
     // 1. Escuta atualizações de SMS Recebido
     db.channel('my-activations')
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
             table: 'activations',
-            filter: `user_id=eq.${currentUser.id}` 
+            filter: `user_id=eq.${currentUser.id}`
         }, payload => {
             const act = payload.new;
             if (act.status === 'received' && act.sms_code) {
@@ -421,11 +421,11 @@ function setupRealtime() {
 
     // 2. Escuta mudanças de saldo (Admin ou Recarga)
     db.channel('my-profile')
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
             table: 'profiles',
-            filter: `id=eq.${currentUser.id}` 
+            filter: `id=eq.${currentUser.id}`
         }, updateUIForUser)
         .subscribe();
 }
@@ -444,13 +444,13 @@ function updateCardWithSMS(id, code) {
     }
 }
 
-// === FUNÇÕES DE NAVEGAÇÃO E MODAIS ===
-window.abrirRecarga = function() {
-    document.getElementById('modalRecarga').style.display = 'flex';
+// Funções de controle do Modal de Recarga
+window.abrirRecarga = function () {
+    const modal = document.getElementById('pixModal');
+    if (modal) modal.style.display = 'flex';
 };
 
-window.fecharRecarga = function() {
-    document.getElementById('modalRecarga').style.display = 'none';
+window.fecharRecarga = function () {
+    const modal = document.getElementById('pixModal');
+    if (modal) modal.style.display = 'none';
 };
-
-init();
