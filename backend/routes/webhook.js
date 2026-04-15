@@ -129,7 +129,7 @@ router.post('/criar-pix', async (req, res) => {
             metadata: { user_id: user.id }  // CRÍTICO: Identificação no webhook
         }, {
             headers: {
-                'X-Idempotency-Key': crypto.randomUUID()
+                'X-Idempotency-Key': crypto.randomBytes(16).toString('hex')
             }
         });
 
