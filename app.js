@@ -444,4 +444,13 @@ function updateCardWithSMS(id, code) {
     }
 }
 
+// === FUNÇÕES DE NAVEGAÇÃO E MODAIS ===
+window.abrirRecarga = function() {
+    document.getElementById('modalRecarga').style.display = 'flex';
+};
+
+window.fecharRecarga = function() {
+    document.getElementById('modalRecarga').style.display = 'none';
+};
+
 init();
