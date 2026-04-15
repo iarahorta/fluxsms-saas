@@ -127,6 +127,8 @@ async function handleAuth(type) {
                 alert('Falha no login: ' + error.message);
             } else {
                 console.log("Login SUCESSO!");
+                document.getElementById('authModal').style.display = 'none';
+                toggleViews(data.session);
             }
         } else {
             const email = document.getElementById('reg-email').value;
