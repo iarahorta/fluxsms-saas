@@ -9,7 +9,14 @@ const { rateLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
 const app = express();
-app.set('trust proxy', 1); // Necessário para express-rate-limit funcionar no Railway
+app.set('trust proxy', 1);
+
+// ─── Middlewares Base ─────────────────────────────────────────
+app.use(express.json({ limit: '10kb' })); 
+app.use(cors({ origin: '*' }));
+
+// ─── Rotas Prioritárias (Isentas de Rate Limit / Segurança) ───
+app.use('/webhook', webhookRouter);  // Mercado Pago
 
 // ─── Supabase (service_role para operações protegidas) ────────
 const supabase = createClient(
@@ -20,18 +27,12 @@ const supabase = createClient(
 // Disponibiliza globalmente para rotas
 app.set('supabase', supabase);
 
-// ─── Middlewares de Segurança ─────────────────────────────────
+// ─── Middlewares de Segurança p/ demais rotas ──────────────────
 app.use(helmet());
-app.use(cors({ origin: '*' }));
-app.use(express.json({ limit: '10kb' })); // Limita body size
-// ─── Rotas Isentas de Rate Limit ──────────────────────────────
-app.use('/webhook', webhookRouter);  // Mercado Pago
-
-// ─── Middlewares de Segurança ─────────────────────────────────
 app.use(rateLimiter);    // Rate limiting global
 app.use(validateInput);  // Sanitização de inputs
 
-// ─── Rotas Restritas ──────────────────────────────────────────
+// ─── Demais Rotas ─────────────────────────────────────────────
 app.use('/sms', smsRouter);      // Modem → SMS delivery
 
 // Health check
