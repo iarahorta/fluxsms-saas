@@ -45,10 +45,10 @@ function validarAssinaturaMP(req) {
 }
 
 /**
- * POST /webhook/mercadopago
+ * POST /webhook
  * Recebe notificações de pagamento e credita saldo via RPC.
  */
-router.post('/mercadopago', async (req, res) => {
+router.post('/', async (req, res) => {
     const supabase = req.app.get('supabase');
 
     // ─── Valida assinatura secreta do MP (anti-fraude) ────────
