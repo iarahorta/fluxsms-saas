@@ -24,11 +24,14 @@ app.set('supabase', supabase);
 app.use(helmet());
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10kb' })); // Limita body size
+// ─── Rotas Isentas de Rate Limit ──────────────────────────────
+app.use('/webhook', webhookRouter);  // Mercado Pago
+
+// ─── Middlewares de Segurança ─────────────────────────────────
 app.use(rateLimiter);    // Rate limiting global
 app.use(validateInput);  // Sanitização de inputs
 
-// ─── Rotas ────────────────────────────────────────────────────
-app.use('/webhook', webhookRouter);  // Mercado Pago
+// ─── Rotas Restritas ──────────────────────────────────────────
 app.use('/sms', smsRouter);      // Modem → SMS delivery
 
 // Health check
