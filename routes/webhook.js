@@ -68,7 +68,14 @@ router.post('/', async (req, res) => {
         const paymentId = String(data.id);
 
         // Valida o pagamento na API oficial (nunca confiar só no body)
-        const { data: payment } = await mpAxios().get(`/v1/payments/${paymentId}`);
+        let payment;
+        try {
+            const resMP = await mpAxios().get(`/v1/payments/${paymentId}`);
+            payment = resMP.data;
+        } catch (err) {
+            console.log(`[WEBHOOK MP] Pagamento ${paymentId} não encontrado ou inválido, ignorando...`);
+            return res.status(200).send('OK'); // Retorna OK mesmo que não exista (ex: testes do MP)
+        }
 
         const status = payment.status;
         const amount = parseFloat(payment.transaction_amount);
@@ -76,7 +83,7 @@ router.post('/', async (req, res) => {
 
         if (!userId) {
             console.warn('[WEBHOOK MP] Pagamento sem user_id no metadata:', paymentId);
-            return res.status(200).json({ ok: true, msg: 'no_user_id' });
+            return res.status(200).send('OK');
         }
 
         const { data: rpcResult, error } = await supabase.rpc('rpc_creditar_saldo', {
