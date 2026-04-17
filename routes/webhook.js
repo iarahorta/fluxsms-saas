@@ -49,21 +49,20 @@ function validarAssinaturaMP(req) {
  * Recebe notificações de pagamento e credita saldo via RPC.
  */
 router.post('/', async (req, res) => {
+    // RESPONDE 200 OK IMEDIATAMENTE (Para evitar 502/Timeout no Mercado Pago)
+    res.status(200).send('OK');
+
     const supabase = req.app.get('supabase');
 
     // ─── Valida assinatura secreta do MP (anti-fraude) ────────
     if (!validarAssinaturaMP(req)) {
-        console.warn('[WEBHOOK MP] Assinatura inválida — requisição rejeitada');
-        console.debug('[WEBHOOK MP] Headers:', JSON.stringify(req.headers));
-        console.debug('[WEBHOOK MP] Body:', JSON.stringify(req.body));
-        return res.status(401).json({ error: 'invalid_signature' });
+        console.warn('[WEBHOOK MP] Assinatura inválida — ignorando processamento');
+        return; 
     }
 
     try {
         const { type, data } = req.body;
-        if (type !== 'payment' || !data?.id) {
-            return res.status(200).json({ ok: true, msg: 'ignored' });
-        }
+        if (type !== 'payment' || !data?.id) return;
 
         const paymentId = String(data.id);
 
@@ -101,12 +100,10 @@ router.post('/', async (req, res) => {
         }
 
         console.log(`[WEBHOOK MP] ${paymentId} | ${status} | R$ ${amount} | user: ${userId}`);
-        return res.status(200).send('OK');
 
     } catch (err) {
         const detail = err.response?.data || err.message;
         console.error('[WEBHOOK MP] Falha capturada (blindada):', detail);
-        return res.status(200).send('OK'); // Sempre responde OK para o Mercado Pago
     }
 });
 
