@@ -515,8 +515,6 @@ async function loadActiveSessions() {
     }
 }
 
-let isRealtimeActive = false;
-
 function setupRealtime() {
     if (isRealtimeActive) return;
     isRealtimeActive = true;
