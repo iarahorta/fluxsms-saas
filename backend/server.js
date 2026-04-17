@@ -31,7 +31,7 @@ app.use('/webhook', webhookRouter);  // Mercado Pago
 app.use('/sms',     smsRouter);      // Modem → SMS delivery
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
 
 // Handler de erros não capturados
 app.use((err, _req, res, _next) => {
