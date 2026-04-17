@@ -68,7 +68,14 @@ router.post('/', async (req, res) => {
         const paymentId = String(data.id);
 
         // Valida o pagamento na API oficial (nunca confiar só no body)
-        const { data: payment } = await mpAxios().get(`/v1/payments/${paymentId}`);
+        let payment;
+        try {
+            const resMP = await mpAxios().get(`/v1/payments/${paymentId}`);
+            payment = resMP.data;
+        } catch (err) {
+            console.log(`[WEBHOOK MP] Pagamento ${paymentId} não encontrado ou inválido, ignorando...`);
+            return res.status(200).send('OK'); // Retorna OK mesmo que não exista (ex: testes do MP)
+        }
 
         const status = payment.status;
         const amount = parseFloat(payment.transaction_amount);
@@ -76,7 +83,7 @@ router.post('/', async (req, res) => {
 
         if (!userId) {
             console.warn('[WEBHOOK MP] Pagamento sem user_id no metadata:', paymentId);
-            return res.status(200).json({ ok: true, msg: 'no_user_id' });
+            return res.status(200).send('OK');
         }
 
         const { data: rpcResult, error } = await supabase.rpc('rpc_creditar_saldo', {
@@ -88,16 +95,16 @@ router.post('/', async (req, res) => {
 
         if (error) {
             console.error('[WEBHOOK MP] Erro RPC:', error.message);
-            return res.status(500).json({ ok: false });
+            return res.status(200).send('OK'); // Blindado: responde 200 mesmo em erro interno
         }
 
         console.log(`[WEBHOOK MP] ${paymentId} | ${status} | R$ ${amount} | user: ${userId}`);
-        return res.status(200).json({ ok: true, result: rpcResult });
+        return res.status(200).send('OK');
 
     } catch (err) {
         const detail = err.response?.data || err.message;
-        console.error('[WEBHOOK MP] Falha crítica:', detail);
-        return res.status(500).json({ ok: false, error: err.message });
+        console.error('[WEBHOOK MP] Falha capturada (blindada):', detail);
+        return res.status(200).send('OK'); // Sempre responde OK para o Mercado Pago
     }
 });
 
