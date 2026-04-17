@@ -325,26 +325,38 @@
                     </table>
                 </div>
 
-                <h2 style="margin-top: 30px;">Ajuste Rápido de Preço</h2>
-                <p style="font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-bottom: 15px;">Defina preço customizado para um usuário.</p>
+                <h2 style="margin-top: 30px;">Preço VIP / Revendedor</h2>
+                <p style="font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-bottom: 15px;">Defina um preço exclusivo para um e-mail específico.</p>
                 <form id="form-custom-price">
                     <div class="input-group">
-                        <input type="text" id="price-user-id" placeholder="ID do Usuário (UUID)" required>
+                        <input type="email" id="price-user-email" placeholder="E-mail do Usuário" required>
                     </div>
                     <div class="input-group">
-                        <select id="price-service">
-                            <option value="whatsapp">WhatsApp</option>
-                            <option value="telegram">Telegram</option>
-                            <option value="google">Google</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="tiktok">TikTok</option>
+                        <select id="price-service" class="service-select-list">
+                            <!-- Preenchido dinamicamente -->
                         </select>
                     </div>
                     <div class="input-group">
-                        <input type="number" id="price-value" step="0.01" placeholder="Novo Preço (R$)" required>
+                        <input type="number" id="price-value" step="0.01" placeholder="Novo Preço VIP (R$)" required>
                     </div>
                     <button type="submit" class="btn-action" style="width: 100%;">Salvar Preço Customizado</button>
                 </form>
+
+                <h2 style="margin-top: 40px;">Preços Globais (Site Todo)</h2>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table id="table-global-prices">
+                        <thead>
+                            <tr>
+                                <th>Serviço</th>
+                                <th>Preço Padrão (R$)</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </div>
     </div>
