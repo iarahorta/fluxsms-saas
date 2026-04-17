@@ -109,6 +109,7 @@ async function loadUsers(search = '') {
         `;
         tbody.appendChild(tr);
     });
+    }
 }
 
 async function loadChips() {
