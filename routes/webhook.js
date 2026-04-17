@@ -49,6 +49,7 @@ function validarAssinaturaMP(req) {
  * Recebe notificações de pagamento e credita saldo via RPC.
  */
 router.post('/', async (req, res) => {
+    console.log('--- REQUISIÇÃO RECEBIDA NO WEBHOOK ---');
     // RESPONDE 200 OK IMEDIATAMENTE (Para evitar 502/Timeout no Mercado Pago)
     res.status(200).send('OK');
 
