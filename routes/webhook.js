@@ -1,13 +1,13 @@
 const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
-const _axios  = require('axios');
+const axios   = require('axios');
 
 const MP_API = 'https://api.mercadopago.com';
 
 // ─── Helper MP com Access Token sempre do ambiente ───────────
 function mpAxios() {
-    return _axios.create({
+    return axios.create({
         baseURL: MP_API,
         headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` },
         timeout: 8000
@@ -132,7 +132,7 @@ router.post('/criar-pix', async (req, res) => {
     try {
         console.log(`[CRIAR PIX] User: ${user.id} | Amount: ${amount}`);
 
-        const response = await _axios.post(`${MP_API}/v1/payments`, {
+        const response = await axios.post(`${MP_API}/v1/payments`, {
             transaction_amount: parseFloat(amount),
             description: `FluxSMS - Recarga de saldo R$ ${amount}`,
             payment_method_id: 'pix',
