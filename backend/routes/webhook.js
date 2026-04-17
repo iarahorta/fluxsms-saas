@@ -121,17 +121,24 @@ router.post('/criar-pix', async (req, res) => {
     if (!amount || amount < 5) return res.status(400).json({ error: 'Valor mínimo R$ 5,00' });
 
     try {
-        const { data: preference } = await mpAxios().post('/v1/payments', {
+        console.log(`[CRIAR PIX] User: ${user.id} | Amount: ${amount}`);
+
+        const response = await _axios.post(`${MP_API}/v1/payments`, {
             transaction_amount: parseFloat(amount),
             description: `FluxSMS - Recarga de saldo R$ ${amount}`,
             payment_method_id: 'pix',
             payer: { email: user.email },
-            metadata: { user_id: user.id }  // CRÍTICO: Identificação no webhook
+            metadata: { user_id: user.id } 
         }, {
             headers: {
-                'X-Idempotency-Key': crypto.randomBytes(16).toString('hex')
-            }
+                'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+                'x-idempotency-key': crypto.randomBytes(16).toString('hex'),
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000
         });
+
+        const preference = response.data;
 
         return res.status(200).json({
             ok: true,
