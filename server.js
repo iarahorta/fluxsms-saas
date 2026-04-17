@@ -9,6 +9,7 @@ const { rateLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
 const app = express();
+app.set('trust proxy', 1); // Necessário para express-rate-limit funcionar no Railway
 
 // ─── Supabase (service_role para operações protegidas) ────────
 const supabase = createClient(
