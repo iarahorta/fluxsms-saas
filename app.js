@@ -247,6 +247,27 @@ async function gerarPix() {
     }
 }
 
+window.verificarPagamento = async function() {
+    const btn = document.getElementById('btnVerificarPagamento');
+    if (btn) {
+        btn.innerText = 'Verificando...';
+        btn.disabled = true;
+    }
+    
+    try {
+        await updateUIForUser();
+        alert('\u2705 Saldo atualizado! Se o pagamento foi confirmado, seu novo saldo j\u00e1 deve aparecer na tela.');
+    } catch (err) {
+        console.error('Erro ao verificar saldo:', err);
+        alert('\u274c Erro ao atualizar saldo. Tente novamente em instantes.');
+    } finally {
+        if (btn) {
+            btn.innerText = 'J\u00c1 PAGUEI';
+            btn.disabled = false;
+        }
+    }
+};
+
 async function loadChipsCount() {
     // const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
     chipsDisponiveis = 99; // count || 0; (Travado em 99 para Testes Iara)
