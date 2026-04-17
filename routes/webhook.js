@@ -49,7 +49,7 @@ function validarAssinaturaMP(req) {
  * Recebe notificações de pagamento e credita saldo via RPC.
  */
 router.post('/', async (req, res) => {
-    console.log('--- REQUISIÇÃO RECEBIDA NO WEBHOOK ---');
+    console.log('>>>> ALERTA: WEBHOOK RECEBIDO DO MERCADO PAGO <<<<');
     // RESPONDE 200 OK IMEDIATAMENTE (Para evitar 502/Timeout no Mercado Pago)
     res.status(200).send('OK');
 
@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
             payment = resMP.data;
         } catch (err) {
             console.log(`[WEBHOOK MP] Pagamento ${paymentId} não encontrado ou inválido, ignorando...`);
-            return res.status(200).send('OK'); // Retorna OK mesmo que não exista (ex: testes do MP)
+            return; // Já respondemos 200 no topo
         }
 
         const status = payment.status;
@@ -85,7 +85,7 @@ router.post('/', async (req, res) => {
 
         if (!userId) {
             console.warn('[WEBHOOK MP] Pagamento sem user_id no metadata:', paymentId);
-            return res.status(200).send('OK');
+            return; // Já respondemos 200 no topo
         }
 
         const { data: rpcResult, error } = await supabase.rpc('rpc_creditar_saldo', {
@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
 
         if (error) {
             console.error('[WEBHOOK MP] Erro RPC:', error.message);
-            return res.status(200).send('OK'); // Blindado: responde 200 mesmo em erro interno
+            return; // Já respondemos 200 no topo
         }
 
         console.log(`[WEBHOOK MP] ${paymentId} | ${status} | R$ ${amount} | user: ${userId}`);
