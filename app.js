@@ -37,6 +37,7 @@ const SERVICES = [
 // === ESTADO GLOBAL ===
 let activeSessions = {}; // { activation_id: { ...data } }
 let chipsDisponiveis = 0;
+let isRealtimeActive = false;
 
 // === ELEMENTOS DE NAVEGAÇÃO ===
 // === ELEMENTOS DE NAVEGAÇÃO ===
@@ -58,6 +59,9 @@ async function init() {
     // 1. Verifica Sessão
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
+    
+    // Inicia Realtime Global de Chips (Stock)
+    setupRealtimeChips();
 
     if (session) {
         currentUser = session.user;
@@ -302,9 +306,33 @@ async function checkBalanceAuto() {
 }
 
 async function loadChipsCount() {
-    // const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
-    chipsDisponiveis = 99; // count || 0; (Travado em 99 para Testes Iara)
+    if (!db) return;
+    const { count, error } = await db
+        .from('chips')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'idle');
+
+    if (error) {
+        console.error('Erro ao buscar chips:', error.message);
+        return;
+    }
+
+    chipsDisponiveis = count || 0;
     renderServices(SERVICES);
+    
+    // Atualiza indicadores visuais se existirem
+    const stockEl = document.getElementById('stock-count');
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Online`;
+}
+
+function setupRealtimeChips() {
+    if (!db) return;
+    db.channel('chips-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, () => {
+            console.log('Mudança detectada nos chips, atualizando contador...');
+            loadChipsCount();
+        })
+        .subscribe();
 }
 
 async function updateUIForUser() {
