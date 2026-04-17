@@ -88,16 +88,16 @@ router.post('/', async (req, res) => {
 
         if (error) {
             console.error('[WEBHOOK MP] Erro RPC:', error.message);
-            return res.status(500).json({ ok: false });
+            return res.status(200).send('OK'); // Blindado: responde 200 mesmo em erro interno
         }
 
         console.log(`[WEBHOOK MP] ${paymentId} | ${status} | R$ ${amount} | user: ${userId}`);
-        return res.status(200).json({ ok: true, result: rpcResult });
+        return res.status(200).send('OK');
 
     } catch (err) {
         const detail = err.response?.data || err.message;
-        console.error('[WEBHOOK MP] Falha crítica:', detail);
-        return res.status(500).json({ ok: false, error: err.message });
+        console.error('[WEBHOOK MP] Falha capturada (blindada):', detail);
+        return res.status(200).send('OK'); // Sempre responde OK para o Mercado Pago
     }
 });
 
