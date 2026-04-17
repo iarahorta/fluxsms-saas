@@ -132,7 +132,7 @@ router.post('/criar-pix', async (req, res) => {
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-                'x-idempotency-key': crypto.randomBytes(16).toString('hex'),
+                'X-Idempotency-Key': crypto.randomBytes(16).toString('hex'),
                 'Content-Type': 'application/json'
             },
             timeout: 10000
