@@ -79,7 +79,9 @@ router.post('/', async (req, res) => {
 
         const status = payment.status;
         const amount = parseFloat(payment.transaction_amount);
-        const userId = payment.metadata?.user_id;
+        
+        // Prioriza external_reference (mais estável) e depois metadata
+        const userId = payment.external_reference || payment.metadata?.user_id;
 
         if (!userId) {
             console.warn('[WEBHOOK MP] Pagamento sem user_id no metadata:', paymentId);
@@ -135,6 +137,7 @@ router.post('/criar-pix', async (req, res) => {
             description: `FluxSMS - Recarga de saldo R$ ${amount}`,
             payment_method_id: 'pix',
             payer: { email: user.email },
+            external_reference: String(user.id),
             metadata: { user_id: user.id } 
         }, {
             headers: {
