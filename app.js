@@ -15,9 +15,25 @@ if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
     db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
-// === LISTA DE SERVIÇOS (Carregada do Banco via fetchGlobalServices) ===
-let SERVICES = [];
-let userCustomPrices = {}; // { service_id: price }
+// === LISTA DE SERVIÇOS (Padrão de Segurança / Fallback) ===
+let SERVICES = [
+    { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
+    { id: 'telegram', name: 'Telegram', price: 4.00 },
+    { id: 'google', name: 'Google', price: 1.50 },
+    { id: 'uber', name: 'Uber', price: 1.20 },
+    { id: 'tinder', name: 'Tinder', price: 4.50 },
+    { id: 'gov', name: 'GOV.BR', price: 5.00 },
+    { id: 'ifood', name: 'iFood', price: 0.90 },
+    { id: 'instagram', name: 'Instagram', price: 2.00 },
+    { id: 'tiktok', name: 'TikTok', price: 1.50 },
+    { id: 'apple', name: 'Apple ID', price: 3.00 },
+    { id: 'shopee', name: 'Shopee', price: 0.80 },
+    { id: 'mercadolivre', name: 'Mercado Livre', price: 1.20 },
+    { id: 'nubank', name: 'Nubank', price: 2.50 },
+    { id: 'twitter', name: 'X (Twitter)', price: 1.00 },
+    { id: 'paypal', name: 'PayPal', price: 2.00 }
+];
+let userCustomPrices = {}; 
 
 // === ESTADO GLOBAL ===
 let activeSessions = {}; // { activation_id: { ...data } }
@@ -45,8 +61,8 @@ async function init() {
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
     
-    // Carrega preços globais do banco
-    await fetchGlobalServices();
+    // Tenta carregar preços do banco em segundo plano (Não bloqueia o login)
+    fetchGlobalServices().catch(e => console.log("Usando preços padrão (DB offline)"));
     
     // Inicia Realtime Global de Chips (Stock)
     setupRealtimeChips();
