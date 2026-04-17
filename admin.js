@@ -69,10 +69,10 @@ async function loadStats() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', today.toISOString());
 
-    document.getElementById('stat-users').innerText = userCount;
-    document.getElementById('stat-balance').innerText = `R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    document.getElementById('stat-chips').innerText = `${onlineChips}/${chips.length}`;
-    document.getElementById('stat-sms').innerText = smsCount;
+    if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = userCount || 0;
+    if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${onlineChips}/${chips ? chips.length : 0}`;
+    if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = smsCount || 0;
 }
 
 async function loadUsers(search = '') {
@@ -82,11 +82,15 @@ async function loadUsers(search = '') {
         query = query.ilike('email', `%${search}%`);
     }
 
-    const { data: users } = await query;
+    const { data: users, error } = await query;
+    if (error) { console.error("Erro ao carregar usuários:", error); return; }
+
     const tbody = document.querySelector('#table-users tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    users.forEach(u => {
+    if (users) {
+        users.forEach(u => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${u.email}</td>
@@ -108,11 +112,27 @@ async function loadUsers(search = '') {
 }
 
 async function loadChips() {
-    const { data: chips } = await db.from('chips').select('*').order('porta');
-    const tbody = document.querySelector('#table-chips tbody');
-    if (tbody) {
+    try {
+        const { data: chips, error } = await db.from('chips').select('*').order('porta');
+        const tbody = document.querySelector('#table-chips tbody');
+        if (!tbody || error) return;
         tbody.innerHTML = '';
-        // Preenchimento dos chips será restaurado conforme necessidade
+
+        chips.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>Porta ${c.porta}</td>
+                <td style="font-family: monospace;">${c.numero || 'Vazio'}</td>
+                <td>
+                    <span class="status-badge ${c.status === 'idle' ? 'status-online' : (c.status === 'offline' ? 'status-offline' : 'status-busy')}">
+                        ${c.status.toUpperCase()}
+                    </span>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error("Erro ao carregar chips:", err);
     }
 }
 
