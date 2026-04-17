@@ -110,9 +110,10 @@ async function loadUsers(search = '') {
 async function loadChips() {
     const { data: chips } = await db.from('chips').select('*').order('porta');
     const tbody = document.querySelector('#table-chips tbody');
-    tbody.innerHTML = '';
-
-    });
+    if (tbody) {
+        tbody.innerHTML = '';
+        // Preenchimento dos chips será restaurado conforme necessidade
+    }
 }
 
 async function loadGlobalPrices() {
