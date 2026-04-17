@@ -15,24 +15,9 @@ if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
     db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
-// === LISTA DE SERVIÇOS (Tabela Padrão) ===
-const SERVICES = [
-    { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
-    { id: 'telegram', name: 'Telegram', price: 4.00 },
-    { id: 'google', name: 'Google', price: 1.50 },
-    { id: 'uber', name: 'Uber', price: 1.20 },
-    { id: 'tinder', name: 'Tinder', price: 4.50 },
-    { id: 'gov', name: 'GOV.BR', price: 5.00 },
-    { id: 'ifood', name: 'iFood', price: 0.90 },
-    { id: 'instagram', name: 'Instagram', price: 2.00 },
-    { id: 'tiktok', name: 'TikTok', price: 1.50 },
-    { id: 'apple', name: 'Apple ID', price: 3.00 },
-    { id: 'shopee', name: 'Shopee', price: 0.80 },
-    { id: 'mercadolivre', name: 'Mercado Livre', price: 1.20 },
-    { id: 'nubank', name: 'Nubank', price: 2.50 },
-    { id: 'twitter', name: 'X (Twitter)', price: 1.00 },
-    { id: 'paypal', name: 'PayPal', price: 2.00 }
-];
+// === LISTA DE SERVIÇOS (Carregada do Banco via fetchGlobalServices) ===
+let SERVICES = [];
+let userCustomPrices = {}; // { service_id: price }
 
 // === ESTADO GLOBAL ===
 let activeSessions = {}; // { activation_id: { ...data } }
@@ -60,12 +45,16 @@ async function init() {
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
     
+    // Carrega preços globais do banco
+    await fetchGlobalServices();
+    
     // Inicia Realtime Global de Chips (Stock)
     setupRealtimeChips();
 
     if (session) {
         currentUser = session.user;
         updateUIForUser();
+        await fetchUserCustomPrices(); // Carrega preços VIP antes de renderizar
         loadActiveSessions();
         // setupRealtime já será chamado pelo onAuthStateChange abaixo
     }
@@ -305,6 +294,27 @@ async function checkBalanceAuto() {
     }
 }
 
+async function fetchUserCustomPrices() {
+    if (!db || !currentUser) return;
+    const { data, error } = await db.from('custom_prices').select('service, price').eq('user_id', currentUser.id);
+    if (!error && data) {
+        userCustomPrices = {};
+        data.forEach(cp => {
+            userCustomPrices[cp.service] = cp.price;
+        });
+        renderServices(SERVICES);
+    }
+}
+
+async function fetchGlobalServices() {
+    if (!db) return;
+    const { data, error } = await db.from('services_config').select('*').order('name');
+    if (!error && data) {
+        SERVICES = data;
+        renderServices(SERVICES);
+    }
+}
+
 async function loadChipsCount() {
     if (!db) return;
     const { count, error } = await db
@@ -370,19 +380,24 @@ async function updateUIForUser() {
 
 function renderServices(list) {
     const sem_estoque = chipsDisponiveis <= 0;
-    servicesGrid.innerHTML = list.map(s => `
-        <div class="service-row">
-            <div class="name">${s.name}</div>
-            <div class="price">R$ ${s.price.toFixed(2)}</div>
-            <div class="action">
-                <button class="btn-buy" 
-                        onclick="requestNumber('${s.id}', '${s.name}', ${s.price})"
-                        ${sem_estoque ? 'disabled' : ''}>
-                    ${sem_estoque ? 'SEM ESTOQUE' : 'SOLICITAR'}
-                </button>
+    servicesGrid.innerHTML = list.map(s => {
+        // Verifica se usuário tem preço VIP, senão usa o preço global
+        const finalPrice = userCustomPrices[s.id] || s.price;
+        
+        return `
+            <div class="service-row">
+                <div class="name">${s.name}</div>
+                <div class="price">R$ ${finalPrice.toFixed(2)}</div>
+                <div class="action">
+                    <button class="btn-buy" 
+                            onclick="requestNumber('${s.id}', '${s.name}', ${finalPrice})"
+                            ${sem_estoque ? 'disabled' : ''}>
+                        ${sem_estoque ? 'SEM ESTOQUE' : 'SOLICITAR'}
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // === SOLICITAR NÚMERO (REAL) ===
@@ -515,6 +530,17 @@ function setupRealtime() {
             table: 'profiles',
             filter: `id=eq.${currentUser.id}`
         }, updateUIForUser)
+        .subscribe();
+
+    // 3. Escuta mudanças de Preços (Globais e Customizados) para atualizar dashboard na hora
+    db.channel('pricing-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'services_config' }, fetchGlobalServices)
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'custom_prices', 
+            filter: `user_id=eq.${currentUser.id}` 
+        }, fetchUserCustomPrices)
         .subscribe();
 }
 

@@ -44,6 +44,7 @@ async function init() {
     loadUsers();
     loadChips();
     loadPolos();
+    loadGlobalPrices();
 
     // 4. Inicia Listeners Realtime
     setupRealtime();
@@ -111,17 +112,47 @@ async function loadChips() {
     const tbody = document.querySelector('#table-chips tbody');
     tbody.innerHTML = '';
 
-    chips.forEach(c => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${c.porta}</td>
-            <td>${c.numero || '---'}</td>
-            <td>
-                <span class="status-badge status-${c.status}">${c.status}</span>
-            </td>
-        `;
-        tbody.appendChild(tr);
     });
+}
+
+async function loadGlobalPrices() {
+    const { data: services } = await db.from('services_config').select('*').order('name');
+    if (!services) return;
+
+    // 1. Preenche a tabela de preços globais
+    const tbody = document.querySelector('#table-global-prices tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        services.forEach(s => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${s.name}</td>
+                <td>
+                    <input type="number" step="0.01" class="price-input" id="global-price-${s.id}" value="${s.price.toFixed(2)}" 
+                           style="width: 70px; background: transparent; border: 1px solid var(--gold); color: white; border-radius: 4px; padding: 2px 5px;">
+                </td>
+                <td>
+                    <button class="btn-action" style="padding: 2px 8px; font-size: 11px;" onclick="updateGlobalPrice('${s.id}')">SALVAR</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 2. Preenche os selects de serviços (form custom_price)
+    const select = document.getElementById('price-service');
+    if (select) {
+        select.innerHTML = services.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    }
+}
+
+async function updateGlobalPrice(serviceId) {
+    const newVal = parseFloat(document.getElementById(`global-price-${serviceId}`).value);
+    if (isNaN(newVal)) return;
+
+    const { error } = await db.from('services_config').update({ price: newVal, updated_at: new Date() }).eq('id', serviceId);
+    if (error) alert('Erro ao atualizar: ' + error.message);
+    else alert('Preço global atualizado com sucesso!');
 }
 
 // === AÇÕES DE ADMIN ===
@@ -171,18 +202,25 @@ document.getElementById('form-balance').onsubmit = async (e) => {
 
 document.getElementById('form-custom-price').onsubmit = async (e) => {
     e.preventDefault();
-    const userId = document.getElementById('price-user-id').value;
+    const email = document.getElementById('price-user-email').value.trim();
     const service = document.getElementById('price-service').value;
     const price = parseFloat(document.getElementById('price-value').value);
 
+    // Busca o ID do usuário pelo email
+    const { data: userProfile, error: userErr } = await db.from('profiles').select('id').ilike('email', email).single();
+    if (userErr || !userProfile) {
+        alert('Usuário não encontrado com este e-mail.');
+        return;
+    }
+
     const { error } = await db.from('custom_prices').upsert({
-        user_id: userId,
+        user_id: userProfile.id,
         service: service,
         price: price
     });
 
     if (error) alert('Erro ao definir preço: ' + error.message);
-    else alert('Preço customizado salvo!');
+    else alert(`Preço VIP salvo para ${email}!`);
 };
 
 // Busca em tempo real
