@@ -192,6 +192,9 @@ async function handleLogout() {
 const MP_PUBLIC_KEY = 'APP_USR-8a7f3297-2140-41e3-b958-1c1e2d3ff8b9';
 const BACKEND_URL = 'https://fluxsms-saas-production.up.railway.app';
 
+let initialBalance = 0;
+let pixCheckInterval = null;
+
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
     if (!amount || amount < 5) { alert('\u26a0\ufe0f Valor m\u00ednimo: R$ 5,00'); return; }
@@ -233,6 +236,14 @@ async function gerarPix() {
         `;
         pixArea.style.display = 'block';
 
+        // Captura saldo atual para o polling detectar o aumento
+        const { data: profile } = await db.from('profiles').select('balance').eq('id', session.user.id).single();
+        initialBalance = profile?.balance || 0;
+
+        // Inicia polling automático a cada 5 segundos
+        if (pixCheckInterval) clearInterval(pixCheckInterval);
+        pixCheckInterval = setInterval(checkBalanceAuto, 5000);
+
     } catch (err) {
         console.group('[PIX ERROR DEBUG]');
         console.error('Mensagem:', err.message);
@@ -255,8 +266,15 @@ window.verificarPagamento = async function() {
     }
     
     try {
-        await updateUIForUser();
-        alert('\u2705 Saldo atualizado! Se o pagamento foi confirmado, seu novo saldo j\u00e1 deve aparecer na tela.');
+        const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
+        
+        if (profile && profile.balance > initialBalance) {
+            await updateUIForUser();
+            fecharRecarga();
+            alert('\u2705 Sucesso! Pagamento identificado e saldo creditado.');
+        } else {
+            alert('\ud83d\udd04 Aguardando confirma\u00e7\u00e3o... Se voc\u00ea j\u00e1 pagou, aguarde alguns segundos para o Mercado Pago processar.');
+        }
     } catch (err) {
         console.error('Erro ao verificar saldo:', err);
         alert('\u274c Erro ao atualizar saldo. Tente novamente em instantes.');
@@ -267,6 +285,21 @@ window.verificarPagamento = async function() {
         }
     }
 };
+
+async function checkBalanceAuto() {
+    if (!currentUser) return;
+    try {
+        const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
+        if (profile && profile.balance > initialBalance) {
+            if (pixCheckInterval) clearInterval(pixCheckInterval);
+            await updateUIForUser();
+            fecharRecarga();
+            alert('\u2705 Pagamento Recebido! Seu saldo foi atualizado automaticamente.');
+        }
+    } catch (e) {
+        console.error('Erro no polling de saldo:', e);
+    }
+}
 
 async function loadChipsCount() {
     // const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
@@ -480,6 +513,10 @@ window.abrirRecarga = function () {
 window.fecharRecarga = function () {
     const modal = document.getElementById('modalRecarga');
     if (modal) modal.style.display = 'none';
+    if (pixCheckInterval) {
+        clearInterval(pixCheckInterval);
+        pixCheckInterval = null;
+    }
 };
 
 // Inicializa a aplicação
