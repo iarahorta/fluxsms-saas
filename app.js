@@ -83,7 +83,7 @@ async function init() {
     // 5. Verifica evento de login bem-sucedido
     db.auth.onAuthStateChange((event, session) => {
         console.log('Auth Event:', event);
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (event === 'SIGNED_IN') {
             currentUser = session?.user;
             authModal.style.display = 'none';
             toggleViews(session);
@@ -95,7 +95,10 @@ async function init() {
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
             toggleViews(null);
-            window.location.reload();
+            // Evita reload infinito se já estiver na landing
+            if (landingView.style.display === 'none') {
+                window.location.reload();
+            }
         }
     });
 }
@@ -448,11 +451,14 @@ function updateCardWithSMS(id, code) {
 
 // Funções de controle do Modal de Recarga
 window.abrirRecarga = function () {
-    const modal = document.getElementById('pixModal');
+    const modal = document.getElementById('modalRecarga');
     if (modal) modal.style.display = 'flex';
 };
 
 window.fecharRecarga = function () {
-    const modal = document.getElementById('pixModal');
+    const modal = document.getElementById('modalRecarga');
     if (modal) modal.style.display = 'none';
 };
+
+// Inicializa a aplicação
+init();
