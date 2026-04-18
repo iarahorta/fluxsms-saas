@@ -37,15 +37,28 @@ CREATE TABLE IF NOT EXISTS public.custom_prices (
 );
 COMMENT ON TABLE public.custom_prices IS 'Preços customizados para usuários específicos (revendedores)';
 
+-- ─── POLOS (Workers Físicos) ───────────────
+CREATE TABLE IF NOT EXISTS public.polos (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nome                TEXT NOT NULL,
+    chave_acesso        TEXT NOT NULL UNIQUE,
+    status              TEXT NOT NULL DEFAULT 'OFFLINE',
+    chips_ativos        INTEGER DEFAULT 0,
+    ultima_comunicacao  TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ─── CHIPS (Modems GSM) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.chips (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    porta       TEXT NOT NULL UNIQUE,
+    polo_id     UUID REFERENCES public.polos(id) ON DELETE CASCADE,
+    porta       TEXT NOT NULL,
     numero      TEXT,
     operadora   TEXT,
     status      TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle','busy','offline')),
     last_seen   TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(polo_id, porta)
 );
 
 -- ─── ACTIVATIONS (SMS) ───────────────────────────────────────
