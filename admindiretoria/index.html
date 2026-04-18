@@ -197,6 +197,12 @@
             outline: none;
         }
 
+        /* Fix para visibilidade das opções em browsers com tema light */
+        select option {
+            background-color: #1a1a1a !important;
+            color: white !important;
+        }
+
         /* Access Denied Overlay */
         #access-denied {
             display: none;
@@ -383,6 +389,6 @@
         </div>
     </div>
 
-    <script src="../admin.js"></script>
+    <script src="../admin.js?v=1.05"></script>
 </body>
 </html>
