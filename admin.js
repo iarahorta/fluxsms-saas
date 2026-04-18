@@ -269,11 +269,14 @@ function setupRealtime() {
 
 // === GERENCIAMENTO DE POLOS (WORKERS) ===
 async function loadPolos() {
-    const { data: polos, error } = await db.from('polos').select('*').order('criado_em', { ascending: false });
+    const { data: polos, error } = await db.from('polos').select('*').order('created_at', { ascending: false });
     if (error) {
         console.error("Erro carregando polos:", error);
         return;
     }
+
+    // Busca contagem de chips ativos por polo para o resumo individual
+    const { data: chips } = await db.from('chips').select('polo_id, status');
     
     const tbody = document.querySelector('#table-polos tbody');
     if (!tbody) return;
@@ -282,6 +285,8 @@ async function loadPolos() {
     polos.forEach(p => {
         const lastSeen = p.ultima_comunicacao ? new Date(p.ultima_comunicacao).toLocaleString('pt-BR') : 'Sem Conexão';
         const isOnline = p.status === 'ONLINE';
+        const activeChips = chips ? chips.filter(c => c.polo_id === p.id && c.status === 'idle').length : 0;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td style="font-weight:bold; color: white;">${p.nome}</td>
@@ -291,7 +296,7 @@ async function loadPolos() {
                     <button class="btn-action" style="padding: 2px 10px; font-size: 11px;" onclick="navigator.clipboard.writeText('${p.chave_acesso}')">COPIAR</button>
                 </div>
             </td>
-            <td style="text-align:center; font-weight: 800;">${p.chips_ativos}</td>
+            <td style="text-align:center; font-weight: 800;">${activeChips}</td>
             <td>
                 <span class="status-badge ${isOnline ? 'status-online' : (p.status === 'INSTALL_PENDING' ? 'status-busy' : 'status-offline')}">
                     ${p.status === 'INSTALL_PENDING' ? 'Aguardando Instalação' : p.status}
