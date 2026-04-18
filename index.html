@@ -146,12 +146,12 @@
                     <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
                 </div>
                 <nav class="main-nav">
-                    <a href="#" class="nav-item active"><span class="icon">⚡</span> Dashboard</a>
-                    <a href="#" class="nav-item"><span class="icon">💼</span> Meus Números</a>
+                    <a href="javascript:void(0)" onclick="showView('dashboard')" class="nav-item active" id="nav-dashboard"><span class="icon">⚡</span> Dashboard</a>
+                    <a href="javascript:void(0)" onclick="showView('my-numbers')" class="nav-item" id="nav-my-numbers"><span class="icon">💼</span> Meus Números</a>
                     <div class="nav-separator"></div>
-                    <a href="#" class="nav-item" onclick="abrirRecarga()"><span class="icon">💰</span> Recarregar Saldo</a>
-                    <a href="#" class="nav-item"><span class="icon">📊</span> Histórico</a>
-                    <a href="#" class="nav-item" onclick="handleLogout()"><span class="icon">🚪</span> Sair</a>
+                    <a href="javascript:void(0)" onclick="abrirRecarga()" class="nav-item"><span class="icon">💰</span> Recarregar Saldo</a>
+                    <a href="javascript:void(0)" onclick="showView('history')" class="nav-item" id="nav-history"><span class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span> Sair</a>
                 </nav>
                 <div class="sidebar-footer">
                     <div class="badge-premium">◆ 100% PRIVATE SIMCARD INFRASTRUCTURE</div>
@@ -182,7 +182,8 @@
                     </div>
                 </header>
 
-                <section class="content-grid">
+                <!-- VIEW: DASHBOARD (PADRÃO) -->
+                <section id="view-dashboard" class="content-grid app-view">
                     <div class="services-container">
                         <div class="section-header">
                             <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
@@ -200,6 +201,48 @@
                         <div class="sessions-list" id="active-numbers">
                             <div class="empty-state">Nenhum número solicitado no momento.</div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: MEUS NÚMEROS (HISTÓRICO SMS) -->
+                <section id="view-my-numbers" class="admin-section app-view" style="display:none; margin: 20px;">
+                    <h2 class="section-title">MEUS CÓDIGOS RECEBIDOS</h2>
+                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Aqui aparecem todos os SMS que você já recebeu com sucesso no FluxSMS.</p>
+                    <div style="overflow-x: auto;">
+                        <table id="table-my-numbers">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Serviço</th>
+                                    <th>Número</th>
+                                    <th>Código SMS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Preenchido via app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- VIEW: HISTÓRICO (FINANCEIRO) -->
+                <section id="view-history" class="admin-section app-view" style="display:none; margin: 20px;">
+                    <h2 class="section-title">EXTRATO FINANCEIRO</h2>
+                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Consulte suas recargas, débitos de ativação e reembolsos.</p>
+                    <div style="overflow-x: auto;">
+                        <table id="table-user-history">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Valor (R$)</th>
+                                    <th>Descrição</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Preenchido via app.js -->
+                            </tbody>
+                        </table>
                     </div>
                 </section>
             </main>

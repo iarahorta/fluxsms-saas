@@ -138,20 +138,28 @@ async function loadChips() {
 }
 
 async function loadGlobalPrices() {
-    const { data: services } = await db.from('services_config').select('*').order('name');
-    if (!services) return;
+    const { data: services, error } = await db.from('services_config').select('*').order('name');
+    
+    // Fallback caso a tabela esteja vazia (Primeiro acesso)
+    const activeServices = (services && services.length > 0) ? services : [
+        { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
+        { id: 'telegram', name: 'Telegram', price: 4.00 },
+        { id: 'google', name: 'Google', price: 1.50 },
+        { id: 'uber', name: 'Uber', price: 1.20 },
+        { id: 'apple', name: 'Apple ID', price: 3.00 }
+    ];
 
     // 1. Preenche a tabela de preços globais
     const tbody = document.querySelector('#table-global-prices tbody');
     if (tbody) {
         tbody.innerHTML = '';
-        services.forEach(s => {
+        activeServices.forEach(s => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${s.name}</td>
                 <td>
                     <input type="number" step="0.01" class="price-input" id="global-price-${s.id}" value="${s.price.toFixed(2)}" 
-                           style="width: 70px; background: transparent; border: 1px solid var(--gold); color: white; border-radius: 4px; padding: 2px 5px;">
+                           style="width: 70px; background: rgba(255,255,255,0.05); border: 1px solid var(--gold); color: white; border-radius: 4px; padding: 2px 5px;">
                 </td>
                 <td>
                     <button class="btn-action" style="padding: 2px 8px; font-size: 11px;" onclick="updateGlobalPrice('${s.id}')">SALVAR</button>
@@ -164,7 +172,7 @@ async function loadGlobalPrices() {
     // 2. Preenche os selects de serviços (form custom_price)
     const select = document.getElementById('price-service');
     if (select) {
-        select.innerHTML = services.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        select.innerHTML = activeServices.map(s => `<option value="${s.id}" style="background:#111; color:white;">${s.name}</option>`).join('');
     }
 }
 
@@ -254,6 +262,7 @@ function setupRealtime() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, loadStats)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, loadChips)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'polos' }, loadPolos)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'services_config' }, loadGlobalPrices)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activations' }, loadStats)
         .subscribe();
 }

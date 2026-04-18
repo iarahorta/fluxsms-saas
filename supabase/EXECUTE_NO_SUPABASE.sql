@@ -223,8 +223,16 @@ BEGIN
     SELECT balance INTO v_balance FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF v_balance < v_final_price THEN RETURN jsonb_build_object('ok',false,'error','saldo_insuficiente','saldo',v_balance); END IF;
     
-    -- 3. Busca chip disponível
-    SELECT * INTO v_chip FROM chips WHERE status='idle' LIMIT 1 FOR UPDATE SKIP LOCKED;
+    -- 3. Busca chip disponível (que não tenha tido venda recebida para este serviço específico)
+    SELECT * INTO v_chip FROM chips c
+    WHERE c.status = 'idle'
+    AND NOT EXISTS (
+        SELECT 1 FROM activations a
+        WHERE a.chip_id = c.id
+        AND a.service = p_service
+        AND a.status = 'received'
+    )
+    LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'error','sem_chips'); END IF;
     
     -- 4. Processa
@@ -244,22 +252,71 @@ END; $$;
 -- ============================================================
 -- PARTE 6: PERMISSÕES & REALTIME
 -- ============================================================
+-- ============================================================
+-- PARTE 6: PERMISSÕES & REALTIME (Habilitar Realtime com segurança)
+-- ============================================================
 GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms_v2    TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_admin_adjust_balance TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_admin_set_user_status TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_usar_cupom           TO authenticated;
 
--- Garantir que custom_prices e transactions também estão no Realtime para o Admin
-ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_prices;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chips;
+-- Adiciona as tabelas à publicação realtime apenas se elas ainda não estiverem lá
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'custom_prices') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_prices;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'transactions') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'chips') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.chips;
+    END IF;
+END $$;
 
 -- ============================================================
 -- VERIFICAÇÃO FINAL
 -- ============================================================
-SELECT 
-    schemaname, tablename, 
-    (SELECT count(*) FROM pg_policies WHERE tablename = pt.tablename) as policies_count
-FROM pg_tables pt
-WHERE schemaname = 'public' AND tablename IN ('profiles','chips','activations','transactions','custom_prices')
-ORDER BY tablename;
+SELECT 'Setup FluxSMS Concluído com Sucesso!' as status;
+
+-- [MANUTENÇÃO] Função de limpeza automática (Purge > 15 dias)
+CREATE OR REPLACE FUNCTION public.rpc_cleanup_old_data()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    DELETE FROM public.activations WHERE created_at < NOW() - INTERVAL '15 days';
+    DELETE FROM public.transactions WHERE created_at < NOW() - INTERVAL '15 days';
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_cleanup_old_data() TO authenticated;
+
+-- ============================================================
+-- PARTE 7: CONFIGURAÇÃO DE SERVIÇOS E PREÇOS GLOBAIS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.services_config (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO public.services_config (id, name, price)
+VALUES 
+    ('whatsapp', 'WhatsApp', 6.10), ('telegram', 'Telegram', 4.00), ('google', 'Google / YT', 1.50),
+    ('uber', 'Uber', 1.20), ('tinder', 'Tinder', 4.50), ('gov', 'GOV.BR', 5.00),
+    ('ifood', 'iFood', 0.90), ('instagram', 'Instagram', 2.00), ('tiktok', 'TikTok', 1.50),
+    ('apple', 'Apple ID', 3.00), ('shopee', 'Shopee', 0.80), ('mercadolivre', 'Mercado Livre', 1.20),
+    ('nubank', 'Nubank', 2.50), ('twitter', 'X (Twitter)', 1.00), ('paypal', 'PayPal', 2.00)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.services_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "services_config_select_all" ON public.services_config;
+CREATE POLICY "services_config_select_all" ON public.services_config FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "services_config_admin_all" ON public.services_config;
+CREATE POLICY "services_config_admin_all" ON public.services_config FOR ALL USING (is_flux_admin());
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'services_config') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.services_config;
+    END IF;
+END $$;
