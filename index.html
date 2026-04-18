@@ -317,7 +317,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="app.js?v=1.11"></script>
+    <script src="app.js?v=1.14"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
@@ -330,6 +330,16 @@
             if(login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
             else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
+
+        // Medida de Segurança: Bloqueio de Clique Direito
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc)
+        document.onkeydown = function(e) {
+            if (e.keyCode == 123) return false; // F12
+            if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
+            if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0))) return false;
+        };
     </script>
 </body>
 </html>
