@@ -324,6 +324,7 @@ async function fetchUserCustomPrices() {
 
 async function fetchGlobalServices() {
     if (!db) return;
+    setInterval(() => { loadChipsCount(); }, 4000);
     const { data, error } = await db.from('services_config').select('*').order('name');
     if (!error && data) {
         SERVICES = data;
