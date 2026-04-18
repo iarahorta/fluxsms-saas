@@ -37,6 +37,15 @@ const servicesGrid = document.getElementById('services-grid');
 const activeNumbers = document.getElementById('active-numbers');
 const searchInput = document.getElementById('service-search');
 
+function unscrambleSMS(text) {
+    try {
+        if (!text || text === '------') return text;
+        // Base64 Decode -> Invert
+        const decoded = atob(text);
+        return decoded.split('').reverse().join('');
+    } catch(e) { return text; }
+}
+
 // === INICIALIZAÇÃO ===
 async function init() {
     if (!db) {
@@ -330,12 +339,15 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 function renderActivationCard(act) {
     if (document.getElementById(act.id)) return;
     if (activeNumbers.querySelector('.empty-state')) activeNumbers.innerHTML = '';
+    
+    const displayCode = unscrambleSMS(act.sms_code);
+
     const h = `
         <div class="session-card" id="${act.id}">
             <span class="number">${act.phone_number}</span>
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
-            <div class="sms-code-display" id="code-${act.id}">${act.sms_code || '------'}</div>
+            <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
             <div id="actions-${act.id}">${act.status === 'waiting' ? `<button onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
         </div>
     `;
@@ -369,7 +381,22 @@ function setupRealtime() {
 
 function updateCardWithSMS(id, code) {
     const el = document.getElementById(`code-${id}`);
-    if (el) { el.innerText = code; document.getElementById(`status-${id}`).innerText = 'RECEBIDO'; setTimeout(() => document.getElementById(id)?.remove(), 120000); }
+    if (el) { 
+        el.innerText = unscrambleSMS(code); 
+        document.getElementById(`status-${id}`).innerText = 'RECEBIDO'; 
+        
+        // Proteção: Remove do DOM e limpa vestígios após 2 min
+        setTimeout(() => {
+            const card = document.getElementById(id);
+            if (card) {
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.remove();
+                    console.log(`[SEC] Ativação ${id} purgada da memória e do DOM.`);
+                }, 1000);
+            }
+        }, 120000); 
+    }
 }
 
 window.abrirRecarga = () => { document.getElementById('modalRecarga').style.display = 'flex'; };
