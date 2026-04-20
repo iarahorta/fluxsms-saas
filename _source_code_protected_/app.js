@@ -3,15 +3,16 @@
  */
 
 // === SUPABASE PROXY CLIENT ===
-// A URL agora aponta para o nosso próprio backend, que esconde o endereço real
 const SUPABASE_URL = window.location.origin + '/supabase-api';
 const SUPABASE_ANON = 'HIDDEN_PROXIED_KEY'; 
 
 let db = null;
 let currentUser = null;
 
-// Inicializa Supabase via Proxy
-db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
+// Inicializa Supabase - usa window.supabase se disponível (CDN), senão usa o SDK embutido no bundle
+if (window.supabase) {
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+}
 
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
