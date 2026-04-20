@@ -299,6 +299,7 @@ async function loadPolos() {
                 <span style="font-size:10px; color: rgba(255,255,255,0.4);">Visto: ${lastSeen}</span>
             </td>
             <td>
+                <button class="btn-action" style="margin-right: 5px;" onclick="editarPolo('${p.id}', '${p.nome}')">Editar</button>
                 <button class="btn-action" style="border-color: #ff4444; color: #ff4444;" onclick="deletarPolo('${p.id}')">Excluir</button>
             </td>
         `;
@@ -338,10 +339,19 @@ window.gerarPolo = async function() {
 }
 
 window.deletarPolo = async function(id) {
-    if(!confirm("⚠️ AVISO CRÍTICO: Excluir este Polo vai DESCONECTAR a máquina física associada a ele. O Worker irá parar de enviar dados.\\n\\nTem certeza que deseja excluir o Polo?")) return;
+    if(!confirm("⚠️ AVISO CRÍTICO: Excluir este Polo vai DESCONECTAR a máquina física associada a ele. O Worker irá parar de enviar dados.\n\nTem certeza que deseja excluir o Polo?")) return;
     
     const { error } = await db.from('polos').delete().eq('id', id);
     if(error) alert("Erro ao excluir polo: " + error.message);
+    else loadPolos();
+}
+
+window.editarPolo = async function(id, nomeAtual) {
+    const novoNome = prompt("Digite o novo nome para este Polo:", nomeAtual);
+    if (!novoNome || novoNome === nomeAtual) return;
+
+    const { error } = await db.from('polos').update({ nome: novoNome }).eq('id', id);
+    if (error) alert("Erro ao atualizar nome: " + error.message);
     else loadPolos();
 }
 
