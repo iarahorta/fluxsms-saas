@@ -66,11 +66,15 @@ async function loadStats() {
 }
 
 // === LIMPEZA FORÇADA (MANUAL) ===
-window.limpezaForcadaAdmin = async function() {
-    const btn = event.target;
-    const originalText = btn.innerText;
-    btn.innerText = "LIMPANDO...";
-    btn.disabled = true;
+window.limpezaForcadaAdmin = async function(e) {
+    if (e) e.preventDefault();
+    const btn = e ? e.target : null;
+    const originalText = btn ? btn.innerText : "LIMPAR";
+    
+    if (btn) {
+        btn.innerText = "LIMPANDO...";
+        btn.disabled = true;
+    }
 
     try {
         await db.rpc('rpc_monitorar_e_estornar_v2');
