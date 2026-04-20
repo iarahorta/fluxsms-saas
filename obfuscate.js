@@ -2,9 +2,10 @@ const JavaScriptObfuscator = require('javascript-obfuscator');
 const fs = require('fs');
 const path = require('path');
 
+// Fontes agora ficam na pasta protegida
 const filesToObfuscate = [
-    { in: 'app.js', out: 'app.js' }, // Sobrescrevendo o original após criar um backup seria arriscado, vamos criar uma pasta 'dist'
-    { in: 'admin.js', out: 'admin.js' }
+    { in: '_source_code_protected_/app.js', out: 'app.shield.js' },
+    { in: '_source_code_protected_/admin.js', out: 'admin.shield.js' }
 ];
 
 const distDir = path.join(__dirname, 'dist');
@@ -12,39 +13,45 @@ if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir);
 }
 
+// Configurações "MILITARY GRADE"
 const obfuscationOptions = {
     compact: true,
     controlFlowFlattening: true,
     controlFlowFlatteningThreshold: 1,
-    numbersToExpressions: true,
-    simplify: true,
-    stringArrayThreshold: 1,
-    splitStrings: true,
-    splitStringsChunkLength: 10,
-    unicodeEscapeSequence: true,
-    renameGlobals: false, // Perigoso se houver chamadas inline no HTML, vamos deixar false ou mapear
-    identifierNamesGenerator: 'hexadecimal',
+    deadCodeInjection: true,
+    deadCodeInjectionThreshold: 1,
     debugProtection: true,
-    debugProtectionInterval: 4000,
+    debugProtectionInterval: 2500,
     disableConsoleOutput: true,
+    identifierNamesGenerator: 'hexadecimal',
+    log: false,
+    numbersToExpressions: true,
+    renameGlobals: false, // Mantido false para não quebrar os onclick do HTML
     selfDefending: true,
-    sourceMap: false // Desativar source maps completamente
+    splitStrings: true,
+    splitStringsChunkLength: 5,
+    stringArray: true,
+    stringArrayEncoding: ['base64'],
+    stringArrayThreshold: 1,
+    transformObjectKeys: true,
+    unicodeEscapeSequence: true,
+    sourceMap: false
 };
 
-console.log('🚀 Iniciando Ofuscação de Produção...');
+console.log('🛡️ Iniciando Ofuscação de Produção V2 (REFORÇADA)...');
 
 filesToObfuscate.forEach(file => {
     const inputPath = path.join(__dirname, file.in);
     const outputPath = path.join(distDir, file.out);
 
     if (fs.existsSync(inputPath)) {
-        console.log(`[Ofuscando] ${file.in} -> dist/${file.out}`);
+        console.log(`[Blindando] ${file.in} -> dist/${file.out}`);
         const code = fs.readFileSync(inputPath, 'utf8');
         const obfuscationResult = JavaScriptObfuscator.obfuscate(code, obfuscationOptions);
         fs.writeFileSync(outputPath, obfuscationResult.getObfuscatedCode());
     } else {
-        console.warn(`[Aviso] Arquivo não encontrado: ${file.in}`);
+        console.error(`[ERRO] Arquivo fonte não encontrado: ${file.in}`);
     }
 });
 
-console.log('✅ Ofuscação concluída com sucesso! Os arquivos estão na pasta /dist');
+console.log('✅ Blindagem concluída com sucesso! Os arquivos .shield.js estão na pasta /dist');

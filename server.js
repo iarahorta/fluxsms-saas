@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const webhookRouter = require('./routes/webhook');
@@ -53,6 +54,22 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
+
+// ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
+// Negar acesso manual a qualquer arquivo na pasta de fontes originais
+app.use('/_source_code_protected_', (req, res) => res.status(403).send('Forbidden'));
+app.use('/obfuscate.js', (req, res) => res.status(403).send('Forbidden'));
+
+// Servir arquivos permitidos
+const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
+publicFolders.forEach(folder => {
+    app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
+});
+
+// Arquivos individuais na raiz permitidos
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
+app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
 // Handler de erros não capturados
 app.use((err, _req, res, _next) => {
