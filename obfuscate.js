@@ -1,29 +1,19 @@
 const JavaScriptObfuscator = require('javascript-obfuscator');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+
+// Fontes agora ficam na pasta protegida
+const filesToObfuscate = [
+    { in: '_source_code_protected_/app.js', out: 'app.shield.js' },
+    { in: '_source_code_protected_/admin.js', out: 'admin.shield.js' }
+];
 
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir);
 }
 
-// 1. PHASE: BUNDLING (esbuild)
-// Une Supabase SDK + app.js + admin.js em um único arquivo
-console.log('📦 Iniciando Bundling (esbuild)...');
-try {
-    execSync('npx esbuild src/index.js --bundle --minify --outfile=dist/main.bundle.js --platform=browser');
-    console.log('✅ Bundling concluído!');
-} catch (e) {
-    console.error('❌ Erro no Bundling:', e.message);
-    process.exit(1);
-}
-
-// 2. PHASE: TOTAL OBFUSCATION
-console.log('🛡️ Iniciando Blindagem Military Grade (Bundle Total)...');
-const bundlePath = path.join(distDir, 'main.bundle.js');
-const outputPath = path.join(distDir, 'index.shield.js');
-
+// Configurações "MILITARY GRADE"
 const obfuscationOptions = {
     compact: true,
     controlFlowFlattening: true,
@@ -36,7 +26,7 @@ const obfuscationOptions = {
     identifierNamesGenerator: 'hexadecimal',
     log: false,
     numbersToExpressions: true,
-    renameGlobals: false,
+    renameGlobals: false, // Mantido false para não quebrar os onclick do HTML
     selfDefending: true,
     splitStrings: true,
     splitStringsChunkLength: 5,
@@ -48,11 +38,20 @@ const obfuscationOptions = {
     sourceMap: false
 };
 
-const code = fs.readFileSync(bundlePath, 'utf8');
-const obfuscationResult = JavaScriptObfuscator.obfuscate(code, obfuscationOptions);
-fs.writeFileSync(outputPath, obfuscationResult.getObfuscatedCode());
+console.log('🛡️ Iniciando Ofuscação de Produção V2 (REFORÇADA)...');
 
-// Limpeza temporária
-fs.unlinkSync(bundlePath);
+filesToObfuscate.forEach(file => {
+    const inputPath = path.join(__dirname, file.in);
+    const outputPath = path.join(distDir, file.out);
 
-console.log('✅ MEGA-BLINDAGEM concluída! Arquivo único: dist/index.shield.js');
+    if (fs.existsSync(inputPath)) {
+        console.log(`[Blindando] ${file.in} -> dist/${file.out}`);
+        const code = fs.readFileSync(inputPath, 'utf8');
+        const obfuscationResult = JavaScriptObfuscator.obfuscate(code, obfuscationOptions);
+        fs.writeFileSync(outputPath, obfuscationResult.getObfuscatedCode());
+    } else {
+        console.error(`[ERRO] Arquivo fonte não encontrado: ${file.in}`);
+    }
+});
+
+console.log('✅ Blindagem concluída com sucesso! Os arquivos .shield.js estão na pasta /dist');

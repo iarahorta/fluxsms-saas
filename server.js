@@ -55,29 +55,18 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
 
-// ─── Servidor de Arquivos Estáticos (BLINDAGEM TOTAL) ────────
-// Nega acesso a QUALQUER arquivo .js fora da pasta dist
-app.use('/*.js', (req, res, next) => {
-    if (req.path.includes('/dist/')) return next();
-    res.status(403).send('Forbidden: Access Denied');
-});
+// ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
+// Negar acesso manual a qualquer arquivo na pasta de fontes originais
+app.use('/_source_code_protected_', (req, res) => res.status(403).send('Forbidden'));
+app.use('/obfuscate.js', (req, res) => res.status(403).send('Forbidden'));
 
-// Bloqueio de diretórios sensíveis
-const forbiddenDirs = ['src', '_source_code_protected_', 'middleware', 'routes', 'supabase'];
-forbiddenDirs.forEach(dir => {
-    app.use(`/${dir}`, (req, res) => res.status(403).send('Forbidden: Secure Folder'));
-});
-
-// Arquivo de script único permitido
-app.use('/dist', express.static(path.join(__dirname, 'dist')));
-
-// Servir demais ativos permitidos
-const publicFolders = ['assets', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
+// Servir arquivos permitidos
+const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
 publicFolders.forEach(folder => {
     app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
 });
 
-// Arquivos individuais na raiz permitidos (Apenas HTML, CSS e imagens)
+// Arquivos individuais na raiz permitidos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
