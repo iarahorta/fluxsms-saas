@@ -242,7 +242,7 @@ document.getElementById('form-custom-price').onsubmit = async (e) => {
         user_id: userProfile.id,
         service: service,
         price: price
-    });
+    }, { onConflict: 'user_id,service' });
 
     if (error) alert('Erro ao definir preço: ' + error.message);
     else alert(`Preço VIP salvo para ${email}!`);
