@@ -264,7 +264,7 @@ function setupRealtime() {
 
 // === GERENCIAMENTO DE POLOS (WORKERS) ===
 async function loadPolos() {
-    const { data: polos, error } = await db.from('polos').select('*').order('created_at', { ascending: false });
+    const { data: polos, error } = await db.from('polos').select('*').order('criado_em', { ascending: false });
     if (error) {
         console.error("Erro carregando polos:", error);
         return;
