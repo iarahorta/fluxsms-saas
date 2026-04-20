@@ -350,8 +350,8 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     }
 
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
-    if (error || !data.ok) { alert('Erro: ' + (error?.message || data?.error)); return; }
-    renderActivationCard({ id: data.activation_id, phone_number: data.numero, service_name: serviceName, status: 'waiting', sms_code: null, created_at: new Date().toISOString() });
+    if (error || !data.success) { alert('Erro: ' + (error?.message || data?.error)); return; }
+    renderActivationCard({ id: data.activation_id, phone_number: data.phone_number, service_name: serviceName, status: 'waiting', sms_code: null, created_at: new Date().toISOString() });
     updateUIForUser();
 }
 
