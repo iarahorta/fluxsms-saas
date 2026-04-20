@@ -272,7 +272,8 @@ async function loadChipsCount() {
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
         .eq('status', 'idle')
         .eq('polos.status', 'ONLINE')
-        .gt('polos.ultima_comunicacao', ninetySecondsAgo);
+        .gt('polos.ultima_comunicacao', ninetySecondsAgo)
+        .not('numero', 'ilike', 'CCID%'); // 🛡️ FILTRO: Nada de CCID no estoque
 
     chipsDisponiveis = count || 0; 
     db.rpc('rpc_get_service_stocks').then(r => { 
