@@ -3,17 +3,17 @@
  */
 
 // === SUPABASE PROXY CLIENT ===
+import { createClient } from '@supabase/supabase-js';
+
+// === SUPABASE PROXY CLIENT ===
 const SUPABASE_URL  = window.location.origin + '/supabase-api';
 const SUPABASE_ANON = 'HIDDEN_PROXIED_KEY';
 
-let db = null;
+let db = createClient(SUPABASE_URL, SUPABASE_ANON);
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 
 // Inicialização
 async function init() {
-    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-    const { data: { session } } = await db.auth.getSession();
     
     if (!session) {
         window.location.href = '../index.html';
@@ -344,5 +344,13 @@ window.deletarPolo = async function(id) {
     if(error) alert("Erro ao excluir polo: " + error.message);
     else loadPolos();
 }
+
+// === ATTACH TO WINDOW FOR HTML COMPATIBILITY ===
+window.gerarPolo = gerarPolo;
+window.deletarPolo = deletarPolo;
+window.openBalanceModal = openBalanceModal;
+window.closeModal = closeModal;
+window.updateGlobalPrice = updateGlobalPrice;
+window.toggleUserStatus = toggleUserStatus;
 
 init();
