@@ -205,26 +205,35 @@ let pixCheckInterval = null;
 
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
-    if (!amount || amount < 5) { alert('Valor mínimo: R$ 5,00'); return; }
-    const res = await fetch(`${BACKEND_URL}/webhook/criar-pix`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await db.auth.getSession()).data.session.access_token}`,
-            'X-Idempotency-Key': Math.random().toString(36).substring(7)
-        },
-        body: JSON.stringify({ amount })
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error);
-    document.getElementById('qrCodeContainer').innerHTML = `
-        <div style="text-align:center">
-            <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
-            <div style="background:rgba(255,255,255,0.05); padding:10px; margin-top:10px; font-size:11px; word-break:break-all;">${data.qr_code}</div>
-            <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
-        </div>
-    `;
-    document.getElementById('pixArea').style.display = 'block';
+    try {
+        const res = await fetch(`${BACKEND_URL}/webhook/criar-pix`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(await db.auth.getSession()).data.session.access_token}`,
+                'X-Idempotency-Key': Math.random().toString(36).substring(7)
+            },
+            body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+        
+        document.getElementById('qrCodeContainer').innerHTML = `
+            <div style="text-align:center">
+                <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
+                <div style="background:rgba(255,255,255,0.05); padding:10px; margin-top:10px; font-size:11px; word-break:break-all;">${data.qr_code}</div>
+                <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
+            </div>
+        `;
+        document.getElementById('pixArea').style.display = 'block';
+    } catch (err) {
+        console.error("Erro PIX:", err);
+        if (err.message.includes('fetch')) {
+            alert("ERRO DE DOMÍNIO: O servidor Railway ainda não autorizou o domínio fluxsms.com.br. Por favor, me avise para eu te dar o comando de liberação.");
+        } else {
+            alert("Erro ao gerar PIX: " + err.message);
+        }
+    }
     const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
     initialBalance = profile?.balance || 0;
     if (pixCheckInterval) clearInterval(pixCheckInterval);
@@ -350,12 +359,22 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     }
 
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
-    if (error || !data.success) { 
-        const msg = error?.message || data?.error || data?.message || "Nenhum chip disponivel no momento";
-        alert('Erro: ' + msg); 
+    
+    if (error || !data || !data.success) { 
+        console.error("Erro RPC:", error, data);
+        const errorMsg = error?.message || data?.error || "Nenhum chip disponível no momento ou falha na conexão.";
+        alert('Erro ao solicitar: ' + errorMsg); 
         return; 
     }
-    renderActivationCard({ id: data.activation_id, phone_number: data.phone_number, service_name: serviceName, status: 'waiting', sms_code: null, created_at: new Date().toISOString() });
+    
+    renderActivationCard({ 
+        id: data.activation_id, 
+        phone_number: data.phone_number, 
+        service_name: serviceName, 
+        status: 'waiting', 
+        sms_code: null, 
+        created_at: new Date().toISOString() 
+    });
     updateUIForUser();
 }
 
