@@ -262,14 +262,25 @@ async function fetchGlobalServices() {
 
 async function loadChipsCount() {
     if (!db) return;
-    const { count } = await db.from('chips').select('*', { count: 'exact', head: true }).eq('status', 'idle');
+    
+    // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
+    db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e));
+
+    // Busca apenas chips de Polos que estão ONLINE e enviaram sinal nos últimos 90 segundos
+    const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
+    const { count } = await db.from('chips')
+        .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
+        .eq('status', 'idle')
+        .eq('polos.status', 'ONLINE')
+        .gt('polos.ultima_comunicacao', ninetySecondsAgo);
+
     chipsDisponiveis = count || 0; 
     db.rpc('rpc_get_service_stocks').then(r => { 
         if(r.data) serviceStocks = r.data; 
         renderServices(SERVICES); 
     });
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Online`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
 }
 
 function setupRealtimeChips() {
