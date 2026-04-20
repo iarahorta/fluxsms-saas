@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FluxSMS | Números Virtuais de Elite</title>
-    <meta name="description" content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
+    <meta name="description"
+        content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=1.1">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=2.1">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
+
 <body>
 
     <!-- LANDING PAGE VIEW -->
@@ -35,10 +40,13 @@
                 <div class="hero-text">
                     <div class="tag-premium">◆ INFRAESTRUTURA DE ELITE</div>
                     <h1>O Padrão Ouro para Ativações via <span class="text-gold">Chips Reais</span></h1>
-                    <p>Utilizamos apenas chips físicos brasileiros genuínos. Garanta a maior taxa de aprovação para WhatsApp, Telegram, Google e centenas de outros serviços.</p>
+                    <p>Utilizamos apenas chips físicos brasileiros genuínos. Garanta a maior taxa de aprovação para
+                        WhatsApp, Telegram, Google e centenas de outros serviços.</p>
                     <div class="hero-actions">
                         <button class="btn-primary-lp" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
-                        <button class="btn-secondary-lp" onclick="document.getElementById('vantagens').scrollIntoView({behavior:'smooth'})">CONHECER VANTAGENS</button>
+                        <button class="btn-secondary-lp"
+                            onclick="document.getElementById('vantagens').scrollIntoView({behavior:'smooth'})">CONHECER
+                            VANTAGENS</button>
                     </div>
                 </div>
                 <div class="hero-image">
@@ -57,17 +65,20 @@
                     <div class="lp-feature-card">
                         <div class="lp-f-icon">🇧🇷</div>
                         <h3>Chips Físicos Reais</h3>
-                        <p>Hardware real/próprio. Não dependemos de APIs instáveis de terceiros para garantir sua ativação.</p>
+                        <p>Hardware real/próprio. Não dependemos de APIs instáveis de terceiros para garantir sua
+                            ativação.</p>
                     </div>
                     <div class="lp-feature-card">
                         <div class="lp-f-icon">📊</div>
                         <h3>99,9% de Entrega</h3>
-                        <p>Nossa taxa de aprovação para <strong>WhatsApp e Telegram</strong> é a maior do mercado nacional devido ao uso de chips físicos.</p>
+                        <p>Nossa taxa de aprovação para <strong>WhatsApp e Telegram</strong> é a maior do mercado
+                            nacional devido ao uso de chips físicos.</p>
                     </div>
                     <div class="lp-feature-card">
                         <div class="lp-f-icon">🛡️</div>
                         <h3>Estorno Automático</h3>
-                        <p>Transparência total: Se por qualquer motivo o SMS não chegar, o saldo volta para sua conta <strong>na hora</strong>.</p>
+                        <p>Transparência total: Se por qualquer motivo o SMS não chegar, o saldo volta para sua conta
+                            <strong>na hora</strong>.</p>
                     </div>
                 </div>
             </div>
@@ -135,8 +146,10 @@
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-top">
                     <div class="logo-area">
-                        <img src="assets/logo.png" alt="FluxSMS" class="logo-img" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
-                        <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></span>
+                        <img src="assets/logo.png" alt="FluxSMS" class="logo-img"
+                            onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                        <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span
+                                class="logo-sms">SMS</span></span>
                     </div>
                     <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
                 </div>
@@ -146,12 +159,17 @@
                     <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
                 </div>
                 <nav class="main-nav">
-                    <a href="javascript:void(0)" onclick="showView('dashboard')" class="nav-item active" id="nav-dashboard"><span class="icon">⚡</span> Dashboard</a>
-                    <a href="javascript:void(0)" onclick="showView('my-numbers')" class="nav-item" id="nav-my-numbers"><span class="icon">💼</span> Meus Números</a>
+                    <a href="javascript:void(0)" onclick="showView('dashboard')" class="nav-item active"
+                        id="nav-dashboard"><span class="icon">⚡</span> Dashboard</a>
+                    <a href="javascript:void(0)" onclick="showView('my-numbers')" class="nav-item"
+                        id="nav-my-numbers"><span class="icon">💼</span> Meus Números</a>
                     <div class="nav-separator"></div>
-                    <a href="javascript:void(0)" onclick="abrirRecarga()" class="nav-item"><span class="icon">💰</span> Recarregar Saldo</a>
-                    <a href="javascript:void(0)" onclick="showView('history')" class="nav-item" id="nav-history"><span class="icon">📊</span> Histórico</a>
-                    <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span> Sair</a>
+                    <a href="javascript:void(0)" onclick="abrirRecarga()" class="nav-item"><span class="icon">💰</span>
+                        Recarregar Saldo</a>
+                    <a href="javascript:void(0)" onclick="showView('history')" class="nav-item" id="nav-history"><span
+                            class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span>
+                        Sair</a>
                 </nav>
                 <div class="sidebar-footer">
                     <div class="badge-premium">◆ 100% PRIVATE SIMCARD INFRASTRUCTURE</div>
@@ -166,7 +184,9 @@
                             <span class="search-icon">🔍</span>
                             <input type="text" placeholder="Buscar serviço..." id="service-search">
                         </div>
-                        <div id="stock-count" style="font-size: 10px; font-weight: 800; color: #D4AF37; margin-left: 15px; border: 1px solid rgba(212,175,55,0.3); padding: 4px 8px; border-radius: 4px; background: rgba(212,175,55,0.05);">0 CHIPS ONLINE</div>
+                        <div id="stock-count"
+                            style="font-size: 10px; font-weight: 800; color: #D4AF37; margin-left: 15px; border: 1px solid rgba(212,175,55,0.3); padding: 4px 8px; border-radius: 4px; background: rgba(212,175,55,0.05);">
+                            0 CHIPS ONLINE</div>
                     </div>
                     <div class="user-controls">
                         <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
@@ -207,7 +227,8 @@
                 <!-- VIEW: MEUS NÚMEROS (HISTÓRICO SMS) -->
                 <section id="view-my-numbers" class="admin-section app-view" style="display:none; margin: 20px;">
                     <h2 class="section-title">MEUS CÓDIGOS RECEBIDOS</h2>
-                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Aqui aparecem todos os SMS que você já recebeu com sucesso no FluxSMS.</p>
+                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Aqui aparecem todos os SMS que você já
+                        recebeu com sucesso no FluxSMS.</p>
                     <div style="overflow-x: auto;">
                         <table id="table-my-numbers">
                             <thead>
@@ -228,7 +249,8 @@
                 <!-- VIEW: HISTÓRICO (FINANCEIRO) -->
                 <section id="view-history" class="admin-section app-view" style="display:none; margin: 20px;">
                     <h2 class="section-title">EXTRATO FINANCEIRO</h2>
-                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Consulte suas recargas, débitos de ativação e reembolsos.</p>
+                    <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Consulte suas recargas, débitos de
+                        ativação e reembolsos.</p>
                     <div style="overflow-x: auto;">
                         <table id="table-user-history">
                             <thead>
@@ -263,8 +285,11 @@
                 </div>
                 <button id="btn-gerar-pix" class="btn-pix" onclick="gerarPix()">GERAR QR CODE PIX</button>
                 <div id="pixArea" style="display:none; margin-top:20px; text-align:center;">
-                    <div id="qrCodeContainer" style="background:white; padding:10px; border-radius:10px; display:inline-block; margin-bottom:10px;"></div>
-                    <button id="btnVerificarPagamento" class="btn-pix" onclick="verificarPagamento()" style="width: 100%; padding: 12px; font-weight: 800; margin-top: 15px;">JÁ PAGUEI</button>
+                    <div id="qrCodeContainer"
+                        style="background:white; padding:10px; border-radius:10px; display:inline-block; margin-bottom:10px;">
+                    </div>
+                    <button id="btnVerificarPagamento" class="btn-pix" onclick="verificarPagamento()"
+                        style="width: 100%; padding: 12px; font-weight: 800; margin-top: 15px;">JÁ PAGUEI</button>
                     <p style="font-size: 11px; color: #888;">Pague para o saldo subir na hora.</p>
                 </div>
             </div>
@@ -285,14 +310,16 @@
                     <h2 class="section-title" style="text-align:center; margin-bottom:20px;">ACESSO À PLATAFORMA</h2>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com">
+                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
                         <input type="password" id="auth-password" class="custom-value" placeholder="••••••••">
                     </div>
-                    <button class="btn-primary-lp" type="button" onclick="handleAuth('login')" style="width:100%; margin-top: 10px;">ENTRAR</button>
-                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Novo aqui? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Criar conta</a></p>
+                    <button class="btn-primary-lp" type="button" onclick="handleAuth('login')"
+                        style="width:100%; margin-top: 10px;">ENTRAR</button>
+                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Novo aqui? <a
+                            href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Criar conta</a></p>
                 </div>
                 <div id="signupForm" style="display:none;">
                     <h2 class="section-title" style="text-align:center; margin-bottom:20px;">CRIAR CONTA ELITE</h2>
@@ -302,14 +329,16 @@
                     </div>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com">
+                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
                         <input type="password" id="reg-password" class="custom-value" placeholder="Mínimo 6 dígitos">
                     </div>
-                    <button class="btn-primary-lp" type="button" onclick="handleAuth('signup')" style="width:100%; margin-top: 10px;">CADASTRAR GRATUITAMENTE</button>
-                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Já tem conta? <a href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Entrar</a></p>
+                    <button class="btn-primary-lp" type="button" onclick="handleAuth('signup')"
+                        style="width:100%; margin-top: 10px;">CADASTRAR GRATUITAMENTE</button>
+                    <p style="text-align:center; font-size: 12px; margin-top:15px;">Já tem conta? <a
+                            href="javascript:toggleAuthView()" style="color:var(--flux-gold);">Entrar</a></p>
                 </div>
             </div>
         </div>
@@ -317,17 +346,17 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.js"></script>
+    <script src="dist/app.shield.js?v=2.1"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function abrirAuth() { abrirModal('authModal'); }
         function fecharAuth() { fecharModal('authModal'); }
-        function toggleAuthView() { 
+        function toggleAuthView() {
             const login = document.getElementById('loginForm');
             const signup = document.getElementById('signupForm');
-            if(login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
+            if (login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
             else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
 
@@ -335,11 +364,12 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc)
-        document.onkeydown = function(e) {
+        document.onkeydown = function (e) {
             if (e.keyCode == 123) return false; // F12
             if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
             if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0))) return false;
         };
     </script>
 </body>
+
 </html>

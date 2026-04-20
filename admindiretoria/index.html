@@ -216,6 +216,54 @@
             text-align: center;
         }
 
+        /* --- MODAL HISTÓRICO (EXPANDIDO) --- */
+        .modal-history {
+            max-width: 900px !important;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .history-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px dashed rgba(212,175,55,0.3);
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item b {
+            display: block;
+            color: var(--gold);
+            font-size: 1.2rem;
+        }
+
+        .summary-item span {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .history-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .badge-service {
+            background: rgba(212,175,55,0.1);
+            color: var(--gold);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
         @media (max-width: 1024px) {
             .admin-grid { grid-template-columns: 1fr; }
         }
@@ -237,7 +285,10 @@
             </div>
             <div id="admin-user-info" style="text-align: right;">
                 <p id="admin-mail" style="font-weight: 700; color: var(--gold);"></p>
-                <button onclick="window.location.href='index.html'" class="btn-action" style="margin-top: 5px;">Sair do Admin</button>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+                    <button onclick="limpezaForcadaAdmin(event)" class="btn-action" style="border-color: #00ff00; color: #00ff00;">🧹 LIMPEZA FORÇADA</button>
+                    <button onclick="window.location.href='index.html'" class="btn-action">Sair do Admin</button>
+                </div>
             </div>
         </header>
 
@@ -389,7 +440,40 @@
         </div>
     </div>
 
-    <script src="../dist/admin.js"></script>
+    <!-- MODAL: HISTÓRICO DE USUÁRIO (Novo) -->
+    <div id="modal-user-history" class="modal">
+        <div class="modal-content modal-history">
+            <h2 style="color: var(--gold); margin-bottom: 10px;">Histórico de Uso</h2>
+            <p id="history-user-email" style="margin-bottom: 25px; opacity: 0.6;"></p>
+
+            <div id="history-summary" class="history-summary">
+                <!-- Preenchido via JS -->
+            </div>
+
+            <div class="history-table-container">
+                <table class="admin-table" id="table-user-history">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Serviço</th>
+                            <th>Valor</th>
+                            <th>Código</th>
+                            <th>Status Ontem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 30px; display: flex; justify-content: flex-end;">
+                <button type="button" onclick="closeHistoryModal()" class="btn-action">Fechar Histórico</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../dist/admin.shield.js?v=2.1"></script>
     <script>
         // Medida de Segurança: Bloqueio de Clique Direito
         document.addEventListener('contextmenu', event => event.preventDefault());

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const webhookRouter = require('./routes/webhook');
@@ -12,7 +13,6 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─── Middlewares Base ─────────────────────────────────────────
-app.use(express.json({ limit: '10kb' })); 
 app.use(cors({ origin: '*' }));
 
 // ─── Rotas Prioritárias (Isentas de Rate Limit / Segurança) ───
@@ -30,7 +30,8 @@ app.set('supabase', supabase);
 const proxy = require('express-http-proxy');
 
 // ─── Proxy Unificado para Supabase ─────────────────────────────
-// Esconde a URL real e injeta a Service Key no backend
+// IMPORTANTE: Este proxy DEVE ficar ANTES do express.json()
+// porque o express.json() consome o stream do body e quebra o proxy
 app.use('/supabase-api', proxy(process.env.SUPABASE_URL, {
     proxyReqOptDecorator: (proxyReqOpts, _srcReq) => {
         proxyReqOpts.headers['apikey'] = process.env.SUPABASE_SERVICE_KEY;
@@ -38,6 +39,9 @@ app.use('/supabase-api', proxy(process.env.SUPABASE_URL, {
         return proxyReqOpts;
     }
 }));
+
+// express.json() DEPOIS do proxy - assim o stream do body fica intacto para o proxy
+app.use(express.json({ limit: '10kb' }));
 
 // Realtime Proxy (WebSocket handling is more complex, we will handle it with a direct URL obfuscation in app.js for now or a dedicated tunnel if requested)
 
@@ -53,6 +57,22 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
+
+// ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
+// Negar acesso manual a qualquer arquivo na pasta de fontes originais
+app.use('/_source_code_protected_', (req, res) => res.status(403).send('Forbidden'));
+app.use('/obfuscate.js', (req, res) => res.status(403).send('Forbidden'));
+
+// Servir arquivos permitidos
+const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
+publicFolders.forEach(folder => {
+    app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
+});
+
+// Arquivos individuais na raiz permitidos
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
+app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
 // Handler de erros não capturados
 app.use((err, _req, res, _next) => {
