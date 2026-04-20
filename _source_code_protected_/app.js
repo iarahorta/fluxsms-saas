@@ -221,7 +221,7 @@ async function gerarPix() {
         <div style="text-align:center">
             <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
             <div style="background:rgba(255,255,255,0.05); padding:10px; margin-top:10px; font-size:11px; word-break:break-all;">${data.qr_code}</div>
-            <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('Copiado!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
+            <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
         </div>
     `;
     document.getElementById('pixArea').style.display = 'block';
@@ -350,7 +350,11 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     }
 
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
-    if (error || !data.success) { alert('Erro: ' + (error?.message || data?.error)); return; }
+    if (error || !data.success) { 
+        const msg = error?.message || data?.error || data?.message || "Nenhum chip disponivel no momento";
+        alert('Erro: ' + msg); 
+        return; 
+    }
     renderActivationCard({ id: data.activation_id, phone_number: data.phone_number, service_name: serviceName, status: 'waiting', sms_code: null, created_at: new Date().toISOString() });
     updateUIForUser();
 }
