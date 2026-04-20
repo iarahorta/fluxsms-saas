@@ -108,6 +108,7 @@ async function loadUsers(search = '') {
             </td>
             <td>
                 <button class="btn-action" onclick="openBalanceModal('${u.id}', '${u.email}')">Saldo</button>
+                <button class="btn-action" onclick="openUserHistoryModal('${u.id}', '${u.email}')">Histórico</button>
                 <button class="btn-action" style="border-color: #ff4444; color: #ff4444;" onclick="toggleUserStatus('${u.id}', ${u.is_active})">
                     ${u.is_active ? 'Banir' : 'Reativar'}
                 </button>
@@ -367,6 +368,72 @@ window.editarPolo = async function(id, nomeAtual) {
     const { error } = await db.from('polos').update({ nome: novoNome }).eq('id', id);
     if (error) alert("Erro ao atualizar nome: " + error.message);
     else loadPolos();
+}
+
+// === HISTÓRICO DE USUÁRIO ===
+window.openUserHistoryModal = async function(userId, email) {
+    document.getElementById('history-user-email').innerText = `Visualizando atividade de: ${email}`;
+    document.getElementById('modal-user-history').style.display = 'flex';
+    
+    const summaryDiv = document.getElementById('history-summary');
+    const tbody = document.querySelector('#table-user-history tbody');
+    summaryDiv.innerHTML = "Carregando resumo...";
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Buscando ativações...</td></tr>";
+
+    // 1. Busca ativações (Limite de 200 recentes para performance)
+    const { data: acts, error } = await db.from('activations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+    if (error) { 
+        alert('Erro ao carregar histórico: ' + error.message); 
+        return; 
+    }
+
+    if (!acts || acts.length === 0) {
+        summaryDiv.innerHTML = "<b>Nenhuma compra encontrada.</b>";
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>O usuário ainda não realizou compras.</td></tr>";
+        return;
+    }
+
+    // 2. Processa Resumo (Contagem por serviço)
+    const summary = {};
+    acts.forEach(a => {
+        summary[a.service_name] = (summary[a.service_name] || 0) + 1;
+    });
+
+    summaryDiv.innerHTML = Object.entries(summary).map(([name, count]) => `
+        <div class="summary-item">
+            <b>${count}x</b>
+            <span>${name}</span>
+        </div>
+    `).join('');
+
+    // 3. Função para decodificar SMS (Inverte Base64 -> Reverse)
+    function descramble(txt) {
+        try { return atob(txt).split('').reverse().join(''); } catch(e) { return txt || '---'; }
+    }
+
+    // 4. Renderiza Tabela
+    tbody.innerHTML = acts.map(a => `
+        <tr>
+            <td>${new Date(a.created_at).toLocaleString('pt-BR')}</td>
+            <td><span class="badge-service">${a.service_name}</span></td>
+            <td style="color:var(--gold);">R$ ${a.price.toFixed(2)}</td>
+            <td style="font-family: monospace; color: #00ff00;">${a.status === 'received' ? descramble(a.sms_code) : '---'}</td>
+            <td>
+                <span class="status-badge ${a.status === 'received' ? 'status-online' : 'status-offline'}">
+                    ${a.status.toUpperCase()}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+window.closeHistoryModal = function() {
+    document.getElementById('modal-user-history').style.display = 'none';
 }
 
 init();
