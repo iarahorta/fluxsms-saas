@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build:secure": "node obfuscate.js"
   },
   "engines": {
     "node": "20.x"
@@ -16,8 +17,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-http-proxy": "^2.1.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "javascript-obfuscator": "^5.4.1",
     "mercadopago": "^1.5.17",
     "playwright": "^1.59.1"
   },
