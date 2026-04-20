@@ -48,37 +48,41 @@ async function init() {
 // === CARREGAMENTO DE DADOS ===
 
 async function loadStats() {
-    // Total Usuários
-    const { count: userCount } = await db.from('profiles').select('*', { count: 'exact', head: true });
+    // Busca estatísticas reias do banco (Motor V3 - Blindado)
+    const { data: stats, error } = await db.rpc('rpc_get_admin_stats_v3');
     
-    // Saldo Global
-    const { data: balances } = await db.from('profiles').select('balance');
-    const totalBalance = balances.reduce((acc, curr) => acc + (curr.balance || 0), 0);
+    if (error) {
+        console.error("Erro ao buscar estatísticas reais:", error);
+        return;
+    }
 
-    // 🕒 FILTRO DE REALIDADE: Últimos 90 segundos
-    const threshold = new Date(Date.now() - 90000).toISOString();
+    if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = stats.users_count || 0;
+    if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${stats.balance_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${stats.chips_online || 0}/${stats.chips_total || 0}`;
+    if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = stats.sms_count || 0;
+    
+    // GATILHO DE SEGURANÇA: Sempre que abrir/atualizar o Admin, roda o Gari para limpar Polos mortos
+    await db.rpc('rpc_monitorar_e_estornar_v2');
+}
 
-    // Chips Online (Somente de Polos Online com sinal recente)
-    const { count: onlineChips } = await db.from('chips')
-        .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
-        .eq('status', 'idle')
-        .gt('polos.ultima_comunicacao', threshold);
+// === LIMPEZA FORÇADA (MANUAL) ===
+window.limpezaForcadaAdmin = async function() {
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "LIMPANDO...";
+    btn.disabled = true;
 
-    // Total de Modems (Chips criados na base)
-    const { count: totalChipsCount } = await db.from('chips').select('*', { count: 'exact', head: true });
-
-    // SMS Hoje
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const { count: smsCount } = await db
-        .from('activations')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString());
-
-    if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = userCount || 0;
-    if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${onlineChips || 0}/${totalChipsCount || 0}`;
-    if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = smsCount || 0;
+    try {
+        await db.rpc('rpc_monitorar_e_estornar_v2');
+        await loadStats();
+        await loadPolos();
+        alert("🧹 Limpeza forçada concluída! Polos inativos foram offline e clientes estornados.");
+    } catch(err) {
+        alert("Erro na limpeza: " + err.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
 }
 
 async function loadUsers(search = '') {
