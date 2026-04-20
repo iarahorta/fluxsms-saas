@@ -17,18 +17,16 @@ jobs:
 
       - name: Inject Supabase env into app.js and admin.js
         run: |
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" app.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" app.js
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" admin.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" admin.js
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/app.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/admin.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/admin.js
 
-      - name: Install Javascript Obfuscator
-        run: npm install -g javascript-obfuscator
+      - name: Install Dependencies
+        run: npm install
 
       - name: Obfuscate Dashboard Logic (F12 Protection)
-        run: |
-          javascript-obfuscator app.js --output app.js --compact true --self-defending true --string-array true --string-array-encoding 'base64'
-          javascript-obfuscator admin.js --output admin.js --compact true --self-defending true --string-array true --string-array-encoding 'base64'
+        run: node obfuscate.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
