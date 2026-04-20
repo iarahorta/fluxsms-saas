@@ -365,7 +365,7 @@ function renderActivationCard(act) {
     const createdAt = act.created_at ? new Date(act.created_at).getTime() : Date.now();
     const LOCK_MS = 2 * 60 * 1000; // 2 minutos
     const msUntilUnlock = Math.max(0, (createdAt + LOCK_MS) - Date.now());
-    const cancelDisabled = msUntilUnlock > 0 ? 'disabled style="opacity:0.4; cursor:not-allowed; pointer-events:none;"' : '';
+    const cancelDisabled = msUntilUnlock > 0 ? 'disabled class="btn-waiting"' : ''; // 🛡️ Removido style inline
     const cancelLabel = msUntilUnlock > 0 ? 'AGUARDE (2min)' : 'CANCELAR';
 
     const h = `
