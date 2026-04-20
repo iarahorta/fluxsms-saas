@@ -327,9 +327,19 @@ function renderServices(list) {
 
 // === ACTIVATIONS ===
 async function requestNumber(serviceId, serviceName, defaultPrice) {
+    // TRAVA 1: Máximo 5 ativações simultâneas
+    const { count } = await db.from('activations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id)
+        .eq('status', 'waiting');
+    if (count >= 5) {
+        alert('⚠️ Você atingiu o limite de 5 pedidos simultâneos.\nFinalize ou cancele um para pedir outro.');
+        return;
+    }
+
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
     if (error || !data.ok) { alert('Erro: ' + (error?.message || data?.error)); return; }
-    renderActivationCard({ id: data.activation_id, phone_number: data.numero, service_name: serviceName, status: 'waiting', sms_code: null });
+    renderActivationCard({ id: data.activation_id, phone_number: data.numero, service_name: serviceName, status: 'waiting', sms_code: null, created_at: new Date().toISOString() });
     updateUIForUser();
 }
 
@@ -339,16 +349,46 @@ function renderActivationCard(act) {
     
     const displayCode = unscrambleSMS(act.sms_code);
 
+    // TRAVA 2: Botão CANCELAR bloqueado por 2 minutos
+    const createdAt = act.created_at ? new Date(act.created_at).getTime() : Date.now();
+    const LOCK_MS = 2 * 60 * 1000; // 2 minutos
+    const msUntilUnlock = Math.max(0, (createdAt + LOCK_MS) - Date.now());
+    const cancelDisabled = msUntilUnlock > 0 ? 'disabled style="opacity:0.4; cursor:not-allowed; pointer-events:none;"' : '';
+    const cancelLabel = msUntilUnlock > 0 ? 'AGUARDE (2min)' : 'CANCELAR';
+
     const h = `
         <div class="session-card" id="${act.id}">
             <span class="number">${act.phone_number}</span>
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
-            <div id="actions-${act.id}">${act.status === 'waiting' ? `<button onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
+            <div id="actions-${act.id}">${act.status === 'waiting' ? `<button id="btn-cancel-${act.id}" onclick="cancelActivation('${act.id}')" ${cancelDisabled}>${cancelLabel}</button>` : '✓'}</div>
         </div>
     `;
     activeNumbers.insertAdjacentHTML('afterbegin', h);
+
+    if (act.status === 'waiting') {
+        // Desbloqueia o botão cancelar após o período de lock
+        if (msUntilUnlock > 0) {
+            setTimeout(() => {
+                const btn = document.getElementById(`btn-cancel-${act.id}`);
+                if (btn) { btn.disabled = false; btn.removeAttribute('style'); btn.innerText = 'CANCELAR'; }
+            }, msUntilUnlock);
+        }
+
+        // TRAVA 3: Auto-cancelamento após 10 minutos
+        const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
+        const msSinceCreated = Date.now() - createdAt;
+        const timeoutRemaining = Math.max(0, TIMEOUT_MS - msSinceCreated);
+        setTimeout(async () => {
+            const card = document.getElementById(act.id);
+            const statusEl = document.getElementById(`status-${act.id}`);
+            if (card && statusEl && statusEl.innerText !== 'RECEBIDO') {
+                console.log(`[AUTO-CANCEL] Ativação ${act.id} expirou após 10 minutos.`);
+                await cancelActivation(act.id);
+            }
+        }, timeoutRemaining);
+    }
 }
 
 async function cancelActivation(id) {
