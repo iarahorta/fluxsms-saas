@@ -548,13 +548,17 @@ body {
 
 .btn-cancel:disabled,
 .btn-waiting {
-    background: #333 !important;
-    color: #FFF !important;
-    border: 1px solid #444 !important;
+    background: #444 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #666 !important;
     opacity: 1 !important;
+    display: inline-block !important;
+    padding: 10px !important;
+    min-width: 120px !important;
     cursor: not-allowed;
     pointer-events: none;
-    font-weight: 700;
+    font-weight: 800 !important;
+    text-transform: uppercase;
 }
 
 .countdown-timer {
