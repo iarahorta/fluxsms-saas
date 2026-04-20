@@ -2,17 +2,16 @@
  * FluxSMS - Frontend Business Logic (Realtime & Supabase Integration)
  */
 
-// === SUPABASE CLIENT ===
-const SUPABASE_URL = '__SUPABASE_URL__';
-const SUPABASE_ANON = '__SUPABASE_ANON_KEY__';
+// === SUPABASE PROXY CLIENT ===
+// A URL agora aponta para o nosso próprio backend, que esconde o endereço real
+const SUPABASE_URL = window.location.origin + '/supabase-api';
+const SUPABASE_ANON = 'HIDDEN_PROXIED_KEY'; 
 
 let db = null;
 let currentUser = null;
 
-// Inicializa Supabase
-if (!SUPABASE_URL.includes('__') && !SUPABASE_ANON.includes('__')) {
-    db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
-}
+// Inicializa Supabase via Proxy
+db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [

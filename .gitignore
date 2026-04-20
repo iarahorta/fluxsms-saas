@@ -7,7 +7,7 @@ node_modules/
 backend/node_modules/
 
 # Build artifacts
-dist/
+# dist/ (Removido para permitir blindagem em produção)
 .next/
 
 # Logs

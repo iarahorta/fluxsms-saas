@@ -2,20 +2,15 @@
  * FluxSMS - Admin Master Control Logic
  */
 
-// Configuração Supabase (O GitHub Actions substituirá estas chaves no deploy)
-const SUPABASE_URL  = '__SUPABASE_URL__';
-const SUPABASE_ANON = '__SUPABASE_ANON_KEY__';
+// === SUPABASE PROXY CLIENT ===
+const SUPABASE_URL  = window.location.origin + '/supabase-api';
+const SUPABASE_ANON = 'HIDDEN_PROXIED_KEY';
 
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 
 // Inicialização
 async function init() {
-    if (SUPABASE_URL.includes('__')) {
-        console.error('Supabase keys not configured.');
-        return;
-    }
-
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const { data: { session } } = await db.auth.getSession();
