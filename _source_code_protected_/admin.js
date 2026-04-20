@@ -50,12 +50,23 @@ async function init() {
 async function loadStats() {
     // Total Usuários
     const { count: userCount } = await db.from('profiles').select('*', { count: 'exact', head: true });
+    
     // Saldo Global
     const { data: balances } = await db.from('profiles').select('balance');
     const totalBalance = balances.reduce((acc, curr) => acc + (curr.balance || 0), 0);
-    // Chips
-    const { data: chips } = await db.from('chips').select('status');
-    const onlineChips = chips.filter(c => c.status !== 'offline').length;
+
+    // 🕒 FILTRO DE REALIDADE: Últimos 90 segundos
+    const threshold = new Date(Date.now() - 90000).toISOString();
+
+    // Chips Online (Somente de Polos Online com sinal recente)
+    const { count: onlineChips } = await db.from('chips')
+        .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
+        .eq('status', 'idle')
+        .gt('polos.ultima_comunicacao', threshold);
+
+    // Total de Modems (Chips criados na base)
+    const { count: totalChipsCount } = await db.from('chips').select('*', { count: 'exact', head: true });
+
     // SMS Hoje
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -66,7 +77,7 @@ async function loadStats() {
 
     if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = userCount || 0;
     if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${onlineChips}/${chips ? chips.length : 0}`;
+    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${onlineChips || 0}/${totalChipsCount || 0}`;
     if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = smsCount || 0;
 }
 
@@ -278,8 +289,11 @@ async function loadPolos() {
     tbody.innerHTML = '';
 
     polos.forEach(p => {
-        const lastSeen = p.ultima_comunicacao ? new Date(p.ultima_comunicacao).toLocaleString('pt-BR') : 'Sem Conexão';
-        const isOnline = p.status === 'ONLINE';
+        // Regra de 90 segundos para o Badge de Status entrar em OFFLINE automaticamente na tela
+        const lastSeenDate = p.ultima_comunicacao ? new Date(p.ultima_comunicacao) : null;
+        const isOnline = lastSeenDate && (new Date() - lastSeenDate < 90000); 
+        
+        const lastSeenStr = lastSeenDate ? lastSeenDate.toLocaleString('pt-BR') : 'Sem Conexão';
         const activeChips = chips ? chips.filter(c => c.polo_id === p.id && c.status === 'idle').length : 0;
 
         const tr = document.createElement('tr');
@@ -293,10 +307,10 @@ async function loadPolos() {
             </td>
             <td style="text-align:center; font-weight: 800;">${activeChips}</td>
             <td>
-                <span class="status-badge ${isOnline ? 'status-online' : (p.status === 'INSTALL_PENDING' ? 'status-busy' : 'status-offline')}">
-                    ${p.status === 'INSTALL_PENDING' ? 'Aguardando Instalação' : p.status}
+                <span class="status-badge ${isOnline ? 'status-online' : 'status-offline'}">
+                    ${isOnline ? 'ONLINE' : 'OFFLINE'}
                 </span><br>
-                <span style="font-size:10px; color: rgba(255,255,255,0.4);">Visto: ${lastSeen}</span>
+                <span style="font-size:10px; color: rgba(255,255,255,0.4);">Visto: ${lastSeenStr}</span>
             </td>
             <td>
                 <button class="btn-action" style="margin-right: 5px;" onclick="editarPolo('${p.id}', '${p.nome}')">Editar</button>
