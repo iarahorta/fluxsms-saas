@@ -12,29 +12,6 @@ const { validateInput } = require('./middleware/validate');
 const app = express();
 app.set('trust proxy', 1);
 
-// ─── Middlewares Base ─────────────────────────────────────────
-app.use(cors({ 
-    origin: ['https://fluxsms.com.br', 'https://www.fluxsms.com.br'],
-    credentials: true 
-}));
-
-// express.json() configurado antes das rotas que usam body
-app.use(express.json({ limit: '10kb' }));
-
-// ─── Rotas Prioritárias ───────────────────────────────────────
-app.use('/webhook', webhookRouter);  // Mercado Pago
-
-// ─── Supabase (service_role para operações protegidas) ────────
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
-
-// Disponibiliza globalmente para rotas
-app.set('supabase', supabase);
-
-const proxy = require('express-http-proxy');
-
 // ─── Proxy Unificado para Supabase ─────────────────────────────
 // IMPORTANTE: Este proxy DEVE ficar ANTES do express.json()
 // porque o express.json() consome o stream do body e quebra o proxy
@@ -45,6 +22,19 @@ app.use('/supabase-api', proxy(process.env.SUPABASE_URL, {
         return proxyReqOpts;
     }
 }));
+
+// ─── Middlewares Base ─────────────────────────────────────────
+app.use(cors({ 
+    origin: [
+        'https://fluxsms.com.br', 
+        'https://www.fluxsms.com.br',
+        'https://fluxsms-staging-production.up.railway.app' // Liberando Laboratório
+    ],
+    credentials: true 
+}));
+
+// express.json() agora fica DEPOIS do proxy
+app.use(express.json({ limit: '10kb' }));
 
 // proxyReqOptDecorator: ...
 // (express.json() movido para o topo)
