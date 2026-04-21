@@ -546,10 +546,11 @@ body {
     background: #3a1a1a;
 }
 
-.btn-cancel:disabled,
+/* Botão de espera em números ativos (Máximo Contraste) */
 .btn-waiting {
-    background: #FFD700 !important; /* Dourado Vivo */
-    color: #000000 !important; /* Preto Puro */
+    background: #FFD700 !important; /* Dourado Vibrante */
+    color: #000000 !important;    /* Texto Preto Sólido */
+    font-weight: 950 !important;
     border: 2px solid #000000 !important;
     opacity: 1 !important;
     display: block !important;
@@ -557,11 +558,29 @@ body {
     padding: 12px !important;
     cursor: not-allowed;
     pointer-events: none;
-    font-weight: 900 !important;
     text-transform: uppercase;
     text-align: center;
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
     margin-top: 10px;
+}
+
+/* Banner de Dica de Especialista */
+.specialist-tip {
+    background: rgba(255, 215, 0, 0.05);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 12px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #ccc;
+    text-align: left;
+}
+
+.specialist-tip b {
+    color: var(--flux-gold);
+    display: block;
+    margin-bottom: 2px;
 }
 
 .countdown-timer {
