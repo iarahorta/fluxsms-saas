@@ -56,6 +56,7 @@ async function init() {
     
     fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
     setupRealtimeChips();
+    loadChipsCount(); // Forçar carregamento inicial do estoque antes dos eventos
     
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
@@ -204,7 +205,7 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__';
+const BACKEND_URL = '__BACKEND_URL__'.includes('http') ? '__BACKEND_URL__' : (window.location.hostname === 'fluxsms.com.br' ? 'https://api.fluxsms.com.br' : window.location.origin);
 let initialBalance = 0;
 let pixCheckInterval = null;
 
