@@ -11,6 +11,8 @@ const smsRouter = require('./routes/sms');
 const partnerApiRouter = require('./routes/partnerApi');
 const adminPartnersRouter = require('./routes/adminPartners');
 const partnerFinanceRouter = require('./routes/partnerFinance');
+const partnerOnboardingRouter = require('./routes/partnerOnboarding');
+const partnerSelfRouter = require('./routes/partnerSelf');
 const { rateLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
@@ -68,6 +70,8 @@ app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
 app.use('/partner-api', partnerApiRouter); // API universal para parceiros
 app.use('/api/admin/partners', adminPartnersRouter); // Dashboard admin: lista de parceiros (JWT + is_admin)
 app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resumo repasse + pedido de saque (JWT + is_partner)
+app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autónomo: ativar perfil parceiro (JWT)
+app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
@@ -133,8 +137,12 @@ publicFolders.forEach(folder => {
     app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
 });
 
+// Executável Polo Worker (coloque FluxSMS-Polo-Worker-Portable.exe na pasta /downloads ou defina POLO_WORKER_DOWNLOAD_URL)
+app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));
+
 // Arquivos individuais na raiz permitidos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/partner/register', (req, res) => res.sendFile(path.join(__dirname, 'partner-register.html')));
 // Rota /partner removida: evitava confusão (redirecionava para JSON da API). Parceiros ficam no dashboard (admin).
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));

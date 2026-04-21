@@ -252,6 +252,76 @@ const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.inc
     ? '__BACKEND_URL__'
     : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
+
+async function loadPartnerAutonomyStrip() {
+    const strip = document.getElementById('partner-autonomy-strip');
+    if (!strip || !db || !currentUserIsPartner) return;
+    strip.style.display = 'block';
+    const keyLine = document.getElementById('partner-strip-key-line');
+    const finLine = document.getElementById('partner-strip-finance-line');
+    const dl = document.getElementById('partner-strip-download');
+    if (keyLine) keyLine.textContent = 'A carregar…';
+    if (finLine) finLine.textContent = '…';
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/bootstrap`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            if (keyLine) keyLine.textContent = j.detail || j.error || res.statusText;
+            return;
+        }
+        const keys = j.api_keys || [];
+        if (keyLine) {
+            if (!keys.length) {
+                keyLine.innerHTML = '<span style="opacity:0.8">Sem chave ativa — use <strong>Gerar nova chave</strong> para o Polo Worker.</span>';
+            } else {
+                keyLine.textContent = `Prefixo mais recente: ${keys[0].key_prefix}… (${keys.length} chave(s) ativa(s))`;
+            }
+        }
+        const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
+        if (finLine) {
+            finLine.textContent = `Repasse liberado: R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível para saque: R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
+        }
+        if (dl && j.worker_download_url) {
+            dl.href = j.worker_download_url;
+        }
+    } catch (e) {
+        if (keyLine) keyLine.textContent = e.message || String(e);
+    }
+}
+
+window.generatePartnerKeyFromStrip = async function () {
+    if (!currentUserIsPartner) return;
+    const label = window.prompt('Rótulo desta chave (ex.: PC Polo SP):', 'Polo Worker');
+    if (label === null) return;
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Faça login novamente.');
+        return;
+    }
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/api-keys`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ label: label || 'Polo Worker' })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        window.prompt('COPIE AGORA a Partner API Key (mostrada uma única vez):', j.api_key);
+        loadPartnerAutonomyStrip();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
 let pixCheckInterval = null;
 
 async function gerarPix() {
@@ -403,6 +473,13 @@ async function updateUIForUser() {
         a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
         a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
         nav.insertBefore(a, nav.firstChild);
+    }
+
+    if (currentUserIsPartner) {
+        loadPartnerAutonomyStrip();
+    } else {
+        const strip = document.getElementById('partner-autonomy-strip');
+        if (strip) strip.style.display = 'none';
     }
 
     syncPartnerPanelsVisibility();
@@ -576,6 +653,7 @@ window.submitPartnerWithdraw = async function () {
         if (msgEl) msgEl.textContent = j.message || 'Pedido registrado.';
         if (amtEl) amtEl.value = '';
         await loadPartnerFinanceSummary();
+        loadPartnerAutonomyStrip();
     } catch (e) {
         alert('Falha: ' + (e.message || e));
     }
@@ -586,6 +664,7 @@ async function loadPartnerProfiles() {
 
     if (currentUserIsPartner) {
         await loadPartnerFinanceSummary();
+        loadPartnerAutonomyStrip();
     }
 
     const tbody = document.querySelector('#table-partners tbody');

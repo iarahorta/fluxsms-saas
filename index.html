@@ -8,7 +8,7 @@
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -27,6 +27,7 @@
                 <nav class="lp-nav">
                     <a href="#vantagens">Diferenciais</a>
                     <a href="#passo-a-passo">Como Funciona</a>
+                    <a href="/partner/register">Sou parceiro</a>
                     <div class="header-auth-group">
                         <button class="btn-login-header" onclick="abrirModal('authModal')">Entrar</button>
                         <button class="btn-auth-nav" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
@@ -215,6 +216,26 @@
                         </div>
                     </div>
                 </header>
+
+                <div id="partner-autonomy-strip" class="partner-autonomy-strip" style="display: none;" aria-label="Resumo parceiro">
+                    <div class="partner-autonomy-inner">
+                        <div class="partner-autonomy-card">
+                            <div class="partner-autonomy-label">Partner API Key</div>
+                            <div id="partner-strip-key-line" class="partner-autonomy-value">—</div>
+                            <button type="button" class="btn-partner-refresh partner-autonomy-btn" onclick="generatePartnerKeyFromStrip()">Gerar nova chave</button>
+                        </div>
+                        <div class="partner-autonomy-card">
+                            <div class="partner-autonomy-label">Polo Worker · Windows</div>
+                            <a id="partner-strip-download" class="btn-pix partner-autonomy-download" href="#" rel="noopener">Baixar .exe</a>
+                            <p class="partner-autonomy-hint">Instale no PC do polo; use a URL deste site e a chave acima.</p>
+                        </div>
+                        <div class="partner-autonomy-card">
+                            <div class="partner-autonomy-label">Repasse (resumo)</div>
+                            <div id="partner-strip-finance-line" class="partner-autonomy-value">—</div>
+                            <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="showView('partners')">Financeiro &amp; saque</button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- VIEW: DASHBOARD (PADRÃO) -->
                 <section id="view-dashboard" class="content-grid app-view">
@@ -410,7 +431,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=19"></script>
+    <script src="dist/app.shield.js?v=20"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }

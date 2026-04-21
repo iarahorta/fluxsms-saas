@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS | Cadastro de Parceiro</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --gold: #d4af37;
+            --gold-dim: rgba(212, 175, 55, 0.35);
+            --card: rgba(20, 20, 20, 0.92);
+            --text: #f2f2f2;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .hero-partner {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px 48px;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.22), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 50%, rgba(212, 175, 55, 0.08), transparent),
+                radial-gradient(ellipse 50% 35% at 0% 80%, rgba(212, 175, 55, 0.06), transparent),
+                linear-gradient(180deg, #111 0%, var(--bg) 45%);
+        }
+
+        .hero-badge {
+            font-size: 11px;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--gold);
+            border: 1px solid var(--gold-dim);
+            padding: 8px 18px;
+            border-radius: 999px;
+            margin-bottom: 22px;
+        }
+
+        .hero-partner h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 800;
+            text-align: center;
+            line-height: 1.15;
+            max-width: 640px;
+            margin: 0 0 14px;
+        }
+
+        .hero-partner h1 span {
+            color: var(--gold);
+        }
+
+        .hero-lead {
+            text-align: center;
+            max-width: 520px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.62);
+            margin-bottom: 32px;
+        }
+
+        .card-register {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 16px;
+            padding: 28px 26px 24px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+        }
+
+        .card-register label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.55);
+            margin-bottom: 6px;
+        }
+
+        .card-register input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .card-register input:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .btn-hero {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            background: linear-gradient(135deg, #e8c547, var(--gold));
+            color: #111;
+            margin-top: 6px;
+        }
+
+        .btn-hero:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .msg {
+            margin-top: 14px;
+            font-size: 12px;
+            line-height: 1.45;
+            min-height: 2.8em;
+            color: rgba(255, 200, 200, 0.95);
+        }
+
+        .msg.ok {
+            color: rgba(180, 245, 200, 0.95);
+        }
+
+        .footer-links {
+            margin-top: 28px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .footer-links a {
+            color: var(--gold);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="hero-partner">
+        <div class="hero-badge">Parceiro · Infraestrutura</div>
+        <h1>Cadastro <span>autónomo</span> de parceiro FluxSMS</h1>
+        <p class="hero-lead">Crie a sua conta, ative o perfil parceiro e aceda ao painel: API Key, Polo Worker (.exe) e
+            repasses — sem depender de e-mail manual da equipa.</p>
+
+        <div class="card-register">
+            <form id="form-partner-reg" onsubmit="return false;">
+                <label for="pr-name">Nome completo</label>
+                <input id="pr-name" type="text" required autocomplete="name" placeholder="Ex.: João Silva">
+
+                <label for="pr-email">E-mail</label>
+                <input id="pr-email" type="email" required autocomplete="email" placeholder="seu@email.com">
+
+                <label for="pr-pass">Senha</label>
+                <input id="pr-pass" type="password" required minlength="6" autocomplete="new-password"
+                    placeholder="Mínimo 6 caracteres">
+
+                <button type="button" class="btn-hero" id="pr-submit">Criar conta e ativar parceiro</button>
+                <div class="msg" id="pr-msg"></div>
+            </form>
+        </div>
+
+        <div class="footer-links">
+            <a href="/">Já tenho conta — entrar</a>
+            <a href="/termos/">Termos</a>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
+
+        const BACKEND_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
+            ? window.location.origin
+            : 'https://fluxsms-staging-production.up.railway.app';
+
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        const msgEl = document.getElementById('pr-msg');
+        const btn = document.getElementById('pr-submit');
+
+        function setMsg(text, ok) {
+            msgEl.textContent = text || '';
+            msgEl.className = 'msg' + (ok ? ' ok' : '');
+        }
+
+        async function activatePartner(accessToken) {
+            const res = await fetch(BACKEND_URL + '/api/partner/onboarding/activate', {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: '{}'
+            });
+            const j = await res.json().catch(function () { return {}; });
+            if (!res.ok || !j.ok) {
+                throw new Error(j.detail || j.error || res.statusText);
+            }
+            return j;
+        }
+
+        btn.addEventListener('click', async function () {
+            const name = document.getElementById('pr-name').value.trim();
+            const email = document.getElementById('pr-email').value.trim();
+            const password = document.getElementById('pr-pass').value;
+            if (!name || !email || !password) {
+                setMsg('Preencha todos os campos.');
+                return;
+            }
+            btn.disabled = true;
+            setMsg('A criar conta…', true);
+            try {
+                const { data, error } = await db.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: { data: { full_name: name } }
+                });
+                if (error) throw error;
+
+                let session = data.session;
+                if (!session && data.user) {
+                    setMsg('Se o projeto exigir confirmação de e-mail, abra o link enviado e depois entre em fluxsms.com → Parceiros. A tentar login imediato…');
+                    const login = await db.auth.signInWithPassword({ email: email, password: password });
+                    if (login.error) throw login.error;
+                    session = login.data.session;
+                }
+                if (!session) {
+                    throw new Error('Sem sessão após registo. Confirme o e-mail se solicitado e volte a entrar.');
+                }
+
+                setMsg('A ativar perfil parceiro…', true);
+                await activatePartner(session.access_token);
+                setMsg('Conta pronta. A redirecionar para o painel…', true);
+                window.location.href = '/';
+            } catch (e) {
+                setMsg(e.message || String(e));
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>
