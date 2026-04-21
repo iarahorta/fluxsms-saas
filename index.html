@@ -363,10 +363,10 @@
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function abrirAuth() { abrirModal('authModal'); }
         function fecharAuth() { fecharModal('authModal'); }
-        function toggleAuthView( {
+        function toggleAuthView() {
             const login = document.getElementById('loginForm');
             const signup = document.getElementById('signupForm');
-             if (login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
+            if (login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
             else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
 
@@ -374,10 +374,10 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc) — SEM bloquear Enter
-        d ocument.onkeydown = function (e) {
+        document.onkeydown = function (e) {
             if (e.keyCode == 123) return false; // F12
             if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
-            if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0retse;
+            if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0))) return false;
         };
 
         // ⌨️ ENTER KEY: Login, Cadastro e Recarga
