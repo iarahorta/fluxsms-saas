@@ -52,6 +52,7 @@ app.use(validateInput);  // Sanitização de inputs
 
 // ─── Demais Rotas ─────────────────────────────────────────────
 app.use('/sms', smsRouter);      // Modem → SMS delivery
+app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
