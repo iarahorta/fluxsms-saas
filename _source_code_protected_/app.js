@@ -18,7 +18,7 @@ let SERVICES = [
     { id: 'google', name: 'Google', price: 1.50 },
     { id: 'instagram', name: 'Instagram', price: 2.00 }
 ];
-let userCustomPrices = {}; 
+let userCustomPrices = {};
 
 // === ESTADO GLOBAL ===
 let activeSessions = {};
@@ -40,7 +40,7 @@ function unscrambleSMS(text) {
         // Base64 Decode -> Invert
         const decoded = atob(text);
         return decoded.split('').reverse().join('');
-    } catch(e) { return text; }
+    } catch (e) { return text; }
 }
 
 // === INICIALIZAÇÃO ===
@@ -53,14 +53,14 @@ async function init() {
 
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
-    
+
     fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
     setupRealtimeChips();
     loadChipsCount(); // Forçar carregamento inicial do estoque antes dos eventos
-    
+
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
-    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch(e) {} };
+    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch (e) { } };
     runGari();
     setInterval(runGari, 30000);
 
@@ -104,7 +104,7 @@ function toggleViews(session) {
     if (session) {
         landingView.style.display = 'none';
         dashboardView.style.display = 'block';
-        showView('dashboard'); 
+        showView('dashboard');
     } else {
         landingView.style.display = 'block';
         dashboardView.style.display = 'none';
@@ -112,12 +112,12 @@ function toggleViews(session) {
 }
 
 // === NAVEGAÇÃO DE ABAS (SPA) ===
-window.showView = function(viewName) {
+window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
-    
+
     // Esconde todas as abas
     document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
-    
+
     // Limpa classe active
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
@@ -207,8 +207,8 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost') 
-    ? '__BACKEND_URL__' 
+const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
+    ? '__BACKEND_URL__'
     : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
 let pixCheckInterval = null;
@@ -227,7 +227,7 @@ async function gerarPix() {
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error);
-        
+
         document.getElementById('qrCodeContainer').innerHTML = `
             <div style="text-align:center">
                 <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
@@ -277,11 +277,11 @@ async function fetchGlobalServices() {
 
 async function loadChipsCount() {
     if (!db) return;
-    
+
     // Busca chips de Polos (No lab, ignoramos a trava de 90s se for o Polo de Teste)
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
     const isLab = window.location.hostname.includes('railway.app');
-    
+
     let query = db.from('chips')
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
         .eq('status', 'idle')
@@ -291,15 +291,15 @@ async function loadChipsCount() {
     if (!isLab) {
         query = query.gt('polos.ultima_comunicacao', ninetySecondsAgo);
     }
-    
+
     const { count } = await query;
 
-    chipsDisponiveis = count || 0; 
+    chipsDisponiveis = count || 0;
     try {
         const { data: stocks } = await db.rpc('rpc_get_service_stocks');
         if (stocks) serviceStocks = stocks;
         renderServices(SERVICES);
-    } catch(e) { console.error("Erro stocks:", e); }
+    } catch (e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
     if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos ${isLab ? '(LAB)' : ''}`;
 }
@@ -308,7 +308,7 @@ let chipsDebounce = null;
 function setupRealtimeChips() {
     if (!db) return;
     db.channel('chips-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, () => {
-        if(chipsDebounce) clearTimeout(chipsDebounce);
+        if (chipsDebounce) clearTimeout(chipsDebounce);
         chipsDebounce = setTimeout(loadChipsCount, 800);
     }).subscribe();
 }
@@ -324,7 +324,7 @@ async function updateUIForUser() {
         if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
         if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
         
-        // Fidelity Logic
+        // --- FIDELIDADE INTELIGENTE ---
         const total = profile.total_recharged || 0;
         let pClass = 'badge-bronze';
         userFidelityLevel = 'BRONZE';
@@ -336,8 +336,9 @@ async function updateUIForUser() {
         
         const b1 = document.getElementById('fidelity-badge');
         const b2 = document.getElementById('fidelity-badge-mobile');
-        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = (userDiscountFactor===0)?'none':'inline-block'; }
-        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = (userDiscountFactor===0)?'none':'inline-block'; }
+        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
+        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+        // ------------------------------
 
         if (document.getElementById('user-initials') && profile.full_name) {
             document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
@@ -349,7 +350,6 @@ async function updateUIForUser() {
             a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
             nav.insertBefore(a, nav.firstChild);
         }
-        renderServices(SERVICES);
     }
 }
 
@@ -401,17 +401,17 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         return;
     }
 
-    // Usar a V3 segura para aplicar o desconto autônomo no DB
+    // Usa a V3 blindada com sistema fiel de Descontos e Acúmulos
     const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
         p_user_id: currentUser.id,
         p_service: serviceId,
         p_service_name: serviceName,
         p_default_price: defaultPrice
     });
-    
-    if (error || !data || !data.ok) { 
+
+    if (error || !data || !data.ok) {
         console.error("ERRO CRÍTICO RPC:", { error, data });
-        
+
         // 🛡️ CAPTURA DE "Unexpected token <": Se o erro for HTML em vez de JSON
         if (error && typeof error === 'string' && error.startsWith('<!DOCTYPE')) {
             alert('ERRO DE SERVIDOR (HTML): O banco de dados retornou uma página de erro. Me avise para eu verificar os logs da Railway.');
@@ -419,17 +419,17 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         }
 
         const errorMsg = error?.message || data?.error || "Sem estoque ou falha na conexão.";
-        alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
-        return; 
+        alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.'));
+        return;
     }
-    
-    renderActivationCard({ 
-        id: data.activation_id, 
-        phone_number: data.numero, 
-        service_name: serviceName, 
-        status: 'waiting', 
-        sms_code: null, 
-        created_at: new Date().toISOString() 
+
+    renderActivationCard({
+        id: data.activation_id,
+        phone_number: data.numero,
+        service_name: serviceName,
+        status: 'waiting',
+        sms_code: null,
+        created_at: new Date().toISOString()
     });
     updateUIForUser();
 }
@@ -437,7 +437,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 function renderActivationCard(act) {
     if (document.getElementById(act.id)) return;
     if (activeNumbers.querySelector('.empty-state')) activeNumbers.innerHTML = '';
-    
+
     const displayCode = unscrambleSMS(act.sms_code);
 
     // TRAVA 2: Botão CANCELAR bloqueado por 2 minutos
@@ -513,10 +513,10 @@ function setupRealtime() {
 
 function updateCardWithSMS(id, code) {
     const el = document.getElementById(`code-${id}`);
-    if (el) { 
-        el.innerText = unscrambleSMS(code); 
-        document.getElementById(`status-${id}`).innerText = 'RECEBIDO'; 
-        
+    if (el) {
+        el.innerText = unscrambleSMS(code);
+        document.getElementById(`status-${id}`).innerText = 'RECEBIDO';
+
         // Proteção: Remove do DOM e limpa vestígios após 2 min
         setTimeout(() => {
             const card = document.getElementById(id);
@@ -527,7 +527,7 @@ function updateCardWithSMS(id, code) {
                     console.log(`[SEC] Ativação ${id} purgada da memória e do DOM.`);
                 }, 1000);
             }
-        }, 120000); 
+        }, 120000);
     }
 }
 
