@@ -21,6 +21,8 @@ jobs:
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/admin.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/admin.js
+          sed -i "s|__BACKEND_URL__|https://api.fluxsms.com.br|g" _source_code_protected_/app.js
+          sed -i "s|__BACKEND_URL__|https://api.fluxsms.com.br|g" _source_code_protected_/admin.js
 
       - name: Install Dependencies
         run: npm install
