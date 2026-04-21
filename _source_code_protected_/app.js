@@ -19,6 +19,10 @@ let SERVICES = [
     { id: 'instagram', name: 'Instagram', price: 2.00 }
 ];
 let userCustomPrices = {};
+let currentUserIsAdmin = false;
+
+/** Staging: true = botão/menu Parceiros visíveis para qualquer usuário logado (API /api/admin/partners continua exigindo admin). Coloque false quando is_admin estiver correto no Supabase. */
+const PARTNER_UI_FORCE_VISIBLE = true;
 
 // === ESTADO GLOBAL ===
 let activeSessions = {};
@@ -66,6 +70,12 @@ async function init() {
 
     if (session) {
         currentUser = session.user;
+        if (PARTNER_UI_FORCE_VISIBLE) {
+            const pw = document.getElementById('partner-header-wrap');
+            const np = document.getElementById('nav-partners');
+            if (pw) pw.style.display = 'inline-flex';
+            if (np) np.style.display = 'flex';
+        }
         updateUIForUser();
         await fetchUserCustomPrices();
         loadActiveSessions();
@@ -86,12 +96,23 @@ async function init() {
             authModal.style.display = 'none';
             toggleViews(session);
             if (session) {
+                if (PARTNER_UI_FORCE_VISIBLE) {
+                    const pw = document.getElementById('partner-header-wrap');
+                    const np = document.getElementById('nav-partners');
+                    if (pw) pw.style.display = 'inline-flex';
+                    if (np) np.style.display = 'flex';
+                }
                 updateUIForUser();
                 loadActiveSessions();
                 setupRealtime();
             }
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
+            currentUserIsAdmin = false;
+            const partnerWrap = document.getElementById('partner-header-wrap');
+            const navPartners = document.getElementById('nav-partners');
+            if (partnerWrap) partnerWrap.style.display = 'none';
+            if (navPartners) navPartners.style.display = 'none';
             toggleViews(null);
             if (landingView.style.display === 'none') {
                 window.location.reload();
@@ -115,6 +136,11 @@ function toggleViews(session) {
 window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
 
+    if (viewName === 'partners' && !currentUserIsAdmin && !PARTNER_UI_FORCE_VISIBLE) {
+        alert('Acesso restrito a administradores.');
+        return;
+    }
+
     // Esconde todas as abas
     document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
 
@@ -131,6 +157,7 @@ window.showView = function (viewName) {
 
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
+    if (viewName === 'partners') loadPartnerProfiles();
 }
 
 async function loadMyNumbers() {
@@ -319,39 +346,110 @@ let userFidelityLevel = 'Bronze';
 async function updateUIForUser() {
     if (!currentUser) return;
     const { data: profile } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (profile) {
-        const b = `R$ ${profile.balance.toFixed(2)}`;
-        if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
-        if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
-        
-        // --- FIDELIDADE INTELIGENTE ---
-        const total = profile.total_recharged || 0;
-        let pClass = 'badge-bronze';
-        userFidelityLevel = 'BRONZE';
-        userDiscountFactor = 0;
-        
-        if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
-        else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
-        else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
-        
-        const b1 = document.getElementById('fidelity-badge');
-        const b2 = document.getElementById('fidelity-badge-mobile');
-        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
-        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
-        // ------------------------------
+    if (!profile) {
+        currentUserIsAdmin = false;
+        return;
+    }
 
-        if (document.getElementById('user-initials') && profile.full_name) {
-            document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-        }
-        if (profile.is_admin && !document.getElementById('btn-admin-link')) {
-            const nav = document.querySelector('.main-nav');
-            const a = document.createElement('a');
-            a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
-            a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
-            nav.insertBefore(a, nav.firstChild);
-        }
+    currentUserIsAdmin = !!profile.is_admin;
+    const b = `R$ ${profile.balance.toFixed(2)}`;
+    if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
+    if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
+
+    // --- FIDELIDADE INTELIGENTE ---
+    const total = profile.total_recharged || 0;
+    let pClass = 'badge-bronze';
+    userFidelityLevel = 'BRONZE';
+    userDiscountFactor = 0;
+
+    if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
+    else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
+    else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
+
+    const b1 = document.getElementById('fidelity-badge');
+    const b2 = document.getElementById('fidelity-badge-mobile');
+    if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
+    if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+    // ------------------------------
+
+    if (document.getElementById('user-initials') && profile.full_name) {
+        document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    }
+    const partnerWrap = document.getElementById('partner-header-wrap');
+    const navPartners = document.getElementById('nav-partners');
+    const showPartnerUi = !!profile.is_admin || PARTNER_UI_FORCE_VISIBLE;
+    if (partnerWrap) partnerWrap.style.display = showPartnerUi ? 'inline-flex' : 'none';
+    if (navPartners) navPartners.style.display = showPartnerUi ? 'flex' : 'none';
+
+    if (profile.is_admin && !document.getElementById('btn-admin-link')) {
+        const nav = document.querySelector('.main-nav');
+        const a = document.createElement('a');
+        a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
+        a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
+        nav.insertBefore(a, nav.firstChild);
     }
 }
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function loadPartnerProfiles() {
+    const tbody = document.querySelector('#table-partners tbody');
+    if (!tbody) return;
+    if (!db) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Supabase indisponível.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando parceiros...</td></tr>';
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Faça login novamente.</td></tr>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/admin/partners`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+            const msg = json.error === 'forbidden' ? 'Acesso negado (apenas admin).' : (json.detail || json.error || res.statusText);
+            throw new Error(msg);
+        }
+        const rows = json.partners || [];
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum parceiro cadastrado em <code>partner_profiles</code>.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((p) => {
+            const pr = p.profile || {};
+            const email = pr.email || '—';
+            const name = pr.full_name || '—';
+            const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '—';
+            return `
+        <tr>
+            <td><code>${escapeHtml(p.partner_code)}</code></td>
+            <td>${escapeHtml(email)}</td>
+            <td>${escapeHtml(name)}</td>
+            <td><span class="partner-status-badge partner-status-${escapeHtml((p.status || '').toLowerCase())}">${escapeHtml(p.status || '—')}</span></td>
+            <td>${Number(p.margin_percent || 0).toFixed(2)}%</td>
+            <td style="font-size:0.8rem;color:rgba(255,255,255,0.45);">${created}</td>
+        </tr>`;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(err.message || String(err))}</td></tr>`;
+    }
+}
+
+window.loadPartnerProfiles = loadPartnerProfiles;
 
 async function fetchUserCustomPrices() {
     if (!db || !currentUser) return;

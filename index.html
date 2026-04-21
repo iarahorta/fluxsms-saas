@@ -8,7 +8,7 @@
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=16">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -173,6 +173,8 @@
                         Recarregar Saldo</a>
                     <a href="javascript:void(0)" onclick="showView('history')" class="nav-item" id="nav-history"><span
                             class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="showView('partners')" class="nav-item nav-partners-admin"
+                        id="nav-partners" style="display:none;"><span class="icon">★</span> Parceiros API</a>
                     <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span>
                         Sair</a>
                 </nav>
@@ -194,6 +196,10 @@
                             0 CHIPS ONLINE</div>
                     </div>
                     <div class="user-controls">
+                        <span id="partner-header-wrap" class="partner-header-wrap" style="display:none;">
+                            <button type="button" class="btn-partner-lux" onclick="showView('partners')">Parceiros
+                                ★</button>
+                        </span>
                         <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
                         <div class="user-profile">
                             <div class="balance-inline">
@@ -271,6 +277,33 @@
                             </thead>
                             <tbody>
                                 <!-- Preenchido via app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- VIEW: PARCEIROS (somente admin — UI controlada no app.js) -->
+                <section id="view-partners" class="admin-section app-view partner-dashboard-view" style="display:none; margin: 20px;">
+                    <div class="partner-view-head">
+                        <div>
+                            <h2 class="section-title partner-view-title">PARCEIROS API</h2>
+                            <p class="partner-view-sub">Perfis com acesso à Partner API (<code>partner_profiles</code>). Apenas administradores veem esta lista.</p>
+                        </div>
+                        <button type="button" class="btn-partner-refresh" onclick="loadPartnerProfiles()">Atualizar</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="partner-table" id="table-partners">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>E-mail</th>
+                                    <th>Nome</th>
+                                    <th>Status</th>
+                                    <th>Margem %</th>
+                                    <th>Criado em</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                             </tbody>
                         </table>
                     </div>
@@ -356,7 +389,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=15"></script>
+    <script src="dist/app.shield.js?v=17"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }

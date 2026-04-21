@@ -8,6 +8,8 @@ const proxy = require('express-http-proxy');
 
 const webhookRouter = require('./routes/webhook');
 const smsRouter = require('./routes/sms');
+const partnerApiRouter = require('./routes/partnerApi');
+const adminPartnersRouter = require('./routes/adminPartners');
 const { rateLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
@@ -62,6 +64,8 @@ app.use(validateInput);  // Sanitização de inputs
 // ─── Demais Rotas ─────────────────────────────────────────────
 app.use('/sms', smsRouter);      // Modem → SMS delivery
 app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
+app.use('/partner-api', partnerApiRouter); // API universal para parceiros
+app.use('/api/admin/partners', adminPartnersRouter); // Dashboard admin: lista de parceiros (JWT + is_admin)
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
@@ -129,6 +133,7 @@ publicFolders.forEach(folder => {
 
 // Arquivos individuais na raiz permitidos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// Rota /partner removida: evitava confusão (redirecionava para JSON da API). Parceiros ficam no dashboard (admin).
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
