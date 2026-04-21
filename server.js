@@ -95,10 +95,27 @@ app.get('/debug/seed', async (req, res) => {
             { id: '00000000-0000-0000-0000-000000000005', polo_id: POLO_ID, numero: '+5511999990005', status: 'idle' }
         ]);
 
-        // 3. Dar Saldo Abundante para o Usuário Mestre (iarahorta@gmail.com)
+        // 3. Garantir Usuário no Auth e Reset de Senha (iarahorta@gmail.com)
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+            email: 'iarahorta@gmail.com',
+            password: '23112007',
+            email_confirm: true
+        });
+
+        // Se já existir, forçamos o reset da senha para garantir o login
+        if (authError && authError.message.includes('already registered')) {
+            const { data: users } = await supabase.auth.admin.listUsers();
+            const existing = users.users.find(u => u.email === 'iarahorta@gmail.com');
+            if (existing) {
+                console.log('[SEED] Resetando senha do usuário existente:', existing.id);
+                await supabase.auth.admin.updateUserById(existing.id, { password: '23112007' });
+            }
+        }
+
+        // 4. Dar Saldo Abundante para o Usuário Mestre (iarahorta@gmail.com)
         await supabase.from('profiles').update({ balance: 500.00 }).eq('email', 'iarahorta@gmail.com');
 
-        res.json({ ok: true, message: 'Ambiente de Staging populado com sucesso!' });
+        res.json({ ok: true, message: 'Ambiente de Staging populado e senha resetada para 23112007!' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
