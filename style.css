@@ -1633,3 +1633,42 @@ overflow-y: auto;
 @media (max-width: 768px) {
     .partner-autonomy-strip { margin: 0 12px 12px; }
 }
+
+body.partner-mode .hide-for-partner {
+    display: none !important;
+}
+body.partner-mode #client-purchase-dashboard {
+    display: none !important;
+}
+body.partner-mode #partner-infra-monitor {
+    display: block !important;
+}
+body.partner-mode #view-dashboard.content-grid,
+body.partner-mode #view-dashboard {
+    display: block !important;
+}
+body.partner-mode #modalRecarga {
+    display: none !important;
+    pointer-events: none !important;
+}
+.partner-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.partner-api-key-field {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    color: rgba(255, 255, 255, 0.95);
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+}
+.partner-infra-monitor {
+    width: 100%;
+    padding: 8px 0 24px;
+}

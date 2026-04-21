@@ -59,9 +59,7 @@ async function init() {
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
 
-    fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
     setupRealtimeChips();
-    loadChipsCount(); // Forçar carregamento inicial do estoque antes dos eventos
 
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
@@ -77,26 +75,38 @@ async function init() {
             if (pw) pw.style.display = 'inline-flex';
             if (np) np.style.display = 'flex';
         }
-        updateUIForUser();
-        await fetchUserCustomPrices();
-        loadActiveSessions();
+        await updateUIForUser();
+        if (!currentUserIsPartner) {
+            fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
+            await fetchUserCustomPrices();
+            loadActiveSessions();
+            loadChipsCount();
+            renderServices(SERVICES);
+        } else {
+            renderServices([]);
+            loadPartnerChipsMonitor();
+        }
+    } else {
+        fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
+        loadChipsCount();
+        renderServices(SERVICES);
     }
 
-    loadChipsCount();
-    renderServices(SERVICES);
-
-    searchInput.addEventListener('input', () => {
-        const q = searchInput.value.toLowerCase();
-        const filtered = SERVICES.filter(s => s.name.toLowerCase().includes(q));
-        renderServices(filtered);
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (currentUserIsPartner) return;
+            const q = searchInput.value.toLowerCase();
+            const filtered = SERVICES.filter(s => s.name.toLowerCase().includes(q));
+            renderServices(filtered);
+        });
+    }
 
     const partnerWithdrawAmt = document.getElementById('partner-withdraw-amount');
     if (partnerWithdrawAmt) {
         partnerWithdrawAmt.addEventListener('input', () => updatePartnerWithdrawButtonState(_partnerFinanceSummaryCache));
     }
 
-    db.auth.onAuthStateChange((event, session) => {
+    db.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN') {
             currentUser = session?.user;
             authModal.style.display = 'none';
@@ -108,14 +118,19 @@ async function init() {
                     if (pw) pw.style.display = 'inline-flex';
                     if (np) np.style.display = 'flex';
                 }
-                updateUIForUser();
-                loadActiveSessions();
-                setupRealtime();
+                await updateUIForUser();
+                if (!currentUserIsPartner) {
+                    loadActiveSessions();
+                    setupRealtime();
+                } else {
+                    loadPartnerChipsMonitor();
+                }
             }
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
             currentUserIsAdmin = false;
             currentUserIsPartner = false;
+            document.body.classList.remove('partner-mode');
             const partnerWrap = document.getElementById('partner-header-wrap');
             const navPartners = document.getElementById('nav-partners');
             if (partnerWrap) partnerWrap.style.display = 'none';
@@ -143,6 +158,10 @@ function toggleViews(session) {
 window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
 
+    if (currentUserIsPartner && (viewName === 'my-numbers' || viewName === 'history')) {
+        viewName = 'dashboard';
+    }
+
     if (viewName === 'partners' && !currentUserIsAdmin && !PARTNER_UI_FORCE_VISIBLE && !currentUserIsPartner) {
         alert('Acesso restrito a parceiros ou administradores.');
         return;
@@ -165,6 +184,7 @@ window.showView = function (viewName) {
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
     if (viewName === 'partners') loadPartnerProfiles();
+    if (viewName === 'dashboard' && currentUserIsPartner) loadPartnerChipsMonitor();
 };
 
 function syncPartnerPanelsVisibility() {
@@ -253,14 +273,23 @@ const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.inc
     : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
 
+let _partnerApiKeyPlainCache = '';
+let _partnerMarginPercent = 60;
+
 async function loadPartnerAutonomyStrip() {
     const strip = document.getElementById('partner-autonomy-strip');
     if (!strip || !db || !currentUserIsPartner) return;
     strip.style.display = 'block';
-    const keyLine = document.getElementById('partner-strip-key-line');
     const finLine = document.getElementById('partner-strip-finance-line');
     const dl = document.getElementById('partner-strip-download');
-    if (keyLine) keyLine.textContent = 'A carregar…';
+    const keyField = document.getElementById('partner-api-key-field');
+    const keyHint = document.getElementById('partner-key-hint');
+    const revealBtn = document.getElementById('partner-key-reveal-btn');
+    if (keyField) {
+        keyField.value = '';
+        keyField.type = 'password';
+        keyField.placeholder = 'A carregar…';
+    }
     if (finLine) finLine.textContent = '…';
     try {
         const { data: { session } } = await db.auth.getSession();
@@ -270,58 +299,104 @@ async function loadPartnerAutonomyStrip() {
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
-            if (keyLine) keyLine.textContent = j.detail || j.error || res.statusText;
+            if (keyField) keyField.placeholder = j.detail || j.error || res.statusText;
             return;
         }
-        const keys = j.api_keys || [];
-        if (keyLine) {
-            if (!keys.length) {
-                keyLine.innerHTML = '<span style="opacity:0.8">Sem chave ativa — use <strong>Gerar nova chave</strong> para o Polo Worker.</span>';
-            } else {
-                keyLine.textContent = `Prefixo mais recente: ${keys[0].key_prefix}… (${keys.length} chave(s) ativa(s))`;
-            }
+        _partnerApiKeyPlainCache = j.api_key_plain || '';
+        if (j.partner && j.partner.margin_percent != null) {
+            _partnerMarginPercent = Number(j.partner.margin_percent);
         }
+        if (keyField) {
+            keyField.value = _partnerApiKeyPlainCache || '';
+            keyField.type = 'password';
+            keyField.placeholder = _partnerApiKeyPlainCache ? '' : 'Chave legada sem cofre — peça rotação no Admin Hub.';
+        }
+        if (keyHint) {
+            keyHint.textContent = _partnerApiKeyPlainCache
+                ? 'Identidade fixa. O Polo Worker deve enviar o HWID na primeira ligação; outro PC será bloqueado.'
+                : 'Não foi possível ler a chave completa (cofre). A equipa FluxSMS pode rotacionar no Admin Hub.';
+        }
+        if (revealBtn) revealBtn.textContent = 'Revelar';
         const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
         if (finLine) {
-            finLine.textContent = `Repasse liberado: R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível para saque: R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
+            finLine.textContent = `Repasse (${Number(_partnerMarginPercent || 60)}%): liberado R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível saque R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
         }
         if (dl && j.worker_download_url) {
             dl.href = j.worker_download_url;
         }
     } catch (e) {
-        if (keyLine) keyLine.textContent = e.message || String(e);
+        if (keyField) keyField.placeholder = e.message || String(e);
     }
 }
 
-window.generatePartnerKeyFromStrip = async function () {
-    if (!currentUserIsPartner) return;
-    const label = window.prompt('Rótulo desta chave (ex.: PC Polo SP):', 'Polo Worker');
-    if (label === null) return;
-    const { data: { session } } = await db.auth.getSession();
-    if (!session) {
-        alert('Faça login novamente.');
+window.togglePartnerApiKeyReveal = function () {
+    const keyField = document.getElementById('partner-api-key-field');
+    const revealBtn = document.getElementById('partner-key-reveal-btn');
+    if (!keyField || !_partnerApiKeyPlainCache) return;
+    if (keyField.type === 'password') {
+        keyField.type = 'text';
+        if (revealBtn) revealBtn.textContent = 'Ocultar';
+    } else {
+        keyField.type = 'password';
+        if (revealBtn) revealBtn.textContent = 'Revelar';
+    }
+};
+
+window.copyPartnerApiKey = async function () {
+    if (!_partnerApiKeyPlainCache) {
+        alert('Chave completa indisponível neste painel. Contacte a FluxSMS ou use rotação no Admin Hub.');
         return;
     }
     try {
-        const res = await fetch(`${BACKEND_URL}/api/partner/self/api-keys`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ label: label || 'Polo Worker' })
+        await navigator.clipboard.writeText(_partnerApiKeyPlainCache);
+        alert('Chave copiada para a área de transferência.');
+    } catch {
+        window.prompt('Copie manualmente:', _partnerApiKeyPlainCache);
+    }
+};
+
+async function loadPartnerChipsMonitor() {
+    const tbody = document.querySelector('#table-partner-chips-monitor tbody');
+    if (!tbody || !currentUserIsPartner || !db) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">A carregar…</td></tr>';
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/chips`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
-            alert('Erro: ' + (j.detail || j.error || res.statusText));
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</td></tr>`;
             return;
         }
-        window.prompt('COPIE AGORA a Partner API Key (mostrada uma única vez):', j.api_key);
-        loadPartnerAutonomyStrip();
+        const rows = j.chips || [];
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;">Nenhum chip nos seus polos. Use o Polo Worker para registar modems.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((c) => {
+            const wa = c.disponivel_em
+                ? (new Date(c.disponivel_em) > new Date()
+                    ? escapeHtml(new Date(c.disponivel_em).toLocaleString('pt-BR'))
+                    : '—')
+                : '—';
+            const poloLine = c.polo_ultima
+                ? `${escapeHtml(c.polo_status || '—')} · ${escapeHtml(new Date(c.polo_ultima).toLocaleString('pt-BR'))}`
+                : escapeHtml(c.polo_status || '—');
+            return `<tr>
+                <td>${escapeHtml(c.polo_nome || '—')}</td>
+                <td><code>${escapeHtml(c.porta || '')}</code></td>
+                <td>${escapeHtml(c.numero || '—')}</td>
+                <td>${escapeHtml(c.status || '')}</td>
+                <td style="font-size:0.75rem;">${poloLine}</td>
+                <td style="font-size:0.75rem;">${wa}</td>
+            </tr>`;
+        }).join('');
     } catch (e) {
-        alert('Falha: ' + (e.message || e));
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(e.message || String(e))}</td></tr>`;
     }
-};
+}
 let pixCheckInterval = null;
 
 async function gerarPix() {
@@ -433,6 +508,7 @@ async function updateUIForUser() {
     if (!profile) {
         currentUserIsAdmin = false;
         currentUserIsPartner = false;
+        document.body.classList.remove('partner-mode');
         return;
     }
 
@@ -474,6 +550,8 @@ async function updateUIForUser() {
         a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
         nav.insertBefore(a, nav.firstChild);
     }
+
+    document.body.classList.toggle('partner-mode', !!currentUserIsPartner);
 
     if (currentUserIsPartner) {
         loadPartnerAutonomyStrip();
@@ -594,6 +672,7 @@ async function loadPartnerFinanceSummary() {
 
         rulesEl.innerHTML = `
             <ul style="margin:0; padding-left:18px; line-height:1.55; font-size:0.88rem; color:rgba(255,255,255,0.88);">
+                <li><strong>Repasse comercial:</strong> ${Number(_partnerMarginPercent || 60)}% sobre o valor de cada SMS recebido nos seus chips.</li>
                 <li><strong>Mínimo para saque:</strong> R$ ${(r.min_withdrawal_brl || 400).toFixed(2)} — valores menores não podem ser solicitados.</li>
                 <li><strong>Prazos (carência sobre o repasse):</strong> ${prazoLabel}</li>
                 <li><strong>Prioridade admin:</strong> se a FluxSMS marcar sua conta como prioritária, as carências acima deixam de valer para o cálculo do valor liberado.</li>
@@ -737,7 +816,7 @@ async function loadPartnerProfiles() {
 window.loadPartnerProfiles = loadPartnerProfiles;
 
 async function fetchUserCustomPrices() {
-    if (!db || !currentUser) return;
+    if (!db || !currentUser || currentUserIsPartner) return;
     const { data } = await db.from('custom_prices').select('service, price').eq('user_id', currentUser.id);
     if (data) {
         userCustomPrices = {};
@@ -875,6 +954,7 @@ async function cancelActivation(id) {
 }
 
 async function loadActiveSessions() {
+    if (!db || !currentUser || currentUserIsPartner) return;
     const { data } = await db.from('activations').select('*').eq('user_id', currentUser.id).in('status', ['waiting', 'received']);
     if (data && data.length > 0) {
         activeNumbers.innerHTML = '';
@@ -883,7 +963,7 @@ async function loadActiveSessions() {
 }
 
 function setupRealtime() {
-    if (isRealtimeActive) return;
+    if (isRealtimeActive || currentUserIsPartner) return;
     isRealtimeActive = true;
     db.channel('my-activations').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'activations' }, payload => {
         const a = payload.new;

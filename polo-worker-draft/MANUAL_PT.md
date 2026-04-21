@@ -1,6 +1,6 @@
 # FluxSMS Polo Worker — Manual (3 passos)
 
-Versão alinhada ao **Staging** após deploy do backend (`/partner-api/worker/*`) e do painel com **Gerar API Key**.
+Versão alinhada ao **Staging** após deploy do backend (`/partner-api/worker/*`), chave **única** no cadastro parceiro e trava **HWID** (header `X-Flux-Hwid` enviado automaticamente pelo `.exe`).
 
 ---
 
@@ -16,12 +16,11 @@ Versão alinhada ao **Staging** após deploy do backend (`/partner-api/worker/*`
 
 ---
 
-## 2) Como gerar a chave
+## 2) Chave Partner (identidade fixa)
 
-1. Entrar no **site FluxSMS** com conta **admin** (Iara).
-2. **Opção A — Dashboard:** menu **Parceiros API** → na linha do parceiro, botão **Gerar API Key** → copiar a chave do prompt (só aparece uma vez).  
-3. **Opção B — Admin Hub:** `…/admindiretoria/index.html` → secção **Parceiros — Partner API Key** → **Gerar API Key** → copiar do prompt.
-4. A equipa de sistema garante que o **polo** está ligado a esse parceiro no cadastro (campo de vínculo ao `partner_profile`), para o worker conseguir registar chips e heartbeat — sem a CEO executar SQL.
+1. **Parceiro novo:** abrir **`/partner/register`**, criar conta — a **Partner API Key** aparece **uma vez** no prompt; guarde-a. A mesma chave fica no painel (revelar/copiar) e **liga-se ao primeiro PC** que usar o Worker com ela.
+2. **Rotação / legado:** apenas **admin** (Dashboard ou Admin Hub) pode **Gerar API Key** para substituir a chave e libertar um novo vínculo HWID.
+3. A equipa de sistema garante que o **polo** está ligado a esse parceiro no cadastro (`partner_profile_id`), para o worker registar chips e heartbeat.
 
 ---
 

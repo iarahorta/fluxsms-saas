@@ -1,5 +1,5 @@
 const express = require('express');
-const crypto = require('crypto');
+const { rotatePartnerApiKey } = require('../lib/partnerApiKeyIssue');
 
 const router = express.Router();
 
@@ -124,24 +124,14 @@ router.post('/:partnerProfileId/api-keys', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'partner_not_active' });
         }
 
-        const plain = `flux_partner_${crypto.randomBytes(24).toString('hex')}`;
-        const keyHash = crypto.createHash('sha256').update(plain).digest('hex');
-        const keyPrefix = plain.slice(0, 14);
-
-        const { data: row, error: insErr } = await supabase
-            .from('partner_api_keys')
-            .insert({
-                partner_id: partnerProfileId,
-                key_hash: keyHash,
-                key_prefix: keyPrefix,
-                label,
-                is_active: true
-            })
-            .select('id, key_prefix, label, created_at')
-            .maybeSingle();
-
-        if (insErr) {
-            return res.status(500).json({ ok: false, error: 'insert_failed', detail: insErr.message });
+        let plain;
+        let row;
+        try {
+            const out = await rotatePartnerApiKey(supabase, partnerProfileId, label);
+            plain = out.plain;
+            row = out.row;
+        } catch (e) {
+            return res.status(500).json({ ok: false, error: 'key_rotate_failed', detail: e.message });
         }
 
         return res.status(201).json({

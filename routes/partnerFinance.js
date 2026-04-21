@@ -109,8 +109,8 @@ async function buildFinanceSummary(supabase, partnerProfile) {
             saque_prioritario: !!partnerProfile.saque_prioritario,
             effective_hold_hours: holdHours,
             help:
-                'O repasse é calculado sobre SMS recebidos nos seus chips (margem %). ' +
-                'Valores entram na carência após a data do recebimento do código; com saque prioritário ativo pela equipe FluxSMS, a carência não se aplica.'
+                'Repasse = margem % sobre o valor de cada SMS recebido nos seus chips (regra comercial: 60% para parceiros FluxSMS). ' +
+                'Carência após a data do recebimento; com saque prioritário ativo pela equipe FluxSMS, a carência não se aplica.'
         },
         totals: {
             repasse_total: repasseTotal,

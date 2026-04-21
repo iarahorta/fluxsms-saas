@@ -1,12 +1,14 @@
 const express = require('express');
 const crypto = require('crypto');
 const { requireAuthUser } = require('../middleware/partnerSession');
+const { ensurePartnerApiKey } = require('../lib/partnerApiKeyIssue');
 
 const router = express.Router();
 
-const DEFAULT_MARGIN = () => {
-    const n = parseFloat(process.env.PARTNER_SELF_REGISTER_MARGIN_PERCENT || '10');
-    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 10;
+/** Repasse parceiro: 60% sobre o valor da venda (SMS recebido). */
+const PARTNER_MARGIN_PERCENT = () => {
+    const n = parseFloat(process.env.PARTNER_SELF_REGISTER_MARGIN_PERCENT || '60');
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 60;
 };
 
 /** Espelha public.set_partner_code_from_email (PostgreSQL) em JS. */
@@ -19,7 +21,7 @@ function partnerCodeFromEmail(email) {
 
 /**
  * POST /api/partner/onboarding/activate
- * Utilizador logado torna-se parceiro (idempotente). Service role grava perfil.
+ * Utilizador logado torna-se parceiro (idempotente). Emite Partner API Key única se ainda não existir.
  */
 router.post('/activate', requireAuthUser, async (req, res) => {
     const supabase = req.app.get('supabase');
@@ -51,41 +53,58 @@ router.post('/activate', requireAuthUser, async (req, res) => {
             return res.status(500).json({ ok: false, error: 'profile_update_failed', detail: upErr.message });
         }
 
+        let partnerId;
+        let partnerCode;
+        let apiKeyPlain = null;
+
         if (existing) {
             if (existing.status !== 'active') {
                 await supabase
                     .from('partner_profiles')
                     .update({
                         status: 'active',
+                        margin_percent: PARTNER_MARGIN_PERCENT(),
                         notes: 'Reativado via cadastro autónomo (/partner/register)'
                     })
                     .eq('id', existing.id);
+            } else {
+                await supabase
+                    .from('partner_profiles')
+                    .update({ margin_percent: PARTNER_MARGIN_PERCENT() })
+                    .eq('id', existing.id);
             }
+            partnerId = existing.id;
+            partnerCode = existing.partner_code;
+
+            const ensured = await ensurePartnerApiKey(supabase, partnerId, 'Identidade parceiro');
+            apiKeyPlain = ensured.plain;
             return res.json({
                 ok: true,
                 already: !!profile.is_partner,
-                partner_id: existing.id,
-                partner_code: existing.partner_code
+                partner_id: partnerId,
+                partner_code: partnerCode,
+                margin_percent: PARTNER_MARGIN_PERCENT(),
+                api_key: apiKeyPlain
             });
         }
 
-        let partnerCode = partnerCodeFromEmail(profile.email);
+        let newCode = partnerCodeFromEmail(profile.email);
         for (let attempt = 0; attempt < 8; attempt++) {
             const { data: conflict } = await supabase
                 .from('partner_profiles')
                 .select('id')
-                .eq('partner_code', partnerCode)
+                .eq('partner_code', newCode)
                 .maybeSingle();
             if (!conflict) break;
-            partnerCode = partnerCodeFromEmail(profile.email);
+            newCode = partnerCodeFromEmail(profile.email);
         }
 
         const { data: row, error: insErr } = await supabase
             .from('partner_profiles')
             .insert({
                 user_id: userId,
-                partner_code: partnerCode,
-                margin_percent: DEFAULT_MARGIN(),
+                partner_code: newCode,
+                margin_percent: PARTNER_MARGIN_PERCENT(),
                 status: 'active',
                 notes: 'Cadastro autónomo (/partner/register)'
             })
@@ -96,11 +115,17 @@ router.post('/activate', requireAuthUser, async (req, res) => {
             return res.status(500).json({ ok: false, error: 'partner_insert_failed', detail: insErr.message });
         }
 
+        partnerId = row.id;
+        partnerCode = row.partner_code;
+        const ensured = await ensurePartnerApiKey(supabase, partnerId, 'Identidade parceiro');
+        apiKeyPlain = ensured.plain;
+
         return res.status(201).json({
             ok: true,
-            partner_id: row.id,
-            partner_code: row.partner_code,
-            margin_percent: row.margin_percent
+            partner_id: partnerId,
+            partner_code: partnerCode,
+            margin_percent: row.margin_percent,
+            api_key: apiKeyPlain
         });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'internal', detail: err.message });

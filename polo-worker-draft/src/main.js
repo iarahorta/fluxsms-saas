@@ -4,10 +4,24 @@
  * - Chamadas HTTP ao backend (axios) com Partner API Key
  */
 const path = require('path');
+const crypto = require('crypto');
+const os = require('os');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const Store = require('electron-store');
 const axios = require('axios');
 const { SerialPort } = require('serialport');
+
+let cachedFluxHwid = null;
+function getFluxHwid() {
+  if (cachedFluxHwid) return cachedFluxHwid;
+  try {
+    const { machineIdSync } = require('node-machine-id');
+    cachedFluxHwid = crypto.createHash('sha256').update('fluxsms|v1|' + machineIdSync()).digest('hex');
+  } catch {
+    cachedFluxHwid = crypto.createHash('sha256').update('fluxsms|fallback|' + os.hostname() + '|' + os.userInfo().username).digest('hex');
+  }
+  return cachedFluxHwid;
+}
 
 const store = new Store({
   name: 'fluxsms-polo-worker',
@@ -40,7 +54,8 @@ function apiClient() {
     timeout: 20000,
     headers: {
       Authorization: key ? `Bearer ${key}` : '',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Flux-Hwid': getFluxHwid()
     }
   });
 }

@@ -37,13 +37,52 @@ function buildPartnerAuth({ supabase }) {
 
       const { data: keyRow, error: keyError } = await supabase
         .from('partner_api_keys')
-        .select('id, partner_id, is_active, expires_at')
+        .select('id, partner_id, is_active, expires_at, bound_hwid')
         .eq('key_hash', keyHash)
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
         .maybeSingle();
 
       if (keyError || !keyRow) return res.status(401).json({ ok: false, error: 'api_key_invalid' });
+
+      const hwid = String(
+        req.headers['x-flux-hwid'] ||
+        req.headers['x-flux-hw-id'] ||
+        req.headers['x-hardware-id'] ||
+        ''
+      ).trim();
+      if (!hwid || hwid.length < 16) {
+        return res.status(400).json({
+          ok: false,
+          error: 'hwid_required',
+          hint: 'Envie o header X-Flux-Hwid (identificador estável do PC). Atualize o Polo Worker.'
+        });
+      }
+      if (keyRow.bound_hwid) {
+        if (keyRow.bound_hwid !== hwid) {
+          return res.status(403).json({ ok: false, error: 'hwid_mismatch', detail: 'Esta chave já está vinculada a outro computador.' });
+        }
+      } else {
+        const { data: boundRows, error: bindErr } = await supabase
+          .from('partner_api_keys')
+          .update({ bound_hwid: hwid })
+          .eq('id', keyRow.id)
+          .is('bound_hwid', null)
+          .select('bound_hwid');
+        if (bindErr) {
+          return res.status(500).json({ ok: false, error: 'hwid_bind_failed', detail: bindErr.message });
+        }
+        if (!boundRows || boundRows.length === 0) {
+          const { data: rec } = await supabase
+            .from('partner_api_keys')
+            .select('bound_hwid')
+            .eq('id', keyRow.id)
+            .maybeSingle();
+          if (!rec || rec.bound_hwid !== hwid) {
+            return res.status(403).json({ ok: false, error: 'hwid_mismatch', detail: 'Esta chave já está vinculada a outro computador.' });
+          }
+        }
+      }
 
       const { data: partner, error: partnerError } = await supabase
         .from('partner_profiles')

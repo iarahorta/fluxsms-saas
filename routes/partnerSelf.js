@@ -1,7 +1,7 @@
 const express = require('express');
-const crypto = require('crypto');
 const { requirePartnerUser } = require('../middleware/partnerSession');
 const { buildFinanceSummary } = require('./partnerFinance');
+const { decryptPartnerApiKeySecret } = require('../lib/partnerKeyVault');
 
 const router = express.Router();
 
@@ -19,22 +19,25 @@ router.use(requirePartnerUser);
 
 /**
  * GET /api/partner/self/bootstrap
- * Resumo para o strip do dashboard: chaves (metadados), financeiro, link do .exe.
  */
 router.get('/bootstrap', async (req, res) => {
     const supabase = req.app.get('supabase');
     const pid = req.partnerProfile.id;
     try {
-        const { data: keys, error: kErr } = await supabase
+        const { data: keyRow, error: kErr } = await supabase
             .from('partner_api_keys')
-            .select('id, key_prefix, label, is_active, created_at')
+            .select('id, key_prefix, label, is_active, created_at, secret_ciphertext, secret_iv, secret_tag')
             .eq('partner_id', pid)
             .eq('is_active', true)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
         if (kErr) {
             return res.status(500).json({ ok: false, error: 'keys_failed', detail: kErr.message });
         }
+
+        const apiKeyPlain = keyRow ? decryptPartnerApiKeySecret(keyRow) : null;
 
         const finance = await buildFinanceSummary(supabase, req.partnerProfile);
 
@@ -45,7 +48,8 @@ router.get('/bootstrap', async (req, res) => {
                 partner_code: req.partnerProfile.partner_code,
                 margin_percent: req.partnerProfile.margin_percent
             },
-            api_keys: keys || [],
+            api_key_prefix: keyRow?.key_prefix || null,
+            api_key_plain: apiKeyPlain,
             finance,
             worker_download_url: workerDownloadUrl(req)
         });
@@ -55,41 +59,48 @@ router.get('/bootstrap', async (req, res) => {
 });
 
 /**
- * POST /api/partner/self/api-keys
- * Gera nova Partner API Key (plaintext uma vez), como no fluxo admin.
+ * GET /api/partner/self/chips — chips dos polos vinculados ao parceiro.
  */
-router.post('/api-keys', async (req, res) => {
+router.get('/chips', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const label = (req.body && req.body.label) ? String(req.body.label).slice(0, 120) : 'Painel parceiro';
-
+    const pid = req.partnerProfile.id;
     try {
-        const plain = `flux_partner_${crypto.randomBytes(24).toString('hex')}`;
-        const keyHash = crypto.createHash('sha256').update(plain).digest('hex');
-        const keyPrefix = plain.slice(0, 14);
+        const { data: polos, error: pErr } = await supabase
+            .from('polos')
+            .select('id, nome, status, ultima_comunicacao, chave_acesso')
+            .eq('partner_profile_id', pid);
 
-        const { data: row, error: insErr } = await supabase
-            .from('partner_api_keys')
-            .insert({
-                partner_id: req.partnerProfile.id,
-                key_hash: keyHash,
-                key_prefix: keyPrefix,
-                label,
-                is_active: true
-            })
-            .select('id, key_prefix, label, created_at')
-            .maybeSingle();
-
-        if (insErr) {
-            return res.status(500).json({ ok: false, error: 'insert_failed', detail: insErr.message });
+        if (pErr) {
+            return res.status(500).json({ ok: false, error: 'polos_failed', detail: pErr.message });
         }
 
-        return res.status(201).json({
-            ok: true,
-            api_key: plain,
-            key: row
-        });
+        const poloIds = (polos || []).map((p) => p.id);
+        const poloById = Object.fromEntries((polos || []).map((p) => [p.id, p]));
+
+        if (poloIds.length === 0) {
+            return res.json({ ok: true, chips: [], polos: polos || [] });
+        }
+
+        const { data: chips, error: cErr } = await supabase
+            .from('chips')
+            .select('id, polo_id, porta, numero, status, disponivel_em, operadora')
+            .in('polo_id', poloIds)
+            .order('porta');
+
+        if (cErr) {
+            return res.status(500).json({ ok: false, error: 'chips_failed', detail: cErr.message });
+        }
+
+        const enriched = (chips || []).map((c) => ({
+            ...c,
+            polo_nome: poloById[c.polo_id]?.nome || null,
+            polo_status: poloById[c.polo_id]?.status || null,
+            polo_ultima: poloById[c.polo_id]?.ultima_comunicacao || null
+        }));
+
+        return res.json({ ok: true, chips: enriched, polos: polos || [] });
     } catch (err) {
-        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+        return res.status(500).json({ ok: false, error: 'chips_route_failed', detail: err.message });
     }
 });
 

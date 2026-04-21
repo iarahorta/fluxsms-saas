@@ -8,7 +8,7 @@ router.get('/docs', (_req, res) => {
     ok: true,
     module: 'partner-api',
     version: 'v1',
-    auth: 'x-api-key or Authorization: Bearer <API_KEY>',
+    auth: 'x-api-key or Authorization: Bearer <API_KEY> + header obrigatório X-Flux-Hwid (identificador estável do PC)',
     endpoints: [
       { method: 'GET', path: '/partner-api/docs', auth: false, description: 'Documentação base da API Partner' },
       { method: 'GET', path: '/partner-api/health', auth: true, description: 'Health check autenticado + allow list IP' },

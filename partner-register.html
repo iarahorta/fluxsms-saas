@@ -255,7 +255,10 @@
                 }
 
                 setMsg('A ativar perfil parceiro…', true);
-                await activatePartner(session.access_token);
+                const act = await activatePartner(session.access_token);
+                if (act.api_key) {
+                    window.prompt('COPIE AGORA a sua Partner API Key (única, fixa, vincula ao 1.º PC do Worker). Guarde em local seguro:', act.api_key);
+                }
                 setMsg('Conta pronta. A redirecionar para o painel…', true);
                 window.location.href = '/';
             } catch (e) {
