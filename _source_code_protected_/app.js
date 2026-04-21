@@ -367,7 +367,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
     
-    if (error || !data || !data.success) { 
+    if (error || !data || !data.ok) { 
         console.error("Erro RPC:", error, data);
         const errorMsg = error?.message || data?.error || "Nenhum chip disponível no momento ou falha na conexão.";
         alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
@@ -376,7 +376,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     
     renderActivationCard({ 
         id: data.activation_id, 
-        phone_number: data.phone_number, 
+        phone_number: data.numero, 
         service_name: serviceName, 
         status: 'waiting', 
         sms_code: null, 
