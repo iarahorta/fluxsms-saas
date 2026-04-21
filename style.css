@@ -1259,3 +1259,137 @@ overflow-y: auto;
     }
 }
 .lp-header { pointer-events: none !important; } .lp-header .container, .lp-header .logo-area, .lp-header .lp-nav, .lp-header .header-auth-group, .lp-header a, .lp-header button { pointer-events: auto !important; } .lp-btn-primary, .lp-btn-outline { position: relative; z-index: 1001 !important; pointer-events: auto !important; cursor: pointer !important; } #authModal, .modal-overlay { z-index: 99999 !important; pointer-events: auto !important; }
+
+/* ============================================================
+   ?? MOBILE PREMIUM — FluxSMS v15
+   Melhorias de usabilidade para smartphones
+   ============================================================ */
+
+/* Tamanho de toque mínimo para botões no mobile */
+@media (max-width: 768px) {
+    /* Botões maiores e mais fáceis de tocar */
+    .btn-buy, .btn-buy-disabled {
+        padding: 10px 14px !important;
+        font-size: 11px !important;
+        min-height: 40px;
+        min-width: 90px;
+    }
+
+    /* Nome do serviço legível */
+    .service-name {
+        font-size: 14px !important;
+        font-weight: 700;
+    }
+
+    /* Preço maior */
+    .service-price {
+        font-size: 13px !important;
+    }
+
+    /* Linha de serviço com padding maior */
+    .service-row {
+        padding: 14px 12px !important;
+    }
+
+    /* Card de ativação adaptado */
+    .session-card {
+        padding: 16px !important;
+    }
+    .session-card .number {
+        font-size: 20px !important;
+        letter-spacing: 1px;
+    }
+
+    /* Modal de auth/pix em tela cheia no mobile */
+    .modal-box {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        padding: 25px 20px !important;
+        margin: 10px;
+        border-radius: 12px;
+    }
+
+    /* Inputs maiores */
+    .custom-value, input[type="email"], input[type="password"], input[type="text"], input[type="number"] {
+        font-size: 16px !important; /* Evita zoom automático no iOS */
+        padding: 14px 12px !important;
+        border-radius: 8px !important;
+    }
+
+    /* Header mais compacto */
+    .top-header {
+        padding: 10px 12px !important;
+        gap: 8px;
+    }
+
+    /* Estoque de chips — texto menor */
+    #stock-count {
+        font-size: 9px !important;
+        padding: 3px 6px !important;
+    }
+
+    /* Sidebar overlay */
+    #sidebarOverlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 999;
+        display: none;
+    }
+    #sidebarOverlay.active { display: block; }
+
+    /* QR Code centralizado */
+    #qrcode-container {
+        text-align: center;
+    }
+    #qrcode-container canvas, #qrcode-container img {
+        max-width: 200px !important;
+    }
+
+    /* Copiar chave pix */
+    .pix-copy-area {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .pix-copy-area input {
+        width: 100% !important;
+    }
+
+    /* Seção de serviços ocupa toda largura */
+    .services-container {
+        width: 100%;
+    }
+
+    /* Tabela de histórico scroll horizontal */
+    #table-my-numbers, table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Telas muito pequenas (iPhone SE, etc) */
+@media (max-width: 390px) {
+    .hero-text h1 {
+        font-size: 28px !important;
+    }
+
+    .btn-primary-lp {
+        padding: 14px 20px !important;
+        font-size: 13px !important;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .lp-feature-card {
+        padding: 25px 20px !important;
+    }
+
+    .cta-box {
+        padding: 30px 20px !important;
+    }
+}

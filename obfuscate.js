@@ -13,28 +13,23 @@ if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir);
 }
 
-// Configurações "MILITARY GRADE"
+// Configurações EQUILIBRADAS para não quebrar SDKs externos
 const obfuscationOptions = {
     compact: true,
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 1,
-    deadCodeInjection: true,
-    deadCodeInjectionThreshold: 1,
+    controlFlowFlattening: false,
+    deadCodeInjection: false,
     debugProtection: true,
     debugProtectionInterval: 2500,
-    disableConsoleOutput: true,
+    disableConsoleOutput: false,
     identifierNamesGenerator: 'hexadecimal',
     log: false,
-    numbersToExpressions: true,
-    renameGlobals: false, // Mantido false para não quebrar os onclick do HTML
+    numbersToExpressions: false,
+    renameGlobals: false, 
     selfDefending: true,
-    splitStrings: true,
-    splitStringsChunkLength: 5,
-    stringArray: true,
-    stringArrayEncoding: ['base64'],
-    stringArrayThreshold: 1,
-    transformObjectKeys: true,
-    unicodeEscapeSequence: true,
+    splitStrings: false,
+    stringArray: false,
+    transformObjectKeys: false,
+    unicodeEscapeSequence: false,
     sourceMap: false
 };
 

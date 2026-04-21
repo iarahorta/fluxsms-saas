@@ -1,55 +1,58 @@
-name: FluxSMS - Deploy
+name: FluxSMS - Deploy de Segurança (Staging vs Produção)
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
 
 jobs:
-  deploy-frontend:
-    name: Deploy Frontend
+  deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject Supabase env into app.js and admin.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Define Environment Variables
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "staging" ]]; then
+            echo "backend_url=https://fluxsms-staging-production.up.railway.app" >> $GITHUB_OUTPUT
+            echo "railway_service=fluxsms-staging" >> $GITHUB_OUTPUT
+            echo "site_version=LAB-v10" >> $GITHUB_OUTPUT
+          else
+            echo "backend_url=https://api.fluxsms.com.br" >> $GITHUB_OUTPUT
+            echo "railway_service=fluxsms-saas" >> $GITHUB_OUTPUT
+            echo "site_version=PROD-v10" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Inject Backend URL into JS
         run: |
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/admin.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/admin.js
-          sed -i "s|__BACKEND_URL__|https://api.fluxsms.com.br|g" _source_code_protected_/app.js
-          sed -i "s|__BACKEND_URL__|https://api.fluxsms.com.br|g" _source_code_protected_/admin.js
+          sed -i "s|__BACKEND_URL__|${{ steps.env.outputs.backend_url }}|g" _source_code_protected_/app.js
+          sed -i "s|__BACKEND_URL__|${{ steps.env.outputs.backend_url }}|g" _source_code_protected_/admin.js
+          
+          # Injeta versão no HTML para controle de cache
+          sed -i "s|style.css?v=11|style.css?v=${{ steps.env.outputs.site_version }}|g" index.html
+          sed -i "s|app.shield.js?v=11|app.shield.js?v=${{ steps.env.outputs.site_version }}|g" index.html
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Obfuscate Dashboard Logic (F12 Protection)
+      - name: Build Protected Logic
         run: node obfuscate.js
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          cname: fluxsms.com.br
-          exclude_assets: 'backend/**,supabase/**,cloudflare/**,.github/**,*.md'
-
-  deploy-backend:
-    name: Deploy Backend
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - name: Install Railway CLI
         run: npm install -g @railway/cli
-      - name: Deploy to Railway
+
+      - name: Deploy to Railway (Dynamic Target)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --detach --service fluxsms-saas
+        run: railway up --detach --service ${{ steps.env.outputs.railway_service }}

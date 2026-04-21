@@ -60,8 +60,9 @@ async function init() {
     
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
-    db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e));
-    setInterval(() => db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e)), 30000);
+    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch(e) {} };
+    runGari();
+    setInterval(runGari, 30000);
 
     if (session) {
         currentUser = session.user;
@@ -140,6 +141,7 @@ async function loadMyNumbers() {
     const { data, error } = await db.from('activations').select('*').eq('user_id', currentUser.id).eq('status', 'received').order('created_at', { ascending: false });
 
     if (error || !data) {
+        console.error("Erro ao carregar sessões:", error);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum código recebido ainda.</td></tr>';
         return;
     }
@@ -205,7 +207,9 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__'.includes('http') ? '__BACKEND_URL__' : (window.location.hostname === 'fluxsms.com.br' ? 'https://api.fluxsms.com.br' : window.location.origin);
+const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost') 
+    ? '__BACKEND_URL__' 
+    : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
 let pixCheckInterval = null;
 
@@ -278,22 +282,30 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
     
-    // Busca apenas chips de Polos que estão ONLINE e enviaram sinal nos últimos 90 segundos
+    // Busca chips de Polos (No lab, ignoramos a trava de 90s se for o Polo de Teste)
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
-    const { count } = await db.from('chips')
+    const isLab = window.location.hostname.includes('railway.app');
+    
+    let query = db.from('chips')
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
         .eq('status', 'idle')
         .eq('polos.status', 'ONLINE')
-        .gt('polos.ultima_comunicacao', ninetySecondsAgo)
-        .not('numero', 'ilike', 'CCID%'); // 🛡️ FILTRO: Nada de CCID no estoque
+        .not('numero', 'ilike', 'CCID%');
+
+    if (!isLab) {
+        query = query.gt('polos.ultima_comunicacao', ninetySecondsAgo);
+    }
+    
+    const { count } = await query;
 
     chipsDisponiveis = count || 0; 
-    db.rpc('rpc_get_service_stocks').then(r => { 
-        if(r.data) serviceStocks = r.data; 
-        renderServices(SERVICES); 
-    });
+    try {
+        const { data: stocks } = await db.rpc('rpc_get_service_stocks');
+        if (stocks) serviceStocks = stocks;
+        renderServices(SERVICES);
+    } catch(e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos ${isLab ? '(LAB)' : ''}`;
 }
 
 let chipsDebounce = null;
@@ -367,16 +379,23 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
     
-    if (error || !data || !data.success) { 
-        console.error("Erro RPC:", error, data);
-        const errorMsg = error?.message || data?.error || "Nenhum chip disponível no momento ou falha na conexão.";
+    if (error || !data || !data.ok) { 
+        console.error("ERRO CRÍTICO RPC:", { error, data });
+        
+        // 🛡️ CAPTURA DE "Unexpected token <": Se o erro for HTML em vez de JSON
+        if (error && typeof error === 'string' && error.startsWith('<!DOCTYPE')) {
+            alert('ERRO DE SERVIDOR (HTML): O banco de dados retornou uma página de erro. Me avise para eu verificar os logs da Railway.');
+            return;
+        }
+
+        const errorMsg = error?.message || data?.error || "Sem estoque ou falha na conexão.";
         alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
         return; 
     }
     
     renderActivationCard({ 
         id: data.activation_id, 
-        phone_number: data.phone_number, 
+        phone_number: data.numero, 
         service_name: serviceName, 
         status: 'waiting', 
         sms_code: null, 
