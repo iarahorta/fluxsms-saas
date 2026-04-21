@@ -238,11 +238,7 @@ async function gerarPix() {
         document.getElementById('pixArea').style.display = 'block';
     } catch (err) {
         console.error("Erro PIX:", err);
-        if (err.message.includes('fetch')) {
-            alert("ERRO DE DOMÍNIO: O servidor Railway ainda não autorizou o domínio fluxsms.com.br. Por favor, me avise para eu te dar o comando de liberação.");
-        } else {
-            alert("Erro ao gerar PIX: " + err.message);
-        }
+        alert("Erro ao solicitar PIX: " + err.message);
     }
     const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
     initialBalance = profile?.balance || 0;

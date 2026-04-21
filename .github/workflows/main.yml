@@ -25,7 +25,7 @@ jobs:
             echo "railway_service=fluxsms-staging" >> $GITHUB_OUTPUT
             echo "site_version=LAB-v10" >> $GITHUB_OUTPUT
           else
-            echo "backend_url=https://api.fluxsms.com.br" >> $GITHUB_OUTPUT
+            echo "backend_url=https://fluxsms.com.br" >> $GITHUB_OUTPUT
             echo "railway_service=fluxsms-saas" >> $GITHUB_OUTPUT
             echo "site_version=PROD-v10" >> $GITHUB_OUTPUT
           fi
