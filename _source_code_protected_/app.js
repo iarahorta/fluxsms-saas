@@ -394,6 +394,10 @@ function renderActivationCard(act) {
     const h = `
         <div class="session-card" id="${act.id}">
             <span class="number">${act.phone_number}</span>
+            <div class="specialist-tip">
+                <b>💡 Dica de Especialista:</b>
+                Para melhor desempenho, use conexão 4G/5G e ative/desative o modo avião antes de cada nova ativação. Isso preserva a qualidade e aumenta a durabilidade do seu WhatsApp!
+            </div>
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
