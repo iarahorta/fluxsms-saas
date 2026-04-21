@@ -18,7 +18,10 @@ app.use(cors({
     credentials: true 
 }));
 
-// ─── Rotas Prioritárias (Isentas de Rate Limit / Segurança) ───
+// express.json() configurado antes das rotas que usam body
+app.use(express.json({ limit: '10kb' }));
+
+// ─── Rotas Prioritárias ───────────────────────────────────────
 app.use('/webhook', webhookRouter);  // Mercado Pago
 
 // ─── Supabase (service_role para operações protegidas) ────────
@@ -43,8 +46,8 @@ app.use('/supabase-api', proxy(process.env.SUPABASE_URL, {
     }
 }));
 
-// express.json() DEPOIS do proxy - assim o stream do body fica intacto para o proxy
-app.use(express.json({ limit: '10kb' }));
+// proxyReqOptDecorator: ...
+// (express.json() movido para o topo)
 
 // Realtime Proxy (WebSocket handling is more complex, we will handle it with a direct URL obfuscation in app.js for now or a dedicated tunnel if requested)
 
