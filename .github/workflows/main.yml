@@ -1,4 +1,4 @@
-name: FluxSMS - Deploy
+name: FluxSMS - Deploy Atômico V6
 
 on:
   push:
@@ -6,16 +6,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ─── 1. DEPLOY FRONTEND → GitHub Pages ───────────────────
-  deploy-frontend:
-    name: Deploy Frontend
+  deploy-all:
+    name: Build & Deploy (Railway)
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject Supabase env into app.js and admin.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Inject Production Env
         run: |
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
@@ -27,55 +29,13 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Obfuscate Dashboard Logic (F12 Protection)
+      - name: Build Protected Logic (V6)
         run: node obfuscate.js
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          cname: fluxsms.com.br
-          exclude_assets: 'backend/**,supabase/**,cloudflare/**,.github/**,*.md'
-
-  # ─── 2. DEPLOY BACKEND → Railway (via CLI) ───────────────
-  deploy-backend:
-    name: Deploy Backend
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway
+      - name: Deploy to Railway (SINGLE SOURCE OF TRUTH)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --detach --service fluxsms-saas
-
-  # ─── 3. APPLY SUPABASE MIGRATIONS ────────────────────────
-
-  migrate-db:
-    name: Apply DB Migrations
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Apply Migrations
-        env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_ID:  ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: |
-          supabase db push --db-url "postgresql://postgres:$SUPABASE_DB_PASSWORD@db.$SUPABASE_PROJECT_ID.supabase.co:5432/postgres"
