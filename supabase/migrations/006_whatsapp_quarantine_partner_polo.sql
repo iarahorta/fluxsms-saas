@@ -21,6 +21,12 @@ ALTER TABLE public.polos
 
 CREATE INDEX IF NOT EXISTS idx_polos_partner_profile_id ON public.polos(partner_profile_id);
 
+-- Recria funções sem conflito de tipo/assinatura (evita ERROR 42P13)
+DROP FUNCTION IF EXISTS public.rpc_get_service_stocks() CASCADE;
+DROP FUNCTION IF EXISTS public.rpc_monitorar_e_estornar_v2() CASCADE;
+DROP FUNCTION IF EXISTS public.rpc_cancelar_ativacao(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.rpc_solicitar_sms_v3(UUID, TEXT, TEXT, NUMERIC) CASCADE;
+
 -- 4) Impede "subir" chip com mesmo número enquanto outro registro ainda em quarentena WhatsApp
 CREATE OR REPLACE FUNCTION public.trg_chips_valida_quarentena_numero()
 RETURNS TRIGGER
