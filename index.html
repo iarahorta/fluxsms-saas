@@ -78,7 +78,8 @@
                         <div class="lp-f-icon">🛡️</div>
                         <h3>Estorno Automático</h3>
                         <p>Transparência total: Se por qualquer motivo o SMS não chegar, o saldo volta para sua conta
-                            <strong>na hora</strong>.</p>
+                            <strong>na hora</strong>.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -310,7 +311,8 @@
                     <h2 class="section-title" style="text-align:center; margin-bottom:20px;">ACESSO À PLATAFORMA</h2>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
+                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com"
+                            autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
@@ -329,7 +331,8 @@
                     </div>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
+                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com"
+                            autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
@@ -353,10 +356,10 @@
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function abrirAuth() { abrirModal('authModal'); }
         function fecharAuth() { fecharModal('authModal'); }
-        function toggleAuthView() {
+        function toggleAuthView( {
             const login = document.getElementById('loginForm');
             const signup = document.getElementById('signupForm');
-            if (login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
+             if (login.style.display === 'none') { login.style.display = 'block'; signup.style.display = 'none'; }
             else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
 
@@ -364,10 +367,10 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc) — SEM bloquear Enter
-        document.onkeydown = function (e) {
+        d ocument.onkeydown = function (e) {
             if (e.keyCode == 123) return false; // F12
             if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
-            if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0))) return false;
+            if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0retse;
         };
 
         // ⌨️ ENTER KEY: Login, Cadastro e Recarga

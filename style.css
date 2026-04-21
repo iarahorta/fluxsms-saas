@@ -1393,3 +1393,11 @@ overflow-y: auto;
         padding: 30px 20px !important;
     }
 }
+
+/* Fidelity Badges */
+.fidelity-badge { font-size: 9px; font-weight: 800; padding: 3px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; }
+.badge-bronze { background: #CD7F32; color: #fff; display:none; }
+.badge-prata { background: #C0C0C0; color: #000; }
+.badge-ouro { background: #FFD700; color: #000; }
+.badge-diamante { background: #b9f2ff; color: #005f73; }
+.discount-strike { text-decoration: line-through; color: rgba(255,255,255,0.4); font-size: 0.8em; margin-right: 8px; }

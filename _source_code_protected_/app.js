@@ -313,12 +313,32 @@ function setupRealtimeChips() {
     }).subscribe();
 }
 
+let userDiscountFactor = 0;
+let userFidelityLevel = 'Bronze';
+
 async function updateUIForUser() {
     if (!currentUser) return;
     const { data: profile } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile) {
         const b = `R$ ${profile.balance.toFixed(2)}`;
         if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
+        if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
+        
+        // Fidelity Logic
+        const total = profile.total_recharged || 0;
+        let pClass = 'badge-bronze';
+        userFidelityLevel = 'BRONZE';
+        userDiscountFactor = 0;
+        
+        if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
+        else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
+        else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
+        
+        const b1 = document.getElementById('fidelity-badge');
+        const b2 = document.getElementById('fidelity-badge-mobile');
+        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = (userDiscountFactor===0)?'none':'inline-block'; }
+        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = (userDiscountFactor===0)?'none':'inline-block'; }
+
         if (document.getElementById('user-initials') && profile.full_name) {
             document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         }
@@ -329,6 +349,7 @@ async function updateUIForUser() {
             a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
             nav.insertBefore(a, nav.firstChild);
         }
+        renderServices(SERVICES);
     }
 }
 
@@ -346,11 +367,18 @@ function renderServices(list) {
     if (!servicesGrid) return;
     servicesGrid.innerHTML = list.map(s => {
         const stock = serviceStocks[s.id] ?? (chipsDisponiveis > 0 ? 1 : 0);
-        const finalPrice = userCustomPrices[s.id] || s.price;
+        let finalPrice = userCustomPrices[s.id] || s.price;
+        
+        let priceHtml = `R$ ${finalPrice.toFixed(2)}`;
+        if (userDiscountFactor > 0) {
+            const discounted = finalPrice * (1.0 - userDiscountFactor);
+            priceHtml = `<span class="discount-strike">R$ ${finalPrice.toFixed(2)}</span><br><b style="color:var(--flux-gold)">R$ ${discounted.toFixed(2)}</b>`;
+        }
+        
         return `
             <div class="service-row">
                 <div class="name">${s.name}</div>
-                <div class="price">R$ ${finalPrice.toFixed(2)}</div>
+                <div class="price">${priceHtml}</div>
                 <div class="action">
                     <button class="btn-buy" onclick="requestNumber('${s.id}', '${s.name}', ${finalPrice})" ${stock <= 0 ? 'disabled' : ''}>
                         ${stock <= 0 ? 'SEM ESTOQUE' : 'SOLICITAR'}
@@ -373,7 +401,13 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         return;
     }
 
-    const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
+    // Usar a V3 segura para aplicar o desconto autônomo no DB
+    const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
+        p_user_id: currentUser.id,
+        p_service: serviceId,
+        p_service_name: serviceName,
+        p_default_price: defaultPrice
+    });
     
     if (error || !data || !data.ok) { 
         console.error("ERRO CRÍTICO RPC:", { error, data });
