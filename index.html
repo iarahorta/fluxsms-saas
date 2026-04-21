@@ -8,7 +8,7 @@
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -346,7 +346,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=14"></script>
+    <script src="dist/app.shield.js?v=15"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
@@ -360,15 +360,32 @@
             else { login.style.display = 'none'; signup.style.display = 'block'; }
         }
 
-        // Medida de Segurança: Bloqueio de Clique Direito
+        // 🛡️ Medida de Segurança: Bloqueio de Clique Direito
         document.addEventListener('contextmenu', event => event.preventDefault());
 
-        // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc)
+        // Bloqueio de Teclas de Inspeção (F12, Ctrl+Shift+I, etc) — SEM bloquear Enter
         document.onkeydown = function (e) {
             if (e.keyCode == 123) return false; // F12
             if (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0))) return false;
             if (e.ctrlKey && (e.keyCode == 'U'.charCodeAt(0) || e.keyCode == 'S'.charCodeAt(0))) return false;
         };
+
+        // ⌨️ ENTER KEY: Login, Cadastro e Recarga
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enter no login
+            ['auth-email', 'auth-password'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth('login'); });
+            });
+            // Enter no cadastro
+            ['reg-name', 'reg-email', 'reg-password'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth('signup'); });
+            });
+            // Enter no campo de valor da recarga (PIX)
+            const pixAmount = document.getElementById('pix-amount');
+            if (pixAmount) pixAmount.addEventListener('keydown', e => { if (e.key === 'Enter') gerarPix(); });
+        });
     </script>
 </body>
 
