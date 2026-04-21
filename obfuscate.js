@@ -33,7 +33,7 @@ const obfuscationOptions = {
     stringArray: true,
     stringArrayEncoding: ['base64'],
     stringArrayThreshold: 1,
-    transformObjectKeys: true,
+    transformObjectKeys: false, // 🛡️ Desativado para não quebrar chain de métodos do Supabase (from, select, etc)
     unicodeEscapeSequence: true,
     sourceMap: false
 };
