@@ -383,7 +383,7 @@
                 if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth('signup'); });
             });
             // Enter no campo de valor da recarga (PIX)
-            const pixAmount = document.getElementById('pix-amount');
+            const pixAmount = document.getElementById('valorRecarga');
             if (pixAmount) pixAmount.addEventListener('keydown', e => { if (e.key === 'Enter') gerarPix(); });
         });
     </script>
