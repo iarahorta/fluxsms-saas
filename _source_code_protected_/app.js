@@ -56,6 +56,11 @@ async function init() {
     
     fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
     setupRealtimeChips();
+    
+    // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
+    // Run once at start and then every 30 seconds
+    db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e));
+    setInterval(() => db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e)), 30000);
 
     if (session) {
         currentUser = session.user;
@@ -188,8 +193,8 @@ async function handleAuth(type) {
             const name = document.getElementById('reg-name').value;
             if (!email || !password || !name) { alert("Preencha todos os campos."); return; }
             const { data, error } = await db.auth.signUp({ email, password, options: { data: { full_name: name } } });
-            if (error) { alert('Erro: ' + error.message); return; }
-            if (!data.session) await db.auth.signInWithPassword({ email, password });
+            if (error) { alert('Erro: ' + (error.message || 'Falha no cadastro (verifique as variáveis de ambiente)')); return; }
+            if (!data.session && data.user) await db.auth.signInWithPassword({ email, password });
         }
     } catch (err) { console.error("Erro no handleAuth:", err); }
 }
@@ -272,9 +277,6 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
     
-    // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
-    db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e));
-
     // Busca apenas chips de Polos que estão ONLINE e enviaram sinal nos últimos 90 segundos
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
     const { count } = await db.from('chips')
@@ -293,9 +295,13 @@ async function loadChipsCount() {
     if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
 }
 
+let chipsDebounce = null;
 function setupRealtimeChips() {
     if (!db) return;
-    db.channel('chips-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, loadChipsCount).subscribe();
+    db.channel('chips-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, () => {
+        if(chipsDebounce) clearTimeout(chipsDebounce);
+        chipsDebounce = setTimeout(loadChipsCount, 800);
+    }).subscribe();
 }
 
 async function updateUIForUser() {
@@ -363,7 +369,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     if (error || !data || !data.success) { 
         console.error("Erro RPC:", error, data);
         const errorMsg = error?.message || data?.error || "Nenhum chip disponível no momento ou falha na conexão.";
-        alert('Erro ao solicitar: ' + errorMsg); 
+        alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
         return; 
     }
     
