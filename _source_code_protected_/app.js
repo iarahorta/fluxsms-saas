@@ -199,7 +199,7 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = 'https://fluxsms-saas-production.up.railway.app';
+const BACKEND_URL = 'https://api.fluxsms.com.br';
 let initialBalance = 0;
 let pixCheckInterval = null;
 
