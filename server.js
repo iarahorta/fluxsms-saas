@@ -77,23 +77,26 @@ app.get('/debug/seed', async (req, res) => {
         const supabase = req.app.get('supabase');
         console.log('[SEED] Injetando dados de teste...');
 
-        // 1. Criar Polo de Teste (Online)
+        // 1. Criar Polo de Teste (Online e Imortal para o Lab)
         const POLO_ID = 'ba768131-e67e-4299-bf5a-96503f92076c';
         await supabase.from('polos').upsert({
             id: POLO_ID,
             nome: 'Polo Lab Staging',
             status: 'ONLINE',
-            ultima_comunicacao: new Date().toISOString()
+            ultima_comunicacao: '2029-01-01T00:00:00.000Z' // 🛡️ Data no futuro para não cair no timeout de 90s
         });
 
-        // 2. Criar Chips de Teste
+        // 2. Criar Chips de Teste (Vários para garantir estoque em tudo)
         await supabase.from('chips').upsert([
             { id: '00000000-0000-0000-0000-000000000001', polo_id: POLO_ID, numero: '+5511999990001', status: 'idle' },
-            { id: '00000000-0000-0000-0000-000000000002', polo_id: POLO_ID, numero: '+5511999990002', status: 'idle' }
+            { id: '00000000-0000-0000-0000-000000000002', polo_id: POLO_ID, numero: '+5511999990002', status: 'idle' },
+            { id: '00000000-0000-0000-0000-000000000003', polo_id: POLO_ID, numero: '+5511999990003', status: 'idle' },
+            { id: '00000000-0000-0000-0000-000000000004', polo_id: POLO_ID, numero: '+5511999990004', status: 'idle' },
+            { id: '00000000-0000-0000-0000-000000000005', polo_id: POLO_ID, numero: '+5511999990005', status: 'idle' }
         ]);
 
-        // 3. Dar Saldo para o Usuário Mestre (iarahorta@gmail.com)
-        await supabase.from('profiles').update({ balance: 100.00 }).eq('email', 'iarahorta@gmail.com');
+        // 3. Dar Saldo Abundante para o Usuário Mestre (iarahorta@gmail.com)
+        await supabase.from('profiles').update({ balance: 500.00 }).eq('email', 'iarahorta@gmail.com');
 
         res.json({ ok: true, message: 'Ambiente de Staging populado com sucesso!' });
     } catch (err) {

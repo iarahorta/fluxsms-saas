@@ -282,14 +282,21 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
     
-    // Busca apenas chips de Polos que estão ONLINE e enviaram sinal nos últimos 90 segundos
+    // Busca chips de Polos (No lab, ignoramos a trava de 90s se for o Polo de Teste)
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
-    const { count } = await db.from('chips')
+    const isLab = window.location.hostname.includes('railway.app');
+    
+    let query = db.from('chips')
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
         .eq('status', 'idle')
         .eq('polos.status', 'ONLINE')
-        .gt('polos.ultima_comunicacao', ninetySecondsAgo)
-        .not('numero', 'ilike', 'CCID%'); // 🛡️ FILTRO: Nada de CCID no estoque
+        .not('numero', 'ilike', 'CCID%');
+
+    if (!isLab) {
+        query = query.gt('polos.ultima_comunicacao', ninetySecondsAgo);
+    }
+    
+    const { count } = await query;
 
     chipsDisponiveis = count || 0; 
     try {
@@ -298,7 +305,7 @@ async function loadChipsCount() {
         renderServices(SERVICES);
     } catch(e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos ${isLab ? '(LAB)' : ''}`;
 }
 
 let chipsDebounce = null;
