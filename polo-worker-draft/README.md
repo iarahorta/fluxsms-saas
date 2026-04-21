@@ -29,6 +29,20 @@ npm install
 npm start
 ```
 
+## Gerar `.exe` (Windows x64 portable)
+
+```bash
+npm install
+npx @electron/rebuild
+npm run dist
+```
+
+O executável sai em **`polo-worker-draft/dist-exe/`**. Manual em **`MANUAL_PT.md`** (3 passos).
+
+## Manual CEO
+
+Ver **`MANUAL_PT.md`**: baixar / gerar chave / conectar chip.
+
 ## Próximos passos (produção)
 
 - Ler SMS real pela porta COM (parser por modem).

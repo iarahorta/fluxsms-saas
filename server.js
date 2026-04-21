@@ -10,6 +10,7 @@ const webhookRouter = require('./routes/webhook');
 const smsRouter = require('./routes/sms');
 const partnerApiRouter = require('./routes/partnerApi');
 const adminPartnersRouter = require('./routes/adminPartners');
+const partnerFinanceRouter = require('./routes/partnerFinance');
 const { rateLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
@@ -66,6 +67,7 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
 app.use('/partner-api', partnerApiRouter); // API universal para parceiros
 app.use('/api/admin/partners', adminPartnersRouter); // Dashboard admin: lista de parceiros (JWT + is_admin)
+app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resumo repasse + pedido de saque (JWT + is_partner)
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -39,6 +40,121 @@ async function requireFluxAdmin(req, res, next) {
 router.use(requireFluxAdmin);
 
 /**
+ * PATCH /api/admin/partners/:partnerProfileId
+ * body: { saque_prioritario: boolean } — prioridade financeira (ignora carência 48h/24h nos cálculos).
+ */
+router.patch('/:partnerProfileId', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    const sp = req.body && req.body.saque_prioritario;
+    if (typeof sp !== 'boolean') {
+        return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'saque_prioritario_must_be_boolean' });
+    }
+    try {
+        const { data, error } = await supabase
+            .from('partner_profiles')
+            .update({ saque_prioritario: sp })
+            .eq('id', partnerProfileId)
+            .select('id, partner_code, saque_prioritario')
+            .maybeSingle();
+
+        if (error) {
+            return res.status(500).json({ ok: false, error: 'update_failed', detail: error.message });
+        }
+        if (!data) {
+            return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        }
+        return res.json({ ok: true, partner: data });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/partners/:partnerProfileId/api-keys
+ * Lista metadados das chaves (sem revelar hash).
+ */
+router.get('/:partnerProfileId/api-keys', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    try {
+        const { data: partner, error: pErr } = await supabase
+            .from('partner_profiles')
+            .select('id')
+            .eq('id', partnerProfileId)
+            .maybeSingle();
+        if (pErr || !partner) {
+            return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        }
+
+        const { data: keys, error: kErr } = await supabase
+            .from('partner_api_keys')
+            .select('id, key_prefix, label, is_active, last_used_at, expires_at, created_at')
+            .eq('partner_id', partnerProfileId)
+            .order('created_at', { ascending: false });
+
+        if (kErr) {
+            return res.status(500).json({ ok: false, error: 'keys_list_failed', detail: kErr.message });
+        }
+        return res.json({ ok: true, keys: keys || [] });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/partners/:partnerProfileId/api-keys
+ * Gera nova Partner API Key (plaintext devolvida uma única vez no JSON).
+ */
+router.post('/:partnerProfileId/api-keys', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    const label = (req.body && req.body.label) ? String(req.body.label).slice(0, 120) : 'Admin Hub';
+
+    try {
+        const { data: partner, error: pErr } = await supabase
+            .from('partner_profiles')
+            .select('id, status')
+            .eq('id', partnerProfileId)
+            .maybeSingle();
+        if (pErr || !partner) {
+            return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        }
+        if (partner.status !== 'active') {
+            return res.status(400).json({ ok: false, error: 'partner_not_active' });
+        }
+
+        const plain = `flux_partner_${crypto.randomBytes(24).toString('hex')}`;
+        const keyHash = crypto.createHash('sha256').update(plain).digest('hex');
+        const keyPrefix = plain.slice(0, 14);
+
+        const { data: row, error: insErr } = await supabase
+            .from('partner_api_keys')
+            .insert({
+                partner_id: partnerProfileId,
+                key_hash: keyHash,
+                key_prefix: keyPrefix,
+                label,
+                is_active: true
+            })
+            .select('id, key_prefix, label, created_at')
+            .maybeSingle();
+
+        if (insErr) {
+            return res.status(500).json({ ok: false, error: 'insert_failed', detail: insErr.message });
+        }
+
+        return res.status(201).json({
+            ok: true,
+            api_key: plain,
+            key: row
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
+/**
  * GET /api/admin/partners
  * Lista partner_profiles com dados básicos do perfil (somente admin).
  */
@@ -47,7 +163,7 @@ router.get('/', async (req, res) => {
     try {
         const { data: partners, error: pErr } = await supabase
             .from('partner_profiles')
-            .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at')
+            .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario')
             .order('created_at', { ascending: false });
 
         if (pErr) {

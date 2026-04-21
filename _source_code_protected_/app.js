@@ -20,6 +20,7 @@ let SERVICES = [
 ];
 let userCustomPrices = {};
 let currentUserIsAdmin = false;
+let currentUserIsPartner = false;
 
 /** Staging: true = botão/menu Parceiros visíveis para qualquer usuário logado (API /api/admin/partners continua exigindo admin). Coloque false quando is_admin estiver correto no Supabase. */
 const PARTNER_UI_FORCE_VISIBLE = true;
@@ -90,6 +91,11 @@ async function init() {
         renderServices(filtered);
     });
 
+    const partnerWithdrawAmt = document.getElementById('partner-withdraw-amount');
+    if (partnerWithdrawAmt) {
+        partnerWithdrawAmt.addEventListener('input', () => updatePartnerWithdrawButtonState(_partnerFinanceSummaryCache));
+    }
+
     db.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN') {
             currentUser = session?.user;
@@ -109,6 +115,7 @@ async function init() {
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
             currentUserIsAdmin = false;
+            currentUserIsPartner = false;
             const partnerWrap = document.getElementById('partner-header-wrap');
             const navPartners = document.getElementById('nav-partners');
             if (partnerWrap) partnerWrap.style.display = 'none';
@@ -136,8 +143,8 @@ function toggleViews(session) {
 window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
 
-    if (viewName === 'partners' && !currentUserIsAdmin && !PARTNER_UI_FORCE_VISIBLE) {
-        alert('Acesso restrito a administradores.');
+    if (viewName === 'partners' && !currentUserIsAdmin && !PARTNER_UI_FORCE_VISIBLE && !currentUserIsPartner) {
+        alert('Acesso restrito a parceiros ou administradores.');
         return;
     }
 
@@ -158,6 +165,13 @@ window.showView = function (viewName) {
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
     if (viewName === 'partners') loadPartnerProfiles();
+};
+
+function syncPartnerPanelsVisibility() {
+    const finance = document.getElementById('partner-finance-panel');
+    const adminBlk = document.getElementById('partner-admin-block');
+    if (finance) finance.style.display = currentUserIsPartner ? 'block' : 'none';
+    if (adminBlk) adminBlk.style.display = currentUserIsAdmin ? 'block' : 'none';
 }
 
 async function loadMyNumbers() {
@@ -348,10 +362,12 @@ async function updateUIForUser() {
     const { data: profile } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
     if (!profile) {
         currentUserIsAdmin = false;
+        currentUserIsPartner = false;
         return;
     }
 
     currentUserIsAdmin = !!profile.is_admin;
+    currentUserIsPartner = !!profile.is_partner;
     const b = `R$ ${profile.balance.toFixed(2)}`;
     if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
     if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
@@ -377,7 +393,7 @@ async function updateUIForUser() {
     }
     const partnerWrap = document.getElementById('partner-header-wrap');
     const navPartners = document.getElementById('nav-partners');
-    const showPartnerUi = !!profile.is_admin || PARTNER_UI_FORCE_VISIBLE;
+    const showPartnerUi = !!profile.is_admin || PARTNER_UI_FORCE_VISIBLE || currentUserIsPartner;
     if (partnerWrap) partnerWrap.style.display = showPartnerUi ? 'inline-flex' : 'none';
     if (navPartners) navPartners.style.display = showPartnerUi ? 'flex' : 'none';
 
@@ -388,6 +404,8 @@ async function updateUIForUser() {
         a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
         nav.insertBefore(a, nav.firstChild);
     }
+
+    syncPartnerPanelsVisibility();
 }
 
 function escapeHtml(str) {
@@ -417,10 +435,168 @@ function formatPartnerChipsCell(chips) {
     }).join('');
 }
 
+window.generatePartnerApiKeyFromDashboard = async function (partnerProfileId) {
+    if (!currentUserIsAdmin) {
+        alert('Apenas administradores podem gerar API Key.');
+        return;
+    }
+    const label = window.prompt('Rótulo da chave (ex.: Worker Lab):', 'Dashboard');
+    if (label === null) return;
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Faça login novamente.');
+        return;
+    }
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/admin/partners/${partnerProfileId}/api-keys`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ label: label || 'Dashboard' })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        window.prompt('COPIE AGORA a Partner API Key (mostrada uma única vez):', j.api_key);
+        loadPartnerProfiles();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
+function updatePartnerWithdrawButtonState(lastSummary) {
+    const btn = document.getElementById('partner-withdraw-btn');
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    if (!btn || !amtEl) return;
+    const minBrl = (lastSummary && lastSummary.rules && lastSummary.rules.min_withdrawal_brl) ? lastSummary.rules.min_withdrawal_brl : 400;
+    const maxBrl = (lastSummary && lastSummary.totals) ? Number(lastSummary.totals.disponivel_para_solicitar || 0) : 0;
+    const v = parseFloat(String(amtEl.value).replace(',', '.'));
+    const ok = Number.isFinite(v) && v >= minBrl && v <= maxBrl + 0.009 && maxBrl >= minBrl;
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '0.45';
+}
+
+let _partnerFinanceSummaryCache = null;
+
+async function loadPartnerFinanceSummary() {
+    const rulesEl = document.getElementById('partner-finance-rules');
+    const statsEl = document.getElementById('partner-finance-stats');
+    const msgEl = document.getElementById('partner-finance-msg');
+    if (!currentUserIsPartner || !rulesEl || !statsEl) return;
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        rulesEl.innerHTML = '<p style="color:#e085a0;">Faça login novamente.</p>';
+        return;
+    }
+
+    rulesEl.innerHTML = '<p style="opacity:0.6;">Carregando regras e saldos…</p>';
+    statsEl.innerHTML = '';
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/partner/finance/summary`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            rulesEl.innerHTML = `<p style="color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</p>`;
+            return;
+        }
+        _partnerFinanceSummaryCache = j;
+        const r = j.rules || {};
+        const t = j.totals || {};
+        const prazoLabel = r.saque_prioritario
+            ? 'Saque prioritário ativo: a carência de 48h/24h <strong>não se aplica</strong> à sua conta.'
+            : (r.is_novo_parceiro
+                ? `Parceiro <strong>novo</strong> (menos de ${r.novo_period_days || 90} dias no programa): cada repasse só entra no saque após <strong>${r.hold_hours_novo || 48}h</strong> da data do SMS recebido.`
+                : `Parceiro <strong>consolidado</strong>: carência de <strong>${r.hold_hours_antigo || 24}h</strong> após cada SMS recebido.`);
+
+        rulesEl.innerHTML = `
+            <ul style="margin:0; padding-left:18px; line-height:1.55; font-size:0.88rem; color:rgba(255,255,255,0.88);">
+                <li><strong>Mínimo para saque:</strong> R$ ${(r.min_withdrawal_brl || 400).toFixed(2)} — valores menores não podem ser solicitados.</li>
+                <li><strong>Prazos (carência sobre o repasse):</strong> ${prazoLabel}</li>
+                <li><strong>Prioridade admin:</strong> se a FluxSMS marcar sua conta como prioritária, as carências acima deixam de valer para o cálculo do valor liberado.</li>
+            </ul>`;
+
+        const stat = (label, val, color) => `
+            <div style="padding:12px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+                <div style="font-size:10px; opacity:0.55; text-transform:uppercase;">${label}</div>
+                <div style="font-size:1.05rem; font-weight:800; color:${color}; margin-top:4px;">${val}</div>
+            </div>`;
+        statsEl.innerHTML =
+            stat('Repasse total (acumulado)', `R$ ${Number(t.repasse_total || 0).toFixed(2)}`, '#d4b8ff') +
+            stat('Já liberado para saque', `R$ ${Number(t.repasse_liberado || 0).toFixed(2)}`, '#b8f5c8') +
+            stat('Ainda em carência', `R$ ${Number(t.repasse_em_carencia || 0).toFixed(2)}`, '#ffd59a') +
+            stat('Reservado (saques em análise)', `R$ ${Number(t.saques_pendentes_ou_aprovados || 0).toFixed(2)}`, '#ccc') +
+            stat('Disponível p/ solicitar agora', `R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)}`, 'var(--flux-gold)');
+
+        if (msgEl) {
+            msgEl.innerHTML = 'O botão de saque só habilita quando o valor estiver entre o <strong>mínimo</strong> e o <strong>disponível para solicitar</strong>. Pedidos ficam como pendentes até o financeiro FluxSMS.';
+        }
+        updatePartnerWithdrawButtonState(j);
+    } catch (e) {
+        rulesEl.innerHTML = `<p style="color:#e085a0;">${escapeHtml(e.message || String(e))}</p>`;
+    }
+}
+
+window.submitPartnerWithdraw = async function () {
+    if (!currentUserIsPartner) return;
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    const pixEl = document.getElementById('partner-withdraw-pix');
+    const msgEl = document.getElementById('partner-finance-msg');
+    const raw = amtEl && amtEl.value ? String(amtEl.value).replace(',', '.') : '';
+    const amount = parseFloat(raw);
+    const pix = pixEl && pixEl.value ? pixEl.value.trim() : '';
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Faça login novamente.');
+        return;
+    }
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/partner/finance/withdraw`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount, pix_destination: pix || null })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            const extra = j.disponivel_para_solicitar != null ? ` Disponível: R$ ${Number(j.disponivel_para_solicitar).toFixed(2)}.` : '';
+            const min = j.min_brl != null ? ` Mínimo: R$ ${Number(j.min_brl).toFixed(2)}.` : '';
+            alert('Não foi possível registrar o saque: ' + (j.detail || j.error || res.statusText) + min + extra);
+            return;
+        }
+        if (msgEl) msgEl.textContent = j.message || 'Pedido registrado.';
+        if (amtEl) amtEl.value = '';
+        await loadPartnerFinanceSummary();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
 async function loadPartnerProfiles() {
+    syncPartnerPanelsVisibility();
+
+    if (currentUserIsPartner) {
+        await loadPartnerFinanceSummary();
+    }
+
     const tbody = document.querySelector('#table-partners tbody');
-    const colspan = 10;
+    const colspan = 11;
     if (!tbody) return;
+
+    if (!currentUserIsAdmin) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; opacity:0.55;">Lista administrativa de parceiros visível apenas para administradores.</td></tr>`;
+        return;
+    }
+
     if (!db) {
         tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Supabase indisponível.</td></tr>`;
         return;
@@ -456,6 +632,9 @@ async function loadPartnerProfiles() {
             const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '—';
             const nChips = p.chip_count != null ? p.chip_count : (p.chips || []).length;
             const rev = p.revenue_total != null ? Number(p.revenue_total).toFixed(2) : '0.00';
+            const keyCell = currentUserIsAdmin
+                ? `<button type="button" class="btn-partner-refresh" style="padding:6px 10px;font-size:10px;" onclick="generatePartnerApiKeyFromDashboard('${p.id}')">Gerar API Key</button>`
+                : '<span style="opacity:0.35;font-size:10px;">—</span>';
             return `
         <tr>
             <td><code>${escapeHtml(p.partner_code)}</code></td>
@@ -468,6 +647,7 @@ async function loadPartnerProfiles() {
             <td style="color:#b8f5c8;font-weight:700;">R$ ${escapeHtml(rev)}</td>
             <td style="font-size:0.72rem;line-height:1.35;">${formatPartnerChipsCell(p.chips)}</td>
             <td style="font-size:0.8rem;color:rgba(255,255,255,0.45);">${created}</td>
+            <td style="text-align:center;">${keyCell}</td>
         </tr>`;
         }).join('');
     } catch (err) {

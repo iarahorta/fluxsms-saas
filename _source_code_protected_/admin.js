@@ -9,6 +9,12 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 
+const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
+    ? '__BACKEND_URL__'
+    : (typeof window !== 'undefined' && window.location.hostname.includes('railway.app')
+        ? window.location.origin
+        : 'https://fluxsms-staging-production.up.railway.app');
+
 // Inicialização
 async function init() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -40,6 +46,7 @@ async function init() {
     loadChips();
     loadPolos();
     loadGlobalPrices();
+    loadPartnerApiAdmin();
 
     // 4. Inicia Listeners Realtime
     setupRealtime();
@@ -446,6 +453,120 @@ window.openUserHistoryModal = async function(userId, email) {
 
 window.closeHistoryModal = function() {
     document.getElementById('modal-user-history').style.display = 'none';
+};
+
+// === PARTNER API KEYS (admin — sem SQL) ===
+async function loadPartnerApiAdmin() {
+    const wrap = document.getElementById('section-partner-api');
+    const tbody = document.querySelector('#table-partner-api tbody');
+    if (!wrap || !tbody) return;
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return;
+
+    tbody.innerHTML = '<tr><td colspan="6">Carregando parceiros...</td></tr>';
+
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+            tbody.innerHTML = `<tr><td colspan="6" style="color:#f88;">${json.detail || json.error || res.statusText}</td></tr>`;
+            return;
+        }
+        const partners = json.partners || [];
+        if (partners.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6">Nenhum <code>partner_profiles</code>. Crie parceiro (RPC / SQL 004) primeiro.</td></tr>';
+            return;
+        }
+
+        let rows = '';
+        for (const p of partners) {
+            const pr = p.profile || {};
+            const email = pr.email || '—';
+            const kRes = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${p.id}/api-keys`, {
+                headers: { Authorization: `Bearer ${session.access_token}` }
+            });
+            const kJson = await kRes.json().catch(() => ({}));
+            const keys = (kJson.keys || []).length;
+            const prio = !!p.saque_prioritario;
+            rows += `<tr>
+                <td><code style="font-size:11px;">${p.partner_code || '—'}</code></td>
+                <td>${email}</td>
+                <td style="text-align:center;">${keys}</td>
+                <td style="text-align:center;">
+                    <input type="checkbox" ${prio ? 'checked' : ''} title="Ignora carência 48h/24h nos cálculos de saque"
+                        onchange="toggleAdminSaquePrioritario('${p.id}', this.checked)" />
+                </td>
+                <td style="font-size:11px;color:rgba(255,255,255,0.5);">${p.id}</td>
+                <td>
+                    <button type="button" class="btn-action" onclick="generateAdminPartnerKey('${p.id}')">Gerar API Key</button>
+                </td>
+            </tr>`;
+        }
+        tbody.innerHTML = rows;
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#f88;">${e.message || e}</td></tr>`;
+    }
 }
+
+window.toggleAdminSaquePrioritario = async function (partnerProfileId, checked) {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ saque_prioritario: !!checked })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro ao atualizar: ' + (j.detail || j.error || res.statusText));
+            loadPartnerApiAdmin();
+            return;
+        }
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+        loadPartnerApiAdmin();
+    }
+};
+
+window.generateAdminPartnerKey = async function (partnerProfileId) {
+    const label = window.prompt('Rótulo desta chave (ex.: Notebook Polo SP):', 'Polo Worker');
+    if (label === null) return;
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}/api-keys`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ label: label || 'Admin Hub' })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        window.prompt('COPIE AGORA a Partner API Key (não será guardada no servidor de novo):', j.api_key);
+        loadPartnerApiAdmin();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
 
 init();
