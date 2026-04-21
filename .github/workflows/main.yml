@@ -1,4 +1,4 @@
-name: FluxSMS - Deploy Atômico V6
+name: FluxSMS - Deploy
 
 on:
   push:
@@ -6,18 +6,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-all:
-    name: Build & Deploy (Railway)
+  deploy-frontend:
+    name: Deploy Frontend
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Inject Production Env
+      - name: Inject Supabase env into app.js and admin.js
         run: |
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
@@ -29,13 +26,30 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Build Protected Logic (V6)
+      - name: Obfuscate Dashboard Logic (F12 Protection)
         run: node obfuscate.js
 
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          cname: fluxsms.com.br
+          exclude_assets: 'backend/**,supabase/**,cloudflare/**,.github/**,*.md'
+
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install Railway CLI
         run: npm install -g @railway/cli
-
-      - name: Deploy to Railway (SINGLE SOURCE OF TRUTH)
+      - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --detach --service fluxsms-saas
