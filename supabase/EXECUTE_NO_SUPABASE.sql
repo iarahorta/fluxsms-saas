@@ -315,6 +315,7 @@ CREATE OR REPLACE FUNCTION public.rpc_monitorar_e_estornar_v2()
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_rec RECORD;
+    v_refund_amount NUMERIC(10,2);
     v_count_polos INT := 0; v_count_refunds INT := 0;
 BEGIN
     UPDATE polos 
@@ -328,10 +329,22 @@ BEGIN
         FROM activations a JOIN chips c ON a.chip_id = c.id JOIN polos p ON c.polo_id = p.id
         WHERE p.status = 'OFFLINE' AND a.status IN ('pending', 'waiting')
     LOOP
-        UPDATE profiles SET balance = balance + v_rec.price WHERE id = v_rec.user_id;
+        SELECT t.amount INTO v_refund_amount
+        FROM transactions t
+        WHERE t.activation_id = v_rec.id
+          AND t.user_id = v_rec.user_id
+          AND t.type = 'debit'
+        ORDER BY t.created_at DESC
+        LIMIT 1;
+
+        IF v_refund_amount IS NULL THEN
+            v_refund_amount := v_rec.price;
+        END IF;
+
+        UPDATE profiles SET balance = balance + v_refund_amount WHERE id = v_rec.user_id;
         UPDATE activations SET status = 'expired', updated_at = NOW() WHERE id = v_rec.id;
         INSERT INTO transactions (user_id, activation_id, type, amount, description)
-        VALUES (v_rec.user_id, v_rec.id, 'refund', v_rec.price, 'Estorno: Polo Offline (' || v_rec.service_name || ')');
+        VALUES (v_rec.user_id, v_rec.id, 'refund', v_refund_amount, 'Estorno: Polo Offline (' || v_rec.service_name || ')');
         v_count_refunds := v_count_refunds + 1;
     END LOOP;
     RETURN jsonb_build_object('ok', true, 'polos_offline', v_count_polos, 'estornos_realizados', v_count_refunds);

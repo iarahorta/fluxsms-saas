@@ -157,6 +157,10 @@
                 <div class="balance-mobile">
                     <div class="balance-label">SALDO DISPONÍVEL</div>
                     <div class="balance-value" id="balance-display-mobile">R$ 0,00</div>
+                    <div class="mobile-fidelity-wrap">
+                        <span class="fidelity-label">NÍVEL</span>
+                        <span id="fidelity-badge-mobile" class="fidelity-badge badge-bronze">BRONZE</span>
+                    </div>
                     <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
                 </div>
                 <nav class="main-nav">
@@ -194,7 +198,10 @@
                         <div class="user-profile">
                             <div class="balance-inline">
                                 <span class="balance-label-sm">SALDO</span>
-                                <span class="balance-value-sm" id="balance-display">R$ 0,00</span>
+                                <div class="balance-row">
+                                    <span class="balance-value-sm" id="balance-display">R$ 0,00</span>
+                                    <span id="fidelity-badge" class="fidelity-badge badge-bronze">BRONZE</span>
+                                </div>
                             </div>
                             <div class="user-avatar" title="Minha Conta">
                                 <span class="avatar-letters" id="user-initials">--</span>

@@ -125,6 +125,7 @@ SET search_path = public
 AS $$
 DECLARE
     v_activation RECORD;
+    v_refund_amount NUMERIC(10,2);
 BEGIN
     -- Busca com lock
     SELECT * INTO v_activation
@@ -151,14 +152,26 @@ BEGIN
     -- Libera o chip
     UPDATE chips SET status = 'idle' WHERE id = v_activation.chip_id;
 
-    -- Reembolsa o saldo
-    UPDATE profiles SET balance = balance + v_activation.price WHERE id = p_user_id;
+    -- Reembolso sempre usa o valor efetivamente debitado (compatível com V3/discount).
+    SELECT t.amount INTO v_refund_amount
+    FROM transactions t
+    WHERE t.activation_id = p_activation_id
+      AND t.user_id = p_user_id
+      AND t.type = 'debit'
+    ORDER BY t.created_at DESC
+    LIMIT 1;
+
+    IF v_refund_amount IS NULL THEN
+        v_refund_amount := v_activation.price;
+    END IF;
+
+    UPDATE profiles SET balance = balance + v_refund_amount WHERE id = p_user_id;
 
     -- Registra reembolso
     INSERT INTO transactions (user_id, activation_id, type, amount, description)
-    VALUES (p_user_id, p_activation_id, 'refund', v_activation.price, 'Reembolso: ' || v_activation.service_name);
+    VALUES (p_user_id, p_activation_id, 'refund', v_refund_amount, 'Reembolso: ' || v_activation.service_name);
 
-    RETURN jsonb_build_object('ok', true, 'refunded', v_activation.price);
+    RETURN jsonb_build_object('ok', true, 'refunded', v_refund_amount);
 END;
 $$;
 

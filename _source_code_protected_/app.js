@@ -372,7 +372,7 @@ function renderServices(list) {
         let priceHtml = `R$ ${finalPrice.toFixed(2)}`;
         if (userDiscountFactor > 0) {
             const discounted = finalPrice * (1.0 - userDiscountFactor);
-            priceHtml = `<span class="discount-strike">R$ ${finalPrice.toFixed(2)}</span><br><b style="color:var(--flux-gold)">R$ ${discounted.toFixed(2)}</b>`;
+            priceHtml = `<span class="discount-strike">R$ ${finalPrice.toFixed(2)}</span><span class="discount-final">R$ ${discounted.toFixed(2)}</span><span class="discount-level">(${userFidelityLevel})</span>`;
         }
         
         return `

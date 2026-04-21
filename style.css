@@ -337,6 +337,28 @@ body {
     color: var(--flux-gold);
 }
 
+.balance-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.mobile-fidelity-wrap {
+    margin: 6px 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.fidelity-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--flux-dim);
+    font-weight: 700;
+}
+
 .user-avatar {
     width: 36px;
     height: 36px;
@@ -1395,9 +1417,11 @@ overflow-y: auto;
 }
 
 /* Fidelity Badges */
-.fidelity-badge { font-size: 9px; font-weight: 800; padding: 3px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; }
-.badge-bronze { background: #CD7F32; color: #fff; display:none; }
+.fidelity-badge { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 999px; letter-spacing: 0.5px; vertical-align: middle; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.15); }
+.badge-bronze { background: #CD7F32; color: #fff; }
 .badge-prata { background: #C0C0C0; color: #000; }
 .badge-ouro { background: #FFD700; color: #000; }
 .badge-diamante { background: #b9f2ff; color: #005f73; }
-.discount-strike { text-decoration: line-through; color: rgba(255,255,255,0.4); font-size: 0.8em; margin-right: 8px; }
+.discount-strike { text-decoration: line-through; color: rgba(255,255,255,0.4); font-size: 0.85em; display: block; }
+.discount-final { color: var(--flux-gold); font-weight: 900; font-size: 13px; display: block; line-height: 1.2; }
+.discount-level { color: rgba(255,255,255,0.75); font-size: 10px; display: block; font-weight: 700; letter-spacing: 0.2px; }
