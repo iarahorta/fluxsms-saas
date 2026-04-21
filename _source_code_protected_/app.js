@@ -60,8 +60,9 @@ async function init() {
     
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
-    db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e));
-    setInterval(() => db.rpc('rpc_monitorar_e_estornar_v2').catch(e => console.error("Monitoramento Sync:", e)), 30000);
+    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch(e) {} };
+    runGari();
+    setInterval(runGari, 30000);
 
     if (session) {
         currentUser = session.user;
@@ -291,10 +292,11 @@ async function loadChipsCount() {
         .not('numero', 'ilike', 'CCID%'); // 🛡️ FILTRO: Nada de CCID no estoque
 
     chipsDisponiveis = count || 0; 
-    db.rpc('rpc_get_service_stocks').then(r => { 
-        if(r.data) serviceStocks = r.data; 
-        renderServices(SERVICES); 
-    });
+    try {
+        const { data: stocks } = await db.rpc('rpc_get_service_stocks');
+        if (stocks) serviceStocks = stocks;
+        renderServices(SERVICES);
+    } catch(e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
     if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
 }
