@@ -140,6 +140,7 @@ async function loadMyNumbers() {
     const { data, error } = await db.from('activations').select('*').eq('user_id', currentUser.id).eq('status', 'received').order('created_at', { ascending: false });
 
     if (error || !data) {
+        console.error("Erro ao carregar sessões:", error);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum código recebido ainda.</td></tr>';
         return;
     }
@@ -205,7 +206,9 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__'.includes('http') ? '__BACKEND_URL__' : (window.location.hostname === 'fluxsms.com.br' ? 'https://api.fluxsms.com.br' : window.location.origin);
+const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost') 
+    ? '__BACKEND_URL__' 
+    : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
 let pixCheckInterval = null;
 
@@ -368,8 +371,15 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
     const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
     
     if (error || !data || !data.ok) { 
-        console.error("Erro RPC:", error, data);
-        const errorMsg = error?.message || data?.error || "Nenhum chip disponível no momento ou falha na conexão.";
+        console.error("ERRO CRÍTICO RPC:", { error, data });
+        
+        // 🛡️ CAPTURA DE "Unexpected token <": Se o erro for HTML em vez de JSON
+        if (error && typeof error === 'string' && error.startsWith('<!DOCTYPE')) {
+            alert('ERRO DE SERVIDOR (HTML): O banco de dados retornou uma página de erro. Me avise para eu verificar os logs da Railway.');
+            return;
+        }
+
+        const errorMsg = error?.message || data?.error || "Sem estoque ou falha na conexão.";
         alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
         return; 
     }

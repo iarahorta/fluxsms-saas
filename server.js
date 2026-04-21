@@ -71,6 +71,35 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts:
 app.use('/_source_code_protected_', (req, res) => res.status(403).send('Forbidden'));
 app.use('/obfuscate.js', (req, res) => res.status(403).send('Forbidden'));
 
+// ─── DEBUG/SEED (STAGING ONLY) ───────────────────────────────
+app.get('/debug/seed', async (req, res) => {
+    try {
+        const supabase = req.app.get('supabase');
+        console.log('[SEED] Injetando dados de teste...');
+
+        // 1. Criar Polo de Teste (Online)
+        const { data: polo } = await supabase.from('polos').upsert({
+            id: 'ba768131-e67e-4299-bf5a-96503f92076c',
+            nome: 'Polo Lab Staging',
+            status: 'ONLINE',
+            ultima_comunicacao: new Date().toISOString()
+        }).select().single();
+
+        // 2. Criar Chips de Teste
+        await supabase.from('chips').upsert([
+            { id: '00000000-0000-0000-0000-000000000001', polo_id: polo.id, numero: '+5511999990001', status: 'idle' },
+            { id: '00000000-0000-0000-0000-000000000002', polo_id: polo.id, numero: '+5511999990002', status: 'idle' }
+        ]);
+
+        // 3. Dar Saldo para o Usuário Mestre (iarahorta@gmail.com)
+        await supabase.from('profiles').update({ balance: 100.00 }).eq('email', 'iarahorta@gmail.com');
+
+        res.json({ ok: true, message: 'Ambiente de Staging populado com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Servir arquivos permitidos
 const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
 publicFolders.forEach(folder => {
