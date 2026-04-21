@@ -311,7 +311,7 @@ async function loadChipsCount() {
 
     let query = db.from('chips')
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
-        .eq('status', 'idle')
+        .in('status', ['idle', 'quarentena'])
         .eq('polos.status', 'ONLINE')
         .not('numero', 'ilike', 'CCID%');
 
@@ -399,19 +399,38 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
+function formatPartnerChipsCell(chips) {
+    if (!chips || !chips.length) {
+        return '<span style="opacity:0.45;font-size:0.78rem;">Vincule polos em <code>partner_profile_id</code></span>';
+    }
+    return chips.map((c) => {
+        const label = c.numero || c.porta || c.id;
+        const polo = c.polo_nome ? ` <span style="opacity:0.5">(${escapeHtml(c.polo_nome)})</span>` : '';
+        let wa = '';
+        if (c.disponivel_em) {
+            const until = new Date(c.disponivel_em);
+            if (until > new Date()) {
+                wa = ` <span class="partner-wa-lock">WA quarentena até ${until.toLocaleString('pt-BR')}</span>`;
+            }
+        }
+        return `<div class="partner-chip-line"><strong>${escapeHtml(String(label))}</strong>${polo} · R$ ${Number(c.revenue_total || 0).toFixed(2)} · <span style="opacity:0.75">${escapeHtml(c.status || '')}</span>${wa}</div>`;
+    }).join('');
+}
+
 async function loadPartnerProfiles() {
     const tbody = document.querySelector('#table-partners tbody');
+    const colspan = 10;
     if (!tbody) return;
     if (!db) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Supabase indisponível.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Supabase indisponível.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando parceiros...</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Carregando parceiros...</td></tr>`;
 
     const { data: { session } } = await db.auth.getSession();
     if (!session) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Faça login novamente.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Faça login novamente.</td></tr>`;
         return;
     }
 
@@ -426,26 +445,33 @@ async function loadPartnerProfiles() {
         }
         const rows = json.partners || [];
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum parceiro cadastrado em <code>partner_profiles</code>.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Nenhum parceiro cadastrado em <code>partner_profiles</code>.</td></tr>`;
             return;
         }
         tbody.innerHTML = rows.map((p) => {
             const pr = p.profile || {};
             const email = pr.email || '—';
             const name = pr.full_name || '—';
+            const bal = pr.balance != null ? `R$ ${Number(pr.balance).toFixed(2)}` : '—';
             const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '—';
+            const nChips = p.chip_count != null ? p.chip_count : (p.chips || []).length;
+            const rev = p.revenue_total != null ? Number(p.revenue_total).toFixed(2) : '0.00';
             return `
         <tr>
             <td><code>${escapeHtml(p.partner_code)}</code></td>
             <td>${escapeHtml(email)}</td>
             <td>${escapeHtml(name)}</td>
+            <td style="color:#d4b8ff;font-weight:700;">${escapeHtml(bal)}</td>
             <td><span class="partner-status-badge partner-status-${escapeHtml((p.status || '').toLowerCase())}">${escapeHtml(p.status || '—')}</span></td>
             <td>${Number(p.margin_percent || 0).toFixed(2)}%</td>
+            <td style="text-align:center;">${nChips}</td>
+            <td style="color:#b8f5c8;font-weight:700;">R$ ${escapeHtml(rev)}</td>
+            <td style="font-size:0.72rem;line-height:1.35;">${formatPartnerChipsCell(p.chips)}</td>
             <td style="font-size:0.8rem;color:rgba(255,255,255,0.45);">${created}</td>
         </tr>`;
         }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(err.message || String(err))}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#e085a0;">${escapeHtml(err.message || String(err))}</td></tr>`;
     }
 }
 

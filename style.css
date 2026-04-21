@@ -436,6 +436,22 @@ table.partner-table {
     border: 1px solid rgba(220, 80, 80, 0.35);
 }
 
+.partner-chip-line {
+    margin-bottom: 4px;
+}
+
+.partner-wa-lock {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #ffc9a8;
+    background: rgba(255, 120, 80, 0.12);
+    border: 1px solid rgba(255, 140, 100, 0.25);
+}
+
 /* Perfil do usuário (saldo + avatar) */
 .user-profile {
     display: flex;

@@ -136,14 +136,18 @@ async function loadChips() {
 
         chips.forEach(c => {
             const tr = document.createElement('tr');
+            const st = c.status || '';
+            const badgeClass = st === 'idle' ? 'status-online' : (st === 'offline' ? 'status-offline' : (st === 'quarentena' ? 'status-busy' : 'status-busy'));
+            const waUntil = c.disponivel_em ? new Date(c.disponivel_em).toLocaleString('pt-BR') : '—';
             tr.innerHTML = `
                 <td>Porta ${c.porta}</td>
                 <td style="font-family: monospace;">${c.numero || 'Vazio'}</td>
                 <td>
-                    <span class="status-badge ${c.status === 'idle' ? 'status-online' : (c.status === 'offline' ? 'status-offline' : 'status-busy')}">
-                        ${c.status.toUpperCase()}
+                    <span class="status-badge ${badgeClass}">
+                        ${st.toUpperCase()}
                     </span>
                 </td>
+                <td style="font-size:11px;color:rgba(255,255,255,0.55);">${st === 'quarentena' && c.disponivel_em ? 'WA até ' + waUntil : waUntil}</td>
             `;
             tbody.appendChild(tr);
         });
