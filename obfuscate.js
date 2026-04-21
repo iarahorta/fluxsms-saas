@@ -4,8 +4,8 @@ const path = require('path');
 
 // Fontes agora ficam na pasta protegida
 const filesToObfuscate = [
-    { in: '_source_code_protected_/app.js', out: 'app.v5.shield.js' },
-    { in: '_source_code_protected_/admin.js', out: 'admin.v5.shield.js' }
+    { in: '_source_code_protected_/app.js', out: 'app.shield.js' },
+    { in: '_source_code_protected_/admin.js', out: 'admin.shield.js' }
 ];
 
 const distDir = path.join(__dirname, 'dist');
