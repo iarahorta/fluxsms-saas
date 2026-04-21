@@ -13,7 +13,10 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─── Middlewares Base ─────────────────────────────────────────
-app.use(cors({ origin: '*' }));
+app.use(cors({ 
+    origin: ['https://fluxsms.com.br', 'https://www.fluxsms.com.br'],
+    credentials: true 
+}));
 
 // ─── Rotas Prioritárias (Isentas de Rate Limit / Segurança) ───
 app.use('/webhook', webhookRouter);  // Mercado Pago
