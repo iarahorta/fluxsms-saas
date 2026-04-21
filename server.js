@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
+const proxy = require('express-http-proxy');
+
 const webhookRouter = require('./routes/webhook');
 const smsRouter = require('./routes/sms');
 const { rateLimiter } = require('./middleware/rateLimit');
