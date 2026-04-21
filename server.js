@@ -14,6 +14,15 @@ const { validateInput } = require('./middleware/validate');
 const app = express();
 app.set('trust proxy', 1);
 
+// ─── Supabase (service_role para operações protegidas) ────────
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
+
+// Disponibiliza globalmente para as rotas
+app.set('supabase', supabase);
+
 // ─── Proxy Unificado para Supabase ─────────────────────────────
 // IMPORTANTE: Este proxy DEVE ficar ANTES do express.json()
 // porque o express.json() consome o stream do body e quebra o proxy
