@@ -78,17 +78,18 @@ app.get('/debug/seed', async (req, res) => {
         console.log('[SEED] Injetando dados de teste...');
 
         // 1. Criar Polo de Teste (Online)
-        const { data: polo } = await supabase.from('polos').upsert({
-            id: 'ba768131-e67e-4299-bf5a-96503f92076c',
+        const POLO_ID = 'ba768131-e67e-4299-bf5a-96503f92076c';
+        await supabase.from('polos').upsert({
+            id: POLO_ID,
             nome: 'Polo Lab Staging',
             status: 'ONLINE',
             ultima_comunicacao: new Date().toISOString()
-        }).select().single();
+        });
 
         // 2. Criar Chips de Teste
         await supabase.from('chips').upsert([
-            { id: '00000000-0000-0000-0000-000000000001', polo_id: polo.id, numero: '+5511999990001', status: 'idle' },
-            { id: '00000000-0000-0000-0000-000000000002', polo_id: polo.id, numero: '+5511999990002', status: 'idle' }
+            { id: '00000000-0000-0000-0000-000000000001', polo_id: POLO_ID, numero: '+5511999990001', status: 'idle' },
+            { id: '00000000-0000-0000-0000-000000000002', polo_id: POLO_ID, numero: '+5511999990002', status: 'idle' }
         ]);
 
         // 3. Dar Saldo para o Usuário Mestre (iarahorta@gmail.com)
