@@ -84,7 +84,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
-const VERSION = '2.1.1';
+const VERSION = '2.1.2';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 

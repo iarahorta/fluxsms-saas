@@ -11,8 +11,9 @@ let currentUser = null;
 
 db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/** true quando o servidor injeta window.__FLUX_PARTNER_PORTAL (host parceiros.* ou Staging com FORCE_PARTNER_PORTAL=1). */
-const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true;
+/** Portal parceiro só é considerado ativo quando a URL contém /portal. */
+const IS_PORTAL_PATH = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true && IS_PORTAL_PATH;
 const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
 
 // === LISTA DE SERVIÇOS ===
@@ -71,6 +72,8 @@ async function init() {
     if (IS_PARTNER_PORTAL) {
         document.body.classList.add('flux-partner-portal');
         document.title = 'FluxSMS | Portal Parceiros';
+    } else {
+        document.body.classList.remove('flux-partner-portal');
     }
 
     const { data: { session } } = await db.auth.getSession();
@@ -80,6 +83,9 @@ async function init() {
     }
 
     toggleViews(session);
+    if (!IS_PARTNER_PORTAL && (window.location.pathname === '/' || window.location.pathname === '/index.html')) {
+        forceClientHomeButtons();
+    }
 
     setupRealtimeChips();
 
@@ -182,6 +188,16 @@ async function init() {
                 window.location.reload();
             }
         }
+    });
+}
+
+function forceClientHomeButtons() {
+    const ctaButtons = document.querySelectorAll('.btn-primary-lp, .btn-secondary-lp');
+    ctaButtons.forEach((btn) => {
+        btn.style.display = 'inline-flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
     });
 }
 
