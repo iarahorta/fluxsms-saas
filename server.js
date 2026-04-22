@@ -86,7 +86,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
-const VERSION = '2.1.5';
+const VERSION = '2.1.6';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
@@ -117,10 +117,10 @@ function sendIndexHtml(req, res) {
         }
         if (!html.includes('window.__FLUX_CHAT_CONFIG=')) {
             const chatConfig = {
-                provider: String(process.env.CHAT_WIDGET_PROVIDER || '').toLowerCase(),
+                provider: String(process.env.CHAT_WIDGET_PROVIDER || 'tawk').toLowerCase(),
                 crispWebsiteId: process.env.CRISP_WEBSITE_ID || '',
-                tawkPropertyId: process.env.TAWK_PROPERTY_ID || '',
-                tawkWidgetId: process.env.TAWK_WIDGET_ID || ''
+                tawkPropertyId: process.env.TAWK_PROPERTY_ID || '69e8ef5ae501111c351289e9',
+                tawkWidgetId: process.env.TAWK_WIDGET_ID || '1jmqudufi'
             };
             const safeConfigJson = JSON.stringify(chatConfig).replace(/</g, '\\u003c');
             html = html.replace('<head>', `<head>\n    <script>window.__FLUX_CHAT_CONFIG=${safeConfigJson}</script>`);
