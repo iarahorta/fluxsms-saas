@@ -63,7 +63,9 @@ function shouldBootChatWidget() {
 function bootChatWidget() {
     if (chatWidgetBooted || !shouldBootChatWidget()) return;
     const cfg = window.__FLUX_CHAT_CONFIG || {};
-    const provider = String(cfg.provider || '').toLowerCase();
+    const providerRaw = String(cfg.provider || '').toLowerCase();
+    const provider = providerRaw.includes('tawk') ? 'tawk' : providerRaw;
+    const hasTawk = !!(cfg.tawkPropertyId && cfg.tawkWidgetId);
 
     if (provider === 'crisp' && cfg.crispWebsiteId) {
         window.$crisp = window.$crisp || [];
@@ -76,7 +78,7 @@ function bootChatWidget() {
         return;
     }
 
-    if (provider === 'tawk' && cfg.tawkPropertyId && cfg.tawkWidgetId) {
+    if ((provider === 'tawk' || (!provider && hasTawk)) && hasTawk) {
         window.Tawk_API = window.Tawk_API || {};
         window.Tawk_LoadStart = new Date();
         window.Tawk_API.visitor = {
@@ -263,6 +265,7 @@ function forceClientHomeButtons() {
 }
 
 function toggleViews(session) {
+    document.body.classList.toggle('app-dashboard-mode', !!session);
     if (IS_PARTNER_PORTAL) {
         landingView.style.display = 'none';
         if (session) {
