@@ -1831,10 +1831,15 @@ body.flux-partner-portal.partner-mode #view-dashboard {
     padding: 8px 0 24px;
 }
 
-/* Tawk.to: ocultar "attention grabber" (m?ozinha/chamada visual). */
+/* Tawk.to: ocultar "attention grabber" (chamada visual). */
 [class*="tawk-attention"],
 [id*="tawk-attention"],
-iframe[title*="attention" i],
-iframe[title*="grabber" i] {
+[class*="attention-grabber"],
+[id*="attention-grabber"] {
     display: none !important;
+}
+
+/* Evita barra lateral extra por overflow horizontal */
+html, body {
+    overflow-x: hidden;
 }

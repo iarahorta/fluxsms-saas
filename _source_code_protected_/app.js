@@ -79,6 +79,9 @@ function bootChatWidget() {
     if (provider === 'tawk' && cfg.tawkPropertyId && cfg.tawkWidgetId) {
         window.Tawk_API = window.Tawk_API || {};
         window.Tawk_LoadStart = new Date();
+        window.Tawk_API.visitor = {
+            name: 'Cliente FluxSMS'
+        };
         window.Tawk_API.onLoad = function () {
             try {
                 window.Tawk_API.setAttributes({
@@ -100,7 +103,7 @@ function bootChatWidget() {
         };
         const s1 = document.createElement('script');
         s1.async = true;
-        s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}`;
+        s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}/default?lang=pt`;
         s1.charset = 'UTF-8';
         s1.setAttribute('crossorigin', '*');
         document.head.appendChild(s1);
