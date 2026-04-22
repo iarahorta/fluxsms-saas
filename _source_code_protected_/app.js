@@ -25,6 +25,14 @@ let SERVICES = [
 let userCustomPrices = {};
 let currentUserIsAdmin = false;
 let currentUserIsPartner = false;
+const LAUNCH_PROMO_START_ISO = '2026-04-22T00:00:00-03:00';
+const LAUNCH_PROMO_DAYS = 15;
+const WHATSAPP_LEVELS = [
+    { key: 'PADRAO', minSpent: 0, price: 7.50, label: 'Padrão', badgeClass: 'badge-bronze' },
+    { key: 'BRONZE', minSpent: 200.01, price: 7.00, label: 'Bronze', badgeClass: 'badge-bronze' },
+    { key: 'PRATA', minSpent: 1000.01, price: 6.50, label: 'Prata', badgeClass: 'badge-prata' },
+    { key: 'OURO', minSpent: 3000.01, price: 6.10, label: 'Ouro', badgeClass: 'badge-ouro' }
+];
 
 /** Staging: true = botão/menu Parceiros visíveis para qualquer usuário logado (API /api/admin/partners continua exigindo admin). Coloque false quando is_admin estiver correto no Supabase. */
 const PARTNER_UI_FORCE_VISIBLE = true;
@@ -536,6 +544,89 @@ function setupRealtimeChips() {
 
 let userDiscountFactor = 0;
 let userFidelityLevel = 'Bronze';
+let userSpentLast30Days = 0;
+let userWhatsappLevel = WHATSAPP_LEVELS[0];
+
+function getLaunchPromoEndDate() {
+    const start = new Date(LAUNCH_PROMO_START_ISO);
+    const end = new Date(start.getTime());
+    end.setDate(end.getDate() + LAUNCH_PROMO_DAYS);
+    return end;
+}
+
+function isLaunchPromoActive() {
+    return new Date() < getLaunchPromoEndDate();
+}
+
+function getLaunchPromoDaysRemaining() {
+    const diffMs = getLaunchPromoEndDate().getTime() - Date.now();
+    if (diffMs <= 0) return 0;
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+async function getUserSpentLast30Days() {
+    if (!db || !currentUser) return 0;
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)).toISOString();
+    const { data, error } = await db
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', currentUser.id)
+        .eq('type', 'debit')
+        .gte('created_at', thirtyDaysAgo);
+    if (error || !Array.isArray(data)) return 0;
+    return data.reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
+}
+
+function resolveWhatsappLevel(spentLast30Days) {
+    if (spentLast30Days > 3000) return WHATSAPP_LEVELS[3];
+    if (spentLast30Days > 1000) return WHATSAPP_LEVELS[2];
+    if (spentLast30Days > 200) return WHATSAPP_LEVELS[1];
+    return WHATSAPP_LEVELS[0];
+}
+
+function getWhatsappBasePriceForCurrentUser() {
+    if (isLaunchPromoActive()) return 6.10;
+    return userWhatsappLevel.price;
+}
+
+function updateLaunchTimerBanner() {
+    const banner = document.getElementById('launch-timer-banner');
+    const daysEl = document.getElementById('launch-timer-days');
+    if (!banner || !daysEl) return;
+    const days = getLaunchPromoDaysRemaining();
+    if (days > 0) {
+        const suffix = days === 1 ? '1 dia' : `${days} dias`;
+        daysEl.textContent = suffix;
+        banner.style.display = 'block';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
+function updateLevelProgressUI() {
+    const card = document.getElementById('level-progress-card');
+    const badge = document.getElementById('level-current-badge');
+    const price = document.getElementById('level-current-price');
+    const fill = document.getElementById('level-progress-fill');
+    const text = document.getElementById('level-progress-text');
+    if (!card || !badge || !price || !fill || !text) return;
+    card.style.display = 'block';
+    badge.textContent = userWhatsappLevel.label.toUpperCase();
+    badge.className = `fidelity-badge ${userWhatsappLevel.badgeClass}`;
+    price.textContent = `WhatsApp: R$ ${userWhatsappLevel.price.toFixed(2)}`;
+    const nextLevel = WHATSAPP_LEVELS.find(level => level.minSpent > userSpentLast30Days);
+    if (!nextLevel) {
+        fill.style.width = '100%';
+        text.textContent = 'Parabéns! Você já está no Nível Ouro e paga R$ 6,10.';
+        return;
+    }
+    const currentMin = userWhatsappLevel.minSpent;
+    const range = Math.max(1, nextLevel.minSpent - currentMin);
+    const progress = Math.max(0, Math.min(100, ((userSpentLast30Days - currentMin) / range) * 100));
+    const remaining = Math.max(0, nextLevel.minSpent - userSpentLast30Days);
+    fill.style.width = `${progress}%`;
+    text.textContent = `Gaste mais R$ ${remaining.toFixed(2)} para atingir o Nível ${nextLevel.label} e pagar R$ ${nextLevel.price.toFixed(2)}.`;
+}
 
 async function updateUIForUser() {
     if (!currentUser) return;
@@ -561,6 +652,7 @@ async function updateUIForUser() {
         const b = `R$ ${profile.balance.toFixed(2)}`;
         if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
         if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
+        updateLaunchTimerBanner();
 
         // --- FIDELIDADE INTELIGENTE ---
         const total = profile.total_recharged || 0;
@@ -576,6 +668,9 @@ async function updateUIForUser() {
         const b2 = document.getElementById('fidelity-badge-mobile');
         if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
         if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+        userSpentLast30Days = await getUserSpentLast30Days();
+        userWhatsappLevel = resolveWhatsappLevel(userSpentLast30Days);
+        updateLevelProgressUI();
         // ------------------------------
     }
 
@@ -874,6 +969,9 @@ function renderServices(list) {
     servicesGrid.innerHTML = list.map(s => {
         const stock = serviceStocks[s.id] ?? (chipsDisponiveis > 0 ? 1 : 0);
         let finalPrice = userCustomPrices[s.id] || s.price;
+        if (s.id === 'whatsapp') {
+            finalPrice = getWhatsappBasePriceForCurrentUser();
+        }
         
         let priceHtml = `R$ ${finalPrice.toFixed(2)}`;
         if (userDiscountFactor > 0) {
@@ -886,7 +984,7 @@ function renderServices(list) {
                 <div class="name">${s.name}</div>
                 <div class="price">${priceHtml}</div>
                 <div class="action">
-                    <button class="btn-buy" onclick="requestNumber('${s.id}', '${s.name}', ${finalPrice})" ${stock <= 0 ? 'disabled' : ''}>
+                    <button class="btn-buy" onclick="requestNumber('${s.id}', '${s.name}', ${finalPrice.toFixed(2)})" ${stock <= 0 ? 'disabled' : ''}>
                         ${stock <= 0 ? 'SEM ESTOQUE' : 'SOLICITAR'}
                     </button>
                 </div>

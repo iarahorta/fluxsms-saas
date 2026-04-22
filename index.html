@@ -7,8 +7,8 @@
     <title>FluxSMS | Números Virtuais de Elite</title>
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="icon" type="image/png" href="favicon.png?v=2.1.1">
+    <link rel="stylesheet" href="style.css?v=2.1.1">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -51,7 +51,7 @@
                     </div>
                 </div>
                 <div class="hero-image">
-                    <img src="assets/hero_luxury.png" alt="FluxSMS Luxury SIM" id="hero-img-main">
+                    <img src="assets/hero_luxury.png?v=2.1.1" alt="FluxSMS Luxury SIM" id="hero-img-main">
                 </div>
             </div>
         </section>
@@ -148,7 +148,7 @@
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-top">
                     <div class="logo-area">
-                        <img src="assets/logo.png" alt="FluxSMS" class="logo-img"
+                        <img src="assets/logo.png?v=2.1.1" alt="FluxSMS" class="logo-img"
                             onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
                         <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span
                                 class="logo-sms">SMS</span></span>
@@ -174,6 +174,8 @@
                         Recarregar Saldo</a>
                     <a href="javascript:void(0)" onclick="showView('history')" class="nav-item hide-for-partner" id="nav-history"><span
                             class="icon">📊</span> Histórico</a>
+                    <a href="/portal/register" class="nav-item nav-item-fornecedor-mobile"><span class="icon">💰</span>
+                        Seja um fornecedor</a>
                     <a href="javascript:void(0)" onclick="showView('partners')" class="nav-item nav-partners-admin"
                         id="nav-partners" style="display:none;"><span class="icon">◆</span> <span id="nav-partners-label">Financeiro</span></a>
                     <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span>
@@ -242,6 +244,9 @@
                 <!-- VIEW: DASHBOARD — cliente (compra) vs parceiro (infra) -->
                 <section id="view-dashboard" class="content-grid app-view">
                     <div id="client-purchase-dashboard" class="client-purchase-dashboard hide-for-partner">
+                        <div id="launch-timer-banner" class="launch-timer-banner" style="display:none;">
+                            Tarifa de Lançamento: WhatsApp por R$ 6,10 encerra em <strong id="launch-timer-days">15 dias</strong>
+                        </div>
                         <div class="services-container">
                             <div class="section-header">
                                 <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
@@ -256,6 +261,16 @@
                         </div>
                         <div class="active-sessions">
                             <h2 class="section-title">NÚMEROS ATIVOS</h2>
+                            <div id="level-progress-card" class="level-progress-card" style="display:none;">
+                                <div class="level-progress-head">
+                                    <span id="level-current-badge" class="fidelity-badge badge-bronze">PADRÃO</span>
+                                    <span id="level-current-price">R$ 7,50</span>
+                                </div>
+                                <div class="level-progress-track">
+                                    <div id="level-progress-fill" class="level-progress-fill"></div>
+                                </div>
+                                <p id="level-progress-text" class="level-progress-text">Gaste mais R$ 200,00 para atingir o Nível Bronze e pagar R$ 7,00.</p>
+                            </div>
                             <div class="sessions-list" id="active-numbers">
                                 <div class="empty-state">Nenhum número solicitado no momento.</div>
                             </div>
@@ -459,10 +474,13 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=26"></script>
+    <script src="dist/app.shield.js?v=2.1.1"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
-        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function abrirModal(id) {
+            if (window.__FLUX_PARTNER_PORTAL === true && id === 'authModal') return;
+            document.getElementById(id).style.display = 'flex';
+        }
         function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
         function abrirAuth() { abrirModal('authModal'); }
         function fecharAuth() { fecharModal('authModal'); }

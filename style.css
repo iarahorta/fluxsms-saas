@@ -331,6 +331,63 @@ body {
     border-left-color: rgba(123, 63, 249, 0.35);
 }
 
+.nav-item-fornecedor-mobile {
+    display: none;
+    color: #111;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f0c040 0%, #d4af37 100%);
+    border: 1px solid rgba(212, 175, 55, 0.95);
+}
+
+.launch-timer-banner {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    border-radius: 8px;
+    background: rgba(212, 175, 55, 0.08);
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.level-progress-card {
+    margin-bottom: 14px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: rgba(212, 175, 55, 0.06);
+}
+
+.level-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.level-progress-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.13);
+    overflow: hidden;
+}
+
+.level-progress-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #7a6420 0%, #d4af37 100%);
+    transition: width 0.3s ease;
+}
+
+.level-progress-text {
+    margin-top: 8px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.8);
+}
+
 .partner-dashboard-view .partner-view-head {
     display: flex;
     flex-wrap: wrap;
@@ -952,6 +1009,10 @@ overflow-y: auto;
 
     .balance-mobile {
         display: block;
+    }
+
+    .nav-item-fornecedor-mobile {
+        display: flex;
     }
 
     /* Header */

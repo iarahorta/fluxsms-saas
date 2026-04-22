@@ -53,6 +53,14 @@ app.use(cors({
 
 // express.json() agora fica DEPOIS do proxy
 app.use(express.json({ limit: '10kb' }));
+app.use((req, res, next) => {
+    if (req.method === 'GET') {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+    }
+    next();
+});
 
 // proxyReqOptDecorator: ...
 // (express.json() movido para o topo)
@@ -75,8 +83,10 @@ app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resum
 app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autónomo: ativar perfil parceiro (JWT)
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
+// Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
+const VERSION = '2.1.1';
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.8', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
 /** Produção: host parceiros.* | Staging: FORCE_PARTNER_PORTAL=1 no Railway simula o mesmo isolamento. */
 function resolveRequestHost(req) {
@@ -197,6 +207,7 @@ app.get('/portal/register', sendPartnerRegister);
 app.get('/partner-register.html', (_req, res) => res.redirect(301, '/portal/register'));
 app.get('/partner/', (_req, res) => res.redirect(301, '/portal'));
 app.get('/partner', (_req, res) => res.redirect(301, '/portal'));
+app.get(/^\/partner(?:\/.*)?$/i, (_req, res) => res.redirect(301, '/portal'));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
