@@ -76,7 +76,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.7', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.8', ts: new Date().toISOString() }));
 
 /** Produção: host parceiros.* | Staging: FORCE_PARTNER_PORTAL=1 no Railway simula o mesmo isolamento. */
 function resolveRequestHost(req) {
