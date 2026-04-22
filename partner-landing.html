@@ -41,12 +41,6 @@
         .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem; }
         .logo-flux { color: #fff; }
         .logo-sms { color: var(--gold); }
-        .back-home {
-            color: rgba(255,255,255,0.55);
-            text-decoration: none;
-            font-size: 13px;
-        }
-        .back-home:hover { color: var(--gold); }
         .hero {
             max-width: 720px;
             margin: 0 auto;
@@ -151,7 +145,6 @@
     <div class="wrap">
         <div class="top-bar">
             <div class="logo"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></div>
-            <a class="back-home" id="pl-back-site" href="https://fluxsms.com.br/">← Voltar ao site</a>
         </div>
         <div class="hero">
             <div class="badge">Fornecedor · Infraestrutura</div>
@@ -174,7 +167,7 @@
         </div>
         <div class="actions">
             <a class="btn btn-primary" href="/partner/register">Cadastrar</a>
-            <a class="btn btn-secondary" id="pl-portal-login" href="https://parceiros.fluxsms.com.br/?parceiro=login">Fazer login</a>
+            <a class="btn btn-secondary" id="pl-portal-login" href="https://parceiros.fluxsms.com.br/p/login">Fazer login</a>
         </div>
         <p class="footnote">Programa destinado a operadores de infraestrutura (polos / chips). Não inclui compra de números virtuais para consumo próprio — após o login, o painel mostra apenas infraestrutura e financeiro.</p>
     </div>
@@ -182,12 +175,10 @@
         (function () {
             var h = location.hostname;
             var isLab = /railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1';
-            var portal = isLab ? location.origin : 'https://parceiros.fluxsms.com.br';
-            var mainSite = 'https://fluxsms.com.br';
+            var isParceiros = /^parceiros\./i.test(h);
+            var portal = (isLab || isParceiros) ? location.origin : 'https://parceiros.fluxsms.com.br';
             var el = document.getElementById('pl-portal-login');
-            if (el) el.setAttribute('href', portal + '/?parceiro=login');
-            var back = document.getElementById('pl-back-site');
-            if (back) back.setAttribute('href', isLab ? location.origin : mainSite);
+            if (el) el.setAttribute('href', portal + '/p/login');
         })();
     </script>
 </body>

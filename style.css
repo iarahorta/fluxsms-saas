@@ -1680,9 +1680,11 @@ body.flux-partner-portal .user-profile.hide-for-partner,
 body.flux-partner-portal .btn-recharge-full,
 body.flux-partner-portal a.nav-item.hide-for-partner[onclick*="abrirRecarga"],
 body.flux-partner-portal #client-purchase-dashboard,
-body.flux-partner-portal #modalRecarga {
+body.flux-partner-portal #modalRecarga,
+body.flux-partner-portal #authModal {
     display: none !important;
     pointer-events: none !important;
+    visibility: hidden !important;
 }
 body.flux-partner-portal.partner-mode #partner-infra-monitor {
     display: block !important;

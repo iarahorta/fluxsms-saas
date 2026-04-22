@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS Parceiros | Entrar</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root { --bg: #0a0a0a; --gold: #d4af37; --gold-dim: rgba(212, 175, 55, 0.35); --card: rgba(18, 18, 18, 0.96); }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: #f2f2f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.18), transparent), linear-gradient(180deg, #111 0%, var(--bg) 50%);
+        }
+        .box {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card);
+            border: 1px solid rgba(212, 175, 55, 0.28);
+            border-radius: 16px;
+            padding: 32px 28px 28px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+        }
+        .brand {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .brand .f { color: #fff; }
+        .brand .s { color: var(--gold); }
+        .sub {
+            text-align: center;
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.45);
+            margin-bottom: 28px;
+        }
+        label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.5); margin-bottom: 6px; }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        input:focus { outline: none; border-color: var(--gold); }
+        button.primary {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            background: linear-gradient(135deg, #e8c547, var(--gold));
+            color: #111;
+            margin-top: 4px;
+        }
+        button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+        .msg { margin-top: 14px; font-size: 12px; min-height: 2.6em; line-height: 1.45; color: #f0a8a8; }
+        .msg.ok { color: #b8f5c8; }
+        .foot {
+            margin-top: 22px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .foot a { color: var(--gold); text-decoration: none; }
+        .foot a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="brand"><span class="f">FLUX</span><span class="s">SMS</span></div>
+        <div class="sub">Portal de infraestrutura</div>
+        <form id="pl-form" onsubmit="return false;">
+            <label for="pl-email">E-mail</label>
+            <input id="pl-email" type="email" required autocomplete="email" placeholder="seu@email.com">
+            <label for="pl-pass">Senha</label>
+            <input id="pl-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+            <button type="button" class="primary" id="pl-btn">Entrar</button>
+            <div class="msg" id="pl-msg"></div>
+        </form>
+        <div class="foot">
+            <a id="pl-register" href="/partner/register">Primeiro acesso — cadastrar fornecedor</a>
+        </div>
+    </div>
+    <script>
+        const SUPABASE_URL = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        const msgEl = document.getElementById('pl-msg');
+        const btn = document.getElementById('pl-btn');
+
+        (async function checkSession() {
+            const { data: { session } } = await db.auth.getSession();
+            if (session) {
+                window.location.replace('/');
+            }
+        })();
+
+        function setMsg(t, ok) {
+            msgEl.textContent = t || '';
+            msgEl.className = 'msg' + (ok ? ' ok' : '');
+        }
+
+        document.getElementById('pl-btn').addEventListener('click', async function () {
+            const email = document.getElementById('pl-email').value.trim();
+            const password = document.getElementById('pl-pass').value;
+            if (!email || !password) {
+                setMsg('Preencha e-mail e senha.');
+                return;
+            }
+            btn.disabled = true;
+            setMsg('A entrar…', true);
+            try {
+                const { error } = await db.auth.signInWithPassword({ email: email, password: password });
+                if (error) throw error;
+                window.location.replace('/');
+            } catch (e) {
+                setMsg(e.message || String(e));
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
