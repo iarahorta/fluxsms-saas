@@ -44,6 +44,7 @@ let activeSessions = {};
 let chipsDisponiveis = 0;
 let serviceStocks = {};
 let isRealtimeActive = false;
+let chatWidgetBooted = false;
 
 // === ELEMENTOS ===
 const landingView = document.getElementById('landing-view');
@@ -52,6 +53,41 @@ const authModal = document.getElementById('authModal');
 const servicesGrid = document.getElementById('services-grid');
 const activeNumbers = document.getElementById('active-numbers');
 const searchInput = document.getElementById('service-search');
+
+function shouldBootChatWidget() {
+    if (!currentUser) return false;
+    if (IS_PARTNER_PORTAL) return true;
+    return dashboardView && dashboardView.style.display !== 'none';
+}
+
+function bootChatWidget() {
+    if (chatWidgetBooted || !shouldBootChatWidget()) return;
+    const cfg = window.__FLUX_CHAT_CONFIG || {};
+    const provider = String(cfg.provider || '').toLowerCase();
+
+    if (provider === 'crisp' && cfg.crispWebsiteId) {
+        window.$crisp = window.$crisp || [];
+        window.CRISP_WEBSITE_ID = cfg.crispWebsiteId;
+        const s = document.createElement('script');
+        s.src = 'https://client.crisp.chat/l.js';
+        s.async = true;
+        document.head.appendChild(s);
+        chatWidgetBooted = true;
+        return;
+    }
+
+    if (provider === 'tawk' && cfg.tawkPropertyId && cfg.tawkWidgetId) {
+        window.Tawk_API = window.Tawk_API || {};
+        window.Tawk_LoadStart = new Date();
+        const s1 = document.createElement('script');
+        s1.async = true;
+        s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}`;
+        s1.charset = 'UTF-8';
+        s1.setAttribute('crossorigin', '*');
+        document.head.appendChild(s1);
+        chatWidgetBooted = true;
+    }
+}
 
 function unscrambleSMS(text) {
     try {
@@ -105,6 +141,7 @@ async function init() {
             if (np) np.style.display = 'flex';
         }
         await updateUIForUser();
+        bootChatWidget();
         if (!currentUserIsPartner) {
             fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
             await fetchUserCustomPrices();
@@ -163,6 +200,7 @@ async function init() {
                     if (np) np.style.display = 'flex';
                 }
                 await updateUIForUser();
+                bootChatWidget();
                 if (!currentUserIsPartner) {
                     loadActiveSessions();
                     setupRealtime();
@@ -259,6 +297,7 @@ window.showView = function (viewName) {
     if (viewName === 'security') loadSecurityPanel();
     if (viewName === 'partners') loadPartnerProfiles();
     if (viewName === 'dashboard' && currentUserIsPartner) loadPartnerChipsMonitor();
+    if (viewName === 'dashboard') bootChatWidget();
 };
 
 function syncPartnerPanelsVisibility() {

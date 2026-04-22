@@ -86,7 +86,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
-const VERSION = '2.1.4';
+const VERSION = '2.1.5';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
@@ -111,12 +111,19 @@ function isPartnerPortalExperience(req) {
 
 function sendIndexHtml(req, res) {
     try {
-        if (!isPartnerPortalExperience(req)) {
-            return res.sendFile(path.join(__dirname, 'index.html'));
-        }
         let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-        if (!html.includes('window.__FLUX_PARTNER_PORTAL=true')) {
+        if (isPartnerPortalExperience(req) && !html.includes('window.__FLUX_PARTNER_PORTAL=true')) {
             html = html.replace('<head>', '<head>\n    <script>window.__FLUX_PARTNER_PORTAL=true</script>');
+        }
+        if (!html.includes('window.__FLUX_CHAT_CONFIG=')) {
+            const chatConfig = {
+                provider: String(process.env.CHAT_WIDGET_PROVIDER || '').toLowerCase(),
+                crispWebsiteId: process.env.CRISP_WEBSITE_ID || '',
+                tawkPropertyId: process.env.TAWK_PROPERTY_ID || '',
+                tawkWidgetId: process.env.TAWK_WIDGET_ID || ''
+            };
+            const safeConfigJson = JSON.stringify(chatConfig).replace(/</g, '\\u003c');
+            html = html.replace('<head>', `<head>\n    <script>window.__FLUX_CHAT_CONFIG=${safeConfigJson}</script>`);
         }
         res.type('html').send(html);
     } catch (err) {
