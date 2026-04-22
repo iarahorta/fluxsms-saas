@@ -76,7 +76,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.6', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.7', ts: new Date().toISOString() }));
 
 /** Produção: host parceiros.* | Staging: FORCE_PARTNER_PORTAL=1 no Railway simula o mesmo isolamento. */
 function resolveRequestHost(req) {
@@ -191,13 +191,12 @@ app.get('/p/login', (req, res) => {
 });
 app.get('/portal/login', sendPartnerLoginPage);
 const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
-const sendPartnerLanding = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
-app.get('/partner/register', sendPartnerRegister);
-app.get('/partner/register/', sendPartnerRegister);
+app.get('/partner/register', (_req, res) => res.redirect(301, '/portal/register'));
+app.get('/partner/register/', (_req, res) => res.redirect(301, '/portal/register'));
 app.get('/portal/register', sendPartnerRegister);
-app.get('/partner-register.html', sendPartnerRegister);
-app.get('/partner/', sendPartnerLanding);
-app.get('/partner', (_req, res) => res.redirect(301, '/partner/'));
+app.get('/partner-register.html', (_req, res) => res.redirect(301, '/portal/register'));
+app.get('/partner/', (_req, res) => res.redirect(301, '/portal'));
+app.get('/partner', (_req, res) => res.redirect(301, '/portal'));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 

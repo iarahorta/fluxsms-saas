@@ -166,8 +166,8 @@
             </div>
         </div>
         <div class="actions">
-            <a class="btn btn-primary" href="/partner/register">Cadastrar</a>
-            <a class="btn btn-secondary" id="pl-portal-login" href="https://parceiros.fluxsms.com.br/p/login">Fazer login</a>
+            <a class="btn btn-primary" href="/portal/register">Cadastrar</a>
+            <a class="btn btn-secondary" id="pl-portal-login" href="https://fluxsms.com.br/portal/login">Fazer login</a>
         </div>
         <p class="footnote">Programa destinado a operadores de infraestrutura (polos / chips). Não inclui compra de números virtuais para consumo próprio — após o login, o painel mostra apenas infraestrutura e financeiro.</p>
     </div>
@@ -175,10 +175,9 @@
         (function () {
             var h = location.hostname;
             var isLab = /railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1';
-            var isParceiros = /^parceiros\./i.test(h);
-            var portal = (isLab || isParceiros) ? location.origin : 'https://parceiros.fluxsms.com.br';
+            var portal = isLab ? location.origin : 'https://fluxsms.com.br';
             var el = document.getElementById('pl-portal-login');
-            if (el) el.setAttribute('href', portal + '/p/login');
+            if (el) el.setAttribute('href', portal + '/portal/login');
         })();
     </script>
 </body>
