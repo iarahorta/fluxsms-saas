@@ -1104,6 +1104,47 @@ overflow-y: auto;
     gap: 30px;
 }
 
+.lp-hamburger {
+    display: none;
+    background: transparent;
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    color: var(--flux-gold);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.lp-mobile-menu {
+    display: none;
+}
+
+.lp-mobile-menu a,
+.lp-mobile-btn {
+    text-decoration: none;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+}
+
+.lp-mobile-btn {
+    cursor: pointer;
+}
+
+.lp-mobile-btn-gold,
+.lp-mobile-fornecedor {
+    color: #111 !important;
+    background: linear-gradient(135deg, #f0c040 0%, #d4af37 100%) !important;
+    border-color: rgba(212, 175, 55, 0.9) !important;
+}
+
 .lp-nav a {
     color: var(--flux-dim);
     text-decoration: none;
@@ -1498,6 +1539,19 @@ overflow-y: auto;
 
     .lp-nav {
         display: none;
+    }
+
+    .lp-hamburger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .lp-mobile-menu.active {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+        padding: 0 30px 10px;
     }
 
     .hero {

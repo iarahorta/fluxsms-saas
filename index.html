@@ -24,6 +24,7 @@
                 <div class="logo-area">
                     <span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span>
                 </div>
+                <button class="lp-hamburger" type="button" aria-label="Abrir menu" onclick="toggleLandingMenu()">☰</button>
                 <nav class="lp-nav">
                     <a href="#vantagens">Diferenciais</a>
                     <a href="#passo-a-passo">Como Funciona</a>
@@ -33,6 +34,13 @@
                         <button class="btn-auth-nav" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
                     </div>
                 </nav>
+            </div>
+            <div id="lp-mobile-menu" class="lp-mobile-menu">
+                <a href="#vantagens" onclick="closeLandingMenu()">Diferenciais</a>
+                <a href="#passo-a-passo" onclick="closeLandingMenu()">Como Funciona</a>
+                <a class="lp-mobile-fornecedor" href="/partner/" onclick="closeLandingMenu()">💰 Seja um fornecedor</a>
+                <button class="lp-mobile-btn" type="button" onclick="closeLandingMenu(); abrirModal('authModal')">Entrar</button>
+                <button class="lp-mobile-btn lp-mobile-btn-gold" type="button" onclick="closeLandingMenu(); abrirModal('authModal')">COMEÇAR AGORA</button>
             </div>
         </header>
 
@@ -477,6 +485,16 @@
     <script src="dist/app.shield.js?v=2.1.2"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
+        function toggleLandingMenu() {
+            const menu = document.getElementById('lp-mobile-menu');
+            if (!menu) return;
+            menu.classList.toggle('active');
+        }
+        function closeLandingMenu() {
+            const menu = document.getElementById('lp-mobile-menu');
+            if (!menu) return;
+            menu.classList.remove('active');
+        }
         function isPartnerPortalByPath() { return window.location.pathname.startsWith('/portal'); }
         function abrirModal(id) {
             if (window.__FLUX_PARTNER_PORTAL === true && isPartnerPortalByPath() && id === 'authModal') return;
@@ -511,6 +529,14 @@
                     btn.style.opacity = '1';
                 });
             }
+            document.addEventListener('click', function(e) {
+                const menu = document.getElementById('lp-mobile-menu');
+                const btn = document.querySelector('.lp-hamburger');
+                if (!menu || !btn || !menu.classList.contains('active')) return;
+                if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                    closeLandingMenu();
+                }
+            });
             // Enter no login
             ['auth-email', 'auth-password'].forEach(id => {
                 const el = document.getElementById(id);
