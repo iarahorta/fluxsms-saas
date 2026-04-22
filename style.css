@@ -301,6 +301,157 @@ body {
     transform: scale(1.02);
 }
 
+.partner-header-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-partner-lux {
+    background: linear-gradient(90deg, #18122b 60%, #7b3ff9 100%);
+    color: #fff;
+    border: 1px solid rgba(123, 63, 249, 0.45);
+    padding: 10px 18px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: 'Syne', 'Montserrat', sans-serif;
+    box-shadow: 0 2px 16px rgba(91, 40, 183, 0.25);
+    transition: filter 0.2s, transform 0.2s;
+    white-space: nowrap;
+}
+
+.btn-partner-lux:hover {
+    filter: brightness(1.12);
+    transform: scale(1.02);
+}
+
+.nav-partners-admin {
+    border-left-color: rgba(123, 63, 249, 0.35);
+}
+
+.partner-dashboard-view .partner-view-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.partner-view-title {
+    background: linear-gradient(90deg, #c4a5ff 0%, #fff 55%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.partner-view-sub {
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 13px;
+    max-width: 640px;
+    margin: 8px 0 0 0;
+    line-height: 1.5;
+}
+
+.partner-view-sub code {
+    color: rgba(196, 165, 255, 0.85);
+    font-size: 12px;
+}
+
+.btn-partner-refresh {
+    background: linear-gradient(135deg, #2a1548 0%, #4a1f7a 100%);
+    color: #ede8ff;
+    border: 1px solid rgba(123, 63, 249, 0.5);
+    padding: 10px 20px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.btn-partner-refresh:hover {
+    filter: brightness(1.1);
+}
+
+table.partner-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    border: 1px solid rgba(123, 63, 249, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.partner-table thead {
+    background: linear-gradient(90deg, #1a1028 0%, #2d1450 100%);
+}
+
+.partner-table th {
+    text-align: left;
+    padding: 12px 14px;
+    color: rgba(255, 255, 255, 0.75);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(123, 63, 249, 0.25);
+}
+
+.partner-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.partner-table tbody tr:hover {
+    background: rgba(123, 63, 249, 0.08);
+}
+
+.partner-table code {
+    color: #d4b8ff;
+    font-size: 12px;
+}
+
+.partner-status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.partner-status-active {
+    background: rgba(46, 160, 67, 0.2);
+    color: #7dffb1;
+    border: 1px solid rgba(46, 160, 67, 0.35);
+}
+
+.partner-status-suspended {
+    background: rgba(220, 80, 80, 0.15);
+    color: #ff9b9b;
+    border: 1px solid rgba(220, 80, 80, 0.35);
+}
+
+.partner-chip-line {
+    margin-bottom: 4px;
+}
+
+.partner-wa-lock {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #ffc9a8;
+    background: rgba(255, 120, 80, 0.12);
+    border: 1px solid rgba(255, 140, 100, 0.25);
+}
+
 /* Perfil do usuário (saldo + avatar) */
 .user-profile {
     display: flex;
@@ -335,6 +486,28 @@ body {
     font-size: 15px;
     font-weight: 800;
     color: var(--flux-gold);
+}
+
+.balance-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.mobile-fidelity-wrap {
+    margin: 6px 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.fidelity-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--flux-dim);
+    font-weight: 700;
 }
 
 .user-avatar {
@@ -882,6 +1055,18 @@ overflow-y: auto;
     color: var(--flux-gold);
 }
 
+.lp-nav a.lp-nav-fornecedor {
+    color: var(--flux-gold);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    padding: 8px 14px;
+    border-radius: 8px;
+}
+
+.lp-nav a.lp-nav-fornecedor:hover {
+    background: rgba(212, 175, 55, 0.12);
+    color: #fff;
+}
+
 .footer-links {
     margin: 20px 0;
     display: flex;
@@ -1392,4 +1577,139 @@ overflow-y: auto;
     .cta-box {
         padding: 30px 20px !important;
     }
+}
+
+/* Fidelity Badges */
+.fidelity-badge { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 999px; letter-spacing: 0.5px; vertical-align: middle; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.15); }
+.badge-bronze { background: #CD7F32; color: #fff; }
+.badge-prata { background: #C0C0C0; color: #000; }
+.badge-ouro { background: #FFD700; color: #000; }
+.badge-diamante { background: #b9f2ff; color: #005f73; }
+.discount-strike { text-decoration: line-through; color: rgba(255,255,255,0.4); font-size: 0.85em; display: block; }
+.discount-final { color: var(--flux-gold); font-weight: 900; font-size: 13px; display: block; line-height: 1.2; }
+.discount-level { color: rgba(255,255,255,0.75); font-size: 10px; display: block; font-weight: 700; letter-spacing: 0.2px; }
+
+/* Faixa de autonomia do parceiro (topo do dashboard) */
+.partner-autonomy-strip {
+    margin: 0 20px 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(20, 20, 20, 0.95));
+    border: 1px solid rgba(212, 175, 55, 0.28);
+}
+.partner-autonomy-inner {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    align-items: stretch;
+}
+.partner-autonomy-card {
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.partner-autonomy-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 6px;
+}
+.partner-autonomy-value {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.92);
+    margin-bottom: 8px;
+    min-height: 2.4em;
+}
+.partner-autonomy-btn {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+}
+.partner-autonomy-download {
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+.partner-autonomy-hint {
+    font-size: 10px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 0;
+}
+@media (max-width: 768px) {
+    .partner-autonomy-strip { margin: 0 12px 12px; }
+}
+
+body.partner-mode .hide-for-partner {
+    display: none !important;
+}
+body.partner-mode #client-purchase-dashboard {
+    display: none !important;
+}
+body.partner-mode #partner-infra-monitor {
+    display: block !important;
+}
+body.partner-mode #view-dashboard.content-grid,
+body.partner-mode #view-dashboard {
+    display: block !important;
+}
+body.partner-mode #modalRecarga {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+/* Portal subdom?nio parceiros.* ? s? infra + financeiro (HeroSMS-style) */
+body.flux-partner-portal {
+    background: #0a0a0a;
+}
+body.flux-partner-portal #landing-view,
+body.flux-partner-portal .balance-mobile.hide-for-partner,
+body.flux-partner-portal #nav-my-numbers,
+body.flux-partner-portal .nav-separator.hide-for-partner,
+body.flux-partner-portal #nav-history,
+body.flux-partner-portal .search-bar.hide-for-partner,
+body.flux-partner-portal #stock-count,
+body.flux-partner-portal .btn-recharge.hide-for-partner,
+body.flux-partner-portal .user-profile.hide-for-partner,
+body.flux-partner-portal .btn-recharge-full,
+body.flux-partner-portal a.nav-item.hide-for-partner[onclick*="abrirRecarga"],
+body.flux-partner-portal #client-purchase-dashboard,
+body.flux-partner-portal #modalRecarga {
+    display: none !important;
+    pointer-events: none !important;
+}
+body.flux-partner-portal.partner-mode #partner-infra-monitor {
+    display: block !important;
+}
+body.flux-partner-portal.partner-mode #view-dashboard.content-grid,
+body.flux-partner-portal.partner-mode #view-dashboard {
+    display: block !important;
+}
+
+.partner-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.partner-api-key-field {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    color: rgba(255, 255, 255, 0.95);
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+}
+.partner-infra-monitor {
+    width: 100%;
+    padding: 8px 0 24px;
 }

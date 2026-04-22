@@ -340,6 +340,30 @@
                 </div>
             </section>
 
+            <!-- Partner API Keys (CEO — sem SQL) -->
+            <section class="admin-section" id="section-partner-api" style="grid-column: 1 / -1;">
+                <h2>Parceiros — Partner API Key</h2>
+                <p style="font-size:0.8rem;color:rgba(255,255,255,0.45);margin-bottom:16px;">
+                    Gere chaves para o <strong>Polo Worker</strong> (.exe). A chave em texto só aparece uma vez no prompt — guarde em local seguro.
+                </p>
+                <div style="overflow-x:auto;">
+                    <table id="table-partner-api">
+                        <thead>
+                            <tr>
+                                <th>Código parceiro</th>
+                                <th>E-mail</th>
+                                <th>Chaves ativas (contagem)</th>
+                                <th>Saque prioritário</th>
+                                <th>ID perfil</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button type="button" class="btn-action" style="margin-top:12px;border-color:#555;color:#ccc;" onclick="loadPartnerApiAdmin()">Atualizar lista</button>
+            </section>
+
             <!-- Gestão de Usuários -->
             <section class="admin-section">
                 <h2>Gestão de Usuários</h2>
@@ -374,6 +398,7 @@
                                 <th>Porta</th>
                                 <th>Número</th>
                                 <th>Status</th>
+                                <th>WhatsApp / disponível</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -473,7 +498,7 @@
         </div>
     </div>
 
-    <script src="../dist/admin.shield.js?v=11"></script>
+    <script src="../dist/admin.shield.js?v=13"></script>
     <script>
         // Medida de Segurança: Bloqueio de Clique Direito
         document.addEventListener('contextmenu', event => event.preventDefault());

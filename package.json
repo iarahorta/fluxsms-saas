@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "node obfuscate.js",
     "dev": "nodemon server.js",
     "build:secure": "node obfuscate.js"
   },
@@ -22,6 +23,7 @@
     "helmet": "^7.1.0",
     "javascript-obfuscator": "^5.4.1",
     "mercadopago": "^1.5.17",
+    "pg": "^8.20.0",
     "playwright": "^1.59.1"
   },
   "devDependencies": {

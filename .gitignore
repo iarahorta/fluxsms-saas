@@ -9,6 +9,8 @@ backend/node_modules/
 # Build artifacts
 # dist/ (Removido para permitir blindagem em produção)
 .next/
+polo-worker-draft/dist-exe/
+downloads/*.exe
 
 # Logs
 *.log

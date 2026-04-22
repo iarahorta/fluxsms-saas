@@ -11,6 +11,9 @@ let currentUser = null;
 
 db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+/** true quando index é servido em parceiros.fluxsms.com.br (flag injectada no head pelo server.js) */
+const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true;
+
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
     { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
@@ -18,7 +21,12 @@ let SERVICES = [
     { id: 'google', name: 'Google', price: 1.50 },
     { id: 'instagram', name: 'Instagram', price: 2.00 }
 ];
-let userCustomPrices = {}; 
+let userCustomPrices = {};
+let currentUserIsAdmin = false;
+let currentUserIsPartner = false;
+
+/** Staging: true = botão/menu Parceiros visíveis para qualquer usuário logado (API /api/admin/partners continua exigindo admin). Coloque false quando is_admin estiver correto no Supabase. */
+const PARTNER_UI_FORCE_VISIBLE = true;
 
 // === ESTADO GLOBAL ===
 let activeSessions = {};
@@ -40,7 +48,7 @@ function unscrambleSMS(text) {
         // Base64 Decode -> Invert
         const decoded = atob(text);
         return decoded.split('').reverse().join('');
-    } catch(e) { return text; }
+    } catch (e) { return text; }
 }
 
 // === INICIALIZAÇÃO ===
@@ -51,49 +59,116 @@ async function init() {
         return;
     }
 
+    if (IS_PARTNER_PORTAL) {
+        document.body.classList.add('flux-partner-portal');
+        document.title = 'FluxSMS | Portal Parceiros';
+    }
+
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
-    
-    fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
+
     setupRealtimeChips();
-    loadChipsCount(); // Forçar carregamento inicial do estoque antes dos eventos
-    
+
     // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
     // Run once at start and then every 30 seconds
-    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch(e) {} };
+    const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch (e) { } };
     runGari();
     setInterval(runGari, 30000);
 
     if (session) {
         currentUser = session.user;
-        updateUIForUser();
-        await fetchUserCustomPrices();
-        loadActiveSessions();
+        if (PARTNER_UI_FORCE_VISIBLE) {
+            const pw = document.getElementById('partner-header-wrap');
+            const np = document.getElementById('nav-partners');
+            if (pw) pw.style.display = 'inline-flex';
+            if (np) np.style.display = 'flex';
+        }
+        await updateUIForUser();
+        if (!currentUserIsPartner) {
+            fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
+            await fetchUserCustomPrices();
+            loadActiveSessions();
+            loadChipsCount();
+            renderServices(SERVICES);
+        } else {
+            renderServices([]);
+            loadPartnerChipsMonitor();
+            showView('dashboard');
+        }
+    } else if (!IS_PARTNER_PORTAL) {
+        fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
+        loadChipsCount();
+        renderServices(SERVICES);
     }
 
-    loadChipsCount();
-    renderServices(SERVICES);
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (currentUserIsPartner) return;
+            const q = searchInput.value.toLowerCase();
+            const filtered = SERVICES.filter(s => s.name.toLowerCase().includes(q));
+            renderServices(filtered);
+        });
+    }
 
-    searchInput.addEventListener('input', () => {
-        const q = searchInput.value.toLowerCase();
-        const filtered = SERVICES.filter(s => s.name.toLowerCase().includes(q));
-        renderServices(filtered);
-    });
+    const partnerWithdrawAmt = document.getElementById('partner-withdraw-amount');
+    if (partnerWithdrawAmt) {
+        partnerWithdrawAmt.addEventListener('input', () => {
+            updatePartnerWithdrawButtonState(_partnerFinanceSummaryCache);
+        });
+    }
 
-    db.auth.onAuthStateChange((event, session) => {
+    const parceiroLogin = new URLSearchParams(window.location.search).get('parceiro') === 'login';
+    if (!session && authModal && (IS_PARTNER_PORTAL || parceiroLogin)) {
+        authModal.style.display = 'flex';
+        const login = document.getElementById('loginForm');
+        const signup = document.getElementById('signupForm');
+        if (login && signup) {
+            login.style.display = 'block';
+            signup.style.display = 'none';
+        }
+    }
+    if (parceiroLogin) {
+        history.replaceState({}, '', IS_PARTNER_PORTAL ? (window.location.pathname || '/') : '/');
+    } else if (IS_PARTNER_PORTAL && !session) {
+        history.replaceState({}, '', window.location.pathname || '/');
+    }
+
+    db.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN') {
             currentUser = session?.user;
             authModal.style.display = 'none';
             toggleViews(session);
             if (session) {
-                updateUIForUser();
-                loadActiveSessions();
-                setupRealtime();
+                if (PARTNER_UI_FORCE_VISIBLE) {
+                    const pw = document.getElementById('partner-header-wrap');
+                    const np = document.getElementById('nav-partners');
+                    if (pw) pw.style.display = 'inline-flex';
+                    if (np) np.style.display = 'flex';
+                }
+                await updateUIForUser();
+                if (!currentUserIsPartner) {
+                    loadActiveSessions();
+                    setupRealtime();
+                } else {
+                    loadPartnerChipsMonitor();
+                    showView('dashboard');
+                }
             }
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
+            currentUserIsAdmin = false;
+            currentUserIsPartner = false;
+            document.body.classList.remove('partner-mode');
+            if (IS_PARTNER_PORTAL) {
+                window.location.reload();
+                return;
+            }
+            const partnerWrap = document.getElementById('partner-header-wrap');
+            const navPartners = document.getElementById('nav-partners');
+            if (partnerWrap) partnerWrap.style.display = 'none';
+            if (navPartners) navPartners.style.display = 'none';
             toggleViews(null);
-            if (landingView.style.display === 'none') {
+            if (!IS_PARTNER_PORTAL && landingView.style.display === 'none') {
                 window.location.reload();
             }
         }
@@ -101,10 +176,20 @@ async function init() {
 }
 
 function toggleViews(session) {
+    if (IS_PARTNER_PORTAL) {
+        landingView.style.display = 'none';
+        if (session) {
+            dashboardView.style.display = 'block';
+            showView('dashboard');
+        } else {
+            dashboardView.style.display = 'none';
+        }
+        return;
+    }
     if (session) {
         landingView.style.display = 'none';
         dashboardView.style.display = 'block';
-        showView('dashboard'); 
+        showView('dashboard');
     } else {
         landingView.style.display = 'block';
         dashboardView.style.display = 'none';
@@ -112,12 +197,25 @@ function toggleViews(session) {
 }
 
 // === NAVEGAÇÃO DE ABAS (SPA) ===
-window.showView = function(viewName) {
+window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
-    
+
+    if (IS_PARTNER_PORTAL && (viewName === 'my-numbers' || viewName === 'history')) {
+        viewName = 'dashboard';
+    }
+
+    if (currentUserIsPartner && (viewName === 'my-numbers' || viewName === 'history')) {
+        viewName = 'dashboard';
+    }
+
+    if (viewName === 'partners' && !currentUserIsAdmin && !PARTNER_UI_FORCE_VISIBLE && !currentUserIsPartner) {
+        alert('Acesso restrito a parceiros ou administradores.');
+        return;
+    }
+
     // Esconde todas as abas
     document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
-    
+
     // Limpa classe active
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
@@ -131,6 +229,15 @@ window.showView = function(viewName) {
 
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
+    if (viewName === 'partners') loadPartnerProfiles();
+    if (viewName === 'dashboard' && currentUserIsPartner) loadPartnerChipsMonitor();
+};
+
+function syncPartnerPanelsVisibility() {
+    const finance = document.getElementById('partner-finance-panel');
+    const adminBlk = document.getElementById('partner-admin-block');
+    if (finance) finance.style.display = currentUserIsPartner ? 'block' : 'none';
+    if (adminBlk) adminBlk.style.display = currentUserIsAdmin ? 'block' : 'none';
 }
 
 async function loadMyNumbers() {
@@ -207,10 +314,122 @@ async function handleLogout() {
 }
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost') 
-    ? '__BACKEND_URL__' 
+const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
+    ? '__BACKEND_URL__'
     : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
 let initialBalance = 0;
+
+let _partnerApiKeyPlainCache = '';
+let _partnerMarginPercent = 60;
+
+async function loadPartnerAutonomyStrip() {
+    const strip = document.getElementById('partner-autonomy-strip');
+    if (!strip || !db || !currentUserIsPartner) return;
+    strip.style.display = 'block';
+    const finLine = document.getElementById('partner-strip-finance-line');
+    const dl = document.getElementById('partner-strip-download');
+    const keyField = document.getElementById('partner-api-key-field');
+    const keyHint = document.getElementById('partner-key-hint');
+    if (keyField) {
+        keyField.value = '';
+        keyField.type = 'text';
+        keyField.placeholder = 'A carregar…';
+    }
+    if (finLine) finLine.textContent = '…';
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/bootstrap`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            if (keyField) keyField.placeholder = j.detail || j.error || res.statusText;
+            return;
+        }
+        _partnerApiKeyPlainCache = j.api_key_plain || '';
+        if (j.partner && j.partner.repasse_percent != null) {
+            _partnerMarginPercent = Number(j.partner.repasse_percent);
+        } else if (j.finance && j.finance.rules && j.finance.rules.repasse_percent != null) {
+            _partnerMarginPercent = Number(j.finance.rules.repasse_percent);
+        }
+        if (keyField) {
+            keyField.value = _partnerApiKeyPlainCache || '';
+            keyField.type = 'text';
+            keyField.placeholder = _partnerApiKeyPlainCache ? '' : 'Chave indisponível — contacte a FluxSMS.';
+        }
+        if (keyHint) {
+            keyHint.textContent = _partnerApiKeyPlainCache
+                ? 'Identidade fixa. O Polo Worker deve enviar o HWID na primeira ligação; outro PC será bloqueado.'
+                : 'Não foi possível ler a chave completa (cofre). Contacte a equipa FluxSMS.';
+        }
+        const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
+        if (finLine) {
+            finLine.textContent = `Repasse (${Number(_partnerMarginPercent || 60)}%): liberado R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível saque R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
+        }
+        if (dl && j.worker_download_url) {
+            dl.href = j.worker_download_url;
+        }
+    } catch (e) {
+        if (keyField) keyField.placeholder = e.message || String(e);
+    }
+}
+
+window.copyPartnerApiKey = async function () {
+    if (!_partnerApiKeyPlainCache) {
+        alert('Chave completa indisponível neste painel. Contacte a FluxSMS.');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(_partnerApiKeyPlainCache);
+        alert('Chave copiada para a área de transferência.');
+    } catch {
+        window.prompt('Copie manualmente:', _partnerApiKeyPlainCache);
+    }
+};
+
+async function loadPartnerChipsMonitor() {
+    const tbody = document.querySelector('#table-partner-chips-monitor tbody');
+    if (!tbody || !currentUserIsPartner || !db) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">A carregar…</td></tr>';
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/chips`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</td></tr>`;
+            return;
+        }
+        const rows = j.chips || [];
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;">Nenhum chip nos seus polos. Use o Polo Worker para registar modems.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((c) => {
+            const wa = c.disponivel_em
+                ? (new Date(c.disponivel_em) > new Date()
+                    ? escapeHtml(new Date(c.disponivel_em).toLocaleString('pt-BR'))
+                    : '—')
+                : '—';
+            const poloLine = c.polo_ultima
+                ? `${escapeHtml(c.polo_status || '—')} · ${escapeHtml(new Date(c.polo_ultima).toLocaleString('pt-BR'))}`
+                : escapeHtml(c.polo_status || '—');
+            return `<tr>
+                <td>${escapeHtml(c.polo_nome || '—')}</td>
+                <td><code>${escapeHtml(c.porta || '')}</code></td>
+                <td>${escapeHtml(c.numero || '—')}</td>
+                <td>${escapeHtml(c.status || '')}</td>
+                <td style="font-size:0.75rem;">${poloLine}</td>
+                <td style="font-size:0.75rem;">${wa}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(e.message || String(e))}</td></tr>`;
+    }
+}
 let pixCheckInterval = null;
 
 async function gerarPix() {
@@ -227,7 +446,7 @@ async function gerarPix() {
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error);
-        
+
         document.getElementById('qrCodeContainer').innerHTML = `
             <div style="text-align:center">
                 <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
@@ -277,29 +496,29 @@ async function fetchGlobalServices() {
 
 async function loadChipsCount() {
     if (!db) return;
-    
+
     // Busca chips de Polos (No lab, ignoramos a trava de 90s se for o Polo de Teste)
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
     const isLab = window.location.hostname.includes('railway.app');
-    
+
     let query = db.from('chips')
         .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
-        .eq('status', 'idle')
+        .in('status', ['idle', 'quarentena'])
         .eq('polos.status', 'ONLINE')
         .not('numero', 'ilike', 'CCID%');
 
     if (!isLab) {
         query = query.gt('polos.ultima_comunicacao', ninetySecondsAgo);
     }
-    
+
     const { count } = await query;
 
-    chipsDisponiveis = count || 0; 
+    chipsDisponiveis = count || 0;
     try {
         const { data: stocks } = await db.rpc('rpc_get_service_stocks');
         if (stocks) serviceStocks = stocks;
         renderServices(SERVICES);
-    } catch(e) { console.error("Erro stocks:", e); }
+    } catch (e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
     if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos ${isLab ? '(LAB)' : ''}`;
 }
@@ -308,32 +527,333 @@ let chipsDebounce = null;
 function setupRealtimeChips() {
     if (!db) return;
     db.channel('chips-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, () => {
-        if(chipsDebounce) clearTimeout(chipsDebounce);
+        if (chipsDebounce) clearTimeout(chipsDebounce);
         chipsDebounce = setTimeout(loadChipsCount, 800);
     }).subscribe();
 }
 
+let userDiscountFactor = 0;
+let userFidelityLevel = 'Bronze';
+
 async function updateUIForUser() {
     if (!currentUser) return;
     const { data: profile } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (profile) {
-        const b = `R$ ${profile.balance.toFixed(2)}`;
-        if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
-        if (document.getElementById('user-initials') && profile.full_name) {
-            document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    if (!profile) {
+        currentUserIsAdmin = false;
+        currentUserIsPartner = false;
+        document.body.classList.remove('partner-mode');
+        return;
+    }
+
+    currentUserIsAdmin = !!profile.is_admin;
+    currentUserIsPartner = !!profile.is_partner;
+
+    if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
+        alert('Este portal (parceiros.fluxsms.com.br) é exclusivo para fornecedores com perfil parceiro. Use fluxsms.com.br para contas de cliente.');
+        await db.auth.signOut();
+        return;
+    }
+
+    const b = `R$ ${profile.balance.toFixed(2)}`;
+    if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
+    if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
+
+    // --- FIDELIDADE INTELIGENTE ---
+    const total = profile.total_recharged || 0;
+    let pClass = 'badge-bronze';
+    userFidelityLevel = 'BRONZE';
+    userDiscountFactor = 0;
+
+    if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
+    else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
+    else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
+
+    const b1 = document.getElementById('fidelity-badge');
+    const b2 = document.getElementById('fidelity-badge-mobile');
+    if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
+    if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+    // ------------------------------
+
+    if (document.getElementById('user-initials') && profile.full_name) {
+        document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    }
+    const partnerWrap = document.getElementById('partner-header-wrap');
+    const navPartners = document.getElementById('nav-partners');
+    const showPartnerUi = !!profile.is_admin || PARTNER_UI_FORCE_VISIBLE || currentUserIsPartner;
+    if (partnerWrap) partnerWrap.style.display = showPartnerUi ? 'inline-flex' : 'none';
+    if (navPartners) navPartners.style.display = showPartnerUi ? 'flex' : 'none';
+
+    if (profile.is_admin && !IS_PARTNER_PORTAL && !document.getElementById('btn-admin-link')) {
+        const nav = document.querySelector('.main-nav');
+        const a = document.createElement('a');
+        a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
+        a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
+        nav.insertBefore(a, nav.firstChild);
+    }
+
+    document.body.classList.toggle('partner-mode', !!currentUserIsPartner);
+
+    const navDashLabel = document.getElementById('nav-dashboard-label');
+    if (navDashLabel) navDashLabel.textContent = currentUserIsPartner ? 'Infraestrutura' : 'Dashboard';
+
+    if (currentUserIsPartner) {
+        loadPartnerAutonomyStrip();
+    } else {
+        const strip = document.getElementById('partner-autonomy-strip');
+        if (strip) strip.style.display = 'none';
+    }
+
+    syncPartnerPanelsVisibility();
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatPartnerChipsCell(chips) {
+    if (!chips || !chips.length) {
+        return '<span style="opacity:0.45;font-size:0.78rem;">Vincule polos em <code>partner_profile_id</code></span>';
+    }
+    return chips.map((c) => {
+        const label = c.numero || c.porta || c.id;
+        const polo = c.polo_nome ? ` <span style="opacity:0.5">(${escapeHtml(c.polo_nome)})</span>` : '';
+        let wa = '';
+        if (c.disponivel_em) {
+            const until = new Date(c.disponivel_em);
+            if (until > new Date()) {
+                wa = ` <span class="partner-wa-lock">WA quarentena até ${until.toLocaleString('pt-BR')}</span>`;
+            }
         }
-        if (profile.is_admin && !document.getElementById('btn-admin-link')) {
-            const nav = document.querySelector('.main-nav');
-            const a = document.createElement('a');
-            a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
-            a.style.color = 'var(--flux-gold)'; a.innerHTML = `⚙️ Painel Admin`;
-            nav.insertBefore(a, nav.firstChild);
+        return `<div class="partner-chip-line"><strong>${escapeHtml(String(label))}</strong>${polo} · R$ ${Number(c.revenue_total || 0).toFixed(2)} · <span style="opacity:0.75">${escapeHtml(c.status || '')}</span>${wa}</div>`;
+    }).join('');
+}
+
+function updatePartnerWithdrawFeePreview(lastSummary) {
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    const previewEl = document.getElementById('partner-withdraw-fee-preview');
+    if (!previewEl) return;
+    const fee = (lastSummary && lastSummary.rules && lastSummary.rules.withdrawal_fee_brl != null)
+        ? Number(lastSummary.rules.withdrawal_fee_brl)
+        : 5;
+    const raw = amtEl && amtEl.value ? String(amtEl.value).replace(',', '.') : '';
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v) || v <= 0) {
+        previewEl.innerHTML = `Taxa de processamento: R$ ${fee.toFixed(2)} | Você receberá: <strong>—</strong>`;
+        return;
+    }
+    const net = Math.max(0, Math.round((v - fee) * 100) / 100);
+    previewEl.innerHTML = `Taxa de processamento: R$ ${fee.toFixed(2)} | Você receberá: <strong>R$ ${net.toFixed(2)}</strong>`;
+}
+
+function updatePartnerWithdrawButtonState(lastSummary) {
+    const btn = document.getElementById('partner-withdraw-btn');
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    if (!btn || !amtEl) return;
+    const minBrl = (lastSummary && lastSummary.rules && lastSummary.rules.min_withdrawal_brl) ? lastSummary.rules.min_withdrawal_brl : 400;
+    const maxBrl = (lastSummary && lastSummary.totals) ? Number(lastSummary.totals.disponivel_para_solicitar || 0) : 0;
+    const fee = (lastSummary && lastSummary.rules && lastSummary.rules.withdrawal_fee_brl != null)
+        ? Number(lastSummary.rules.withdrawal_fee_brl)
+        : 5;
+    const v = parseFloat(String(amtEl.value).replace(',', '.'));
+    const ok = Number.isFinite(v) && v > fee && v >= minBrl && v <= maxBrl + 0.009 && maxBrl >= minBrl;
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '0.45';
+    updatePartnerWithdrawFeePreview(lastSummary);
+}
+
+let _partnerFinanceSummaryCache = null;
+
+async function loadPartnerFinanceSummary() {
+    const rulesEl = document.getElementById('partner-finance-rules');
+    const statsEl = document.getElementById('partner-finance-stats');
+    const msgEl = document.getElementById('partner-finance-msg');
+    if (!currentUserIsPartner || !rulesEl || !statsEl) return;
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        rulesEl.innerHTML = '<p style="color:#e085a0;">Faça login novamente.</p>';
+        return;
+    }
+
+    rulesEl.innerHTML = '<p style="opacity:0.6;">Carregando regras e saldos…</p>';
+    statsEl.innerHTML = '';
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/partner/finance/summary`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            rulesEl.innerHTML = `<p style="color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</p>`;
+            return;
         }
+        _partnerFinanceSummaryCache = j;
+        const r = j.rules || {};
+        const t = j.totals || {};
+        const repassePct = Number(r.repasse_percent || 60);
+        _partnerMarginPercent = repassePct;
+        const feeBrl = r.withdrawal_fee_brl != null ? Number(r.withdrawal_fee_brl) : 5;
+        const prazoLabel = r.is_novo_parceiro
+            ? `Parceiro <strong>novo</strong> (menos de ${r.novo_period_days || 90} dias no programa): cada repasse só entra no saque após <strong>${r.hold_hours_novo || 48}h</strong> da data do SMS recebido.`
+            : `Parceiro <strong>consolidado</strong>: carência de <strong>${r.hold_hours_antigo || 24}h</strong> após cada SMS recebido.`;
+
+        rulesEl.innerHTML = `
+            <ul style="margin:0; padding-left:18px; line-height:1.55; font-size:0.88rem; color:rgba(255,255,255,0.88);">
+                <li><strong>Repasse comercial:</strong> ${repassePct}% sobre o valor de cada SMS recebido nos seus chips.</li>
+                <li><strong>Mínimo para saque:</strong> R$ ${(r.min_withdrawal_brl || 400).toFixed(2)} — valores menores não podem ser solicitados.</li>
+                <li><strong>Prazos (carência sobre o repasse):</strong> ${prazoLabel}</li>
+                <li><strong>Taxa de processamento por saque:</strong> R$ ${feeBrl.toFixed(2)} por solicitação (descontada do valor pedido; o pagamento é do <strong>valor líquido</strong>).</li>
+            </ul>`;
+
+        const stat = (label, val, color) => `
+            <div style="padding:12px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+                <div style="font-size:10px; opacity:0.55; text-transform:uppercase;">${label}</div>
+                <div style="font-size:1.05rem; font-weight:800; color:${color}; margin-top:4px;">${val}</div>
+            </div>`;
+        statsEl.innerHTML =
+            stat('Repasse total (acumulado)', `R$ ${Number(t.repasse_total || 0).toFixed(2)}`, '#d4b8ff') +
+            stat('Já liberado para saque', `R$ ${Number(t.repasse_liberado || 0).toFixed(2)}`, '#b8f5c8') +
+            stat('Ainda em carência', `R$ ${Number(t.repasse_em_carencia || 0).toFixed(2)}`, '#ffd59a') +
+            stat('Reservado (saques em análise)', `R$ ${Number(t.saques_pendentes_ou_aprovados || 0).toFixed(2)}`, '#ccc') +
+            stat('Disponível p/ solicitar agora', `R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)}`, 'var(--flux-gold)');
+
+        if (msgEl) {
+            msgEl.innerHTML = 'O botão de saque só habilita quando o valor estiver entre o <strong>mínimo</strong> e o <strong>disponível para solicitar</strong>, e for <strong>maior que a taxa de processamento</strong>. Pedidos ficam como pendentes até o financeiro FluxSMS.';
+        }
+        updatePartnerWithdrawButtonState(j);
+        updatePartnerWithdrawFeePreview(j);
+    } catch (e) {
+        rulesEl.innerHTML = `<p style="color:#e085a0;">${escapeHtml(e.message || String(e))}</p>`;
     }
 }
 
+window.submitPartnerWithdraw = async function () {
+    if (!currentUserIsPartner) return;
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    const pixEl = document.getElementById('partner-withdraw-pix');
+    const msgEl = document.getElementById('partner-finance-msg');
+    const raw = amtEl && amtEl.value ? String(amtEl.value).replace(',', '.') : '';
+    const amount = parseFloat(raw);
+    const pix = pixEl && pixEl.value ? pixEl.value.trim() : '';
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Faça login novamente.');
+        return;
+    }
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/partner/finance/withdraw`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount, pix_destination: pix || null })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            const extra = j.disponivel_para_solicitar != null ? ` Disponível: R$ ${Number(j.disponivel_para_solicitar).toFixed(2)}.` : '';
+            const min = j.min_brl != null ? ` Mínimo: R$ ${Number(j.min_brl).toFixed(2)}.` : '';
+            alert('Não foi possível registrar o saque: ' + (j.detail || j.error || res.statusText) + min + extra);
+            return;
+        }
+        if (msgEl) {
+            const w = j.withdrawal || {};
+            const gross = w.amount != null ? Number(w.amount) : amount;
+            const fee = w.fee_brl != null ? Number(w.fee_brl) : 5;
+            const net = w.net_amount != null ? Number(w.net_amount) : Math.max(0, Math.round((gross - fee) * 100) / 100);
+            msgEl.textContent = `Pedido registado. Bruto: R$ ${gross.toFixed(2)} · Taxa: R$ ${fee.toFixed(2)} · Você receberá: R$ ${net.toFixed(2)} (após validação).`;
+        }
+        if (amtEl) amtEl.value = '';
+        await loadPartnerFinanceSummary();
+        loadPartnerAutonomyStrip();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
+async function loadPartnerProfiles() {
+    syncPartnerPanelsVisibility();
+
+    if (currentUserIsPartner) {
+        await loadPartnerFinanceSummary();
+        loadPartnerAutonomyStrip();
+    }
+
+    const tbody = document.querySelector('#table-partners tbody');
+    const colspan = 11;
+    if (!tbody) return;
+
+    if (!currentUserIsAdmin) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; opacity:0.55;">Lista administrativa de parceiros visível apenas para administradores.</td></tr>`;
+        return;
+    }
+
+    if (!db) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Supabase indisponível.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Carregando parceiros...</td></tr>`;
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Faça login novamente.</td></tr>`;
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/admin/partners`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+            const msg = json.error === 'forbidden' ? 'Acesso negado (apenas admin).' : (json.detail || json.error || res.statusText);
+            throw new Error(msg);
+        }
+        const rows = json.partners || [];
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">Nenhum parceiro cadastrado em <code>partner_profiles</code>.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map((p) => {
+            const pr = p.profile || {};
+            const email = pr.email || '—';
+            const name = pr.full_name || '—';
+            const bal = pr.balance != null ? `R$ ${Number(pr.balance).toFixed(2)}` : '—';
+            const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '—';
+            const nChips = p.chip_count != null ? p.chip_count : (p.chips || []).length;
+            const rev = p.revenue_total != null ? Number(p.revenue_total).toFixed(2) : '0.00';
+            const keyCell = '<span style="opacity:0.55;font-size:10px;">Chave única no cadastro</span>';
+            return `
+        <tr>
+            <td><code>${escapeHtml(p.partner_code)}</code></td>
+            <td>${escapeHtml(email)}</td>
+            <td>${escapeHtml(name)}</td>
+            <td style="color:#d4b8ff;font-weight:700;">${escapeHtml(bal)}</td>
+            <td><span class="partner-status-badge partner-status-${escapeHtml((p.status || '').toLowerCase())}">${escapeHtml(p.status || '—')}</span></td>
+            <td>${Number(p.margin_percent || 0).toFixed(2)}%</td>
+            <td style="text-align:center;">${nChips}</td>
+            <td style="color:#b8f5c8;font-weight:700;">R$ ${escapeHtml(rev)}</td>
+            <td style="font-size:0.72rem;line-height:1.35;">${formatPartnerChipsCell(p.chips)}</td>
+            <td style="font-size:0.8rem;color:rgba(255,255,255,0.45);">${created}</td>
+            <td style="text-align:center;">${keyCell}</td>
+        </tr>`;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#e085a0;">${escapeHtml(err.message || String(err))}</td></tr>`;
+    }
+}
+
+window.loadPartnerProfiles = loadPartnerProfiles;
+
 async function fetchUserCustomPrices() {
-    if (!db || !currentUser) return;
+    if (!db || !currentUser || currentUserIsPartner) return;
     const { data } = await db.from('custom_prices').select('service, price').eq('user_id', currentUser.id);
     if (data) {
         userCustomPrices = {};
@@ -346,11 +866,18 @@ function renderServices(list) {
     if (!servicesGrid) return;
     servicesGrid.innerHTML = list.map(s => {
         const stock = serviceStocks[s.id] ?? (chipsDisponiveis > 0 ? 1 : 0);
-        const finalPrice = userCustomPrices[s.id] || s.price;
+        let finalPrice = userCustomPrices[s.id] || s.price;
+        
+        let priceHtml = `R$ ${finalPrice.toFixed(2)}`;
+        if (userDiscountFactor > 0) {
+            const discounted = finalPrice * (1.0 - userDiscountFactor);
+            priceHtml = `<span class="discount-strike">R$ ${finalPrice.toFixed(2)}</span><span class="discount-final">R$ ${discounted.toFixed(2)}</span><span class="discount-level">(${userFidelityLevel})</span>`;
+        }
+        
         return `
             <div class="service-row">
                 <div class="name">${s.name}</div>
-                <div class="price">R$ ${finalPrice.toFixed(2)}</div>
+                <div class="price">${priceHtml}</div>
                 <div class="action">
                     <button class="btn-buy" onclick="requestNumber('${s.id}', '${s.name}', ${finalPrice})" ${stock <= 0 ? 'disabled' : ''}>
                         ${stock <= 0 ? 'SEM ESTOQUE' : 'SOLICITAR'}
@@ -373,11 +900,17 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         return;
     }
 
-    const { data, error } = await db.rpc('rpc_solicitar_sms_v2', { p_user_id: currentUser.id, p_service: serviceId, p_service_name: serviceName, p_default_price: defaultPrice });
-    
-    if (error || !data || !data.ok) { 
+    // Usa a V3 blindada com sistema fiel de Descontos e Acúmulos
+    const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
+        p_user_id: currentUser.id,
+        p_service: serviceId,
+        p_service_name: serviceName,
+        p_default_price: defaultPrice
+    });
+
+    if (error || !data || !data.ok) {
         console.error("ERRO CRÍTICO RPC:", { error, data });
-        
+
         // 🛡️ CAPTURA DE "Unexpected token <": Se o erro for HTML em vez de JSON
         if (error && typeof error === 'string' && error.startsWith('<!DOCTYPE')) {
             alert('ERRO DE SERVIDOR (HTML): O banco de dados retornou uma página de erro. Me avise para eu verificar os logs da Railway.');
@@ -385,17 +918,17 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         }
 
         const errorMsg = error?.message || data?.error || "Sem estoque ou falha na conexão.";
-        alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.')); 
-        return; 
+        alert('Erro ao solicitar: ' + (errorMsg !== 'undefined' ? errorMsg : 'Falha desconhecida. Tente novamente.'));
+        return;
     }
-    
-    renderActivationCard({ 
-        id: data.activation_id, 
-        phone_number: data.numero, 
-        service_name: serviceName, 
-        status: 'waiting', 
-        sms_code: null, 
-        created_at: new Date().toISOString() 
+
+    renderActivationCard({
+        id: data.activation_id,
+        phone_number: data.numero,
+        service_name: serviceName,
+        status: 'waiting',
+        sms_code: null,
+        created_at: new Date().toISOString()
     });
     updateUIForUser();
 }
@@ -403,7 +936,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 function renderActivationCard(act) {
     if (document.getElementById(act.id)) return;
     if (activeNumbers.querySelector('.empty-state')) activeNumbers.innerHTML = '';
-    
+
     const displayCode = unscrambleSMS(act.sms_code);
 
     // TRAVA 2: Botão CANCELAR bloqueado por 2 minutos
@@ -458,6 +991,7 @@ async function cancelActivation(id) {
 }
 
 async function loadActiveSessions() {
+    if (!db || !currentUser || currentUserIsPartner) return;
     const { data } = await db.from('activations').select('*').eq('user_id', currentUser.id).in('status', ['waiting', 'received']);
     if (data && data.length > 0) {
         activeNumbers.innerHTML = '';
@@ -466,7 +1000,7 @@ async function loadActiveSessions() {
 }
 
 function setupRealtime() {
-    if (isRealtimeActive) return;
+    if (isRealtimeActive || currentUserIsPartner) return;
     isRealtimeActive = true;
     db.channel('my-activations').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'activations' }, payload => {
         const a = payload.new;
@@ -479,10 +1013,10 @@ function setupRealtime() {
 
 function updateCardWithSMS(id, code) {
     const el = document.getElementById(`code-${id}`);
-    if (el) { 
-        el.innerText = unscrambleSMS(code); 
-        document.getElementById(`status-${id}`).innerText = 'RECEBIDO'; 
-        
+    if (el) {
+        el.innerText = unscrambleSMS(code);
+        document.getElementById(`status-${id}`).innerText = 'RECEBIDO';
+
         // Proteção: Remove do DOM e limpa vestígios após 2 min
         setTimeout(() => {
             const card = document.getElementById(id);
@@ -493,11 +1027,15 @@ function updateCardWithSMS(id, code) {
                     console.log(`[SEC] Ativação ${id} purgada da memória e do DOM.`);
                 }, 1000);
             }
-        }, 120000); 
+        }, 120000);
     }
 }
 
-window.abrirRecarga = () => { document.getElementById('modalRecarga').style.display = 'flex'; };
+window.abrirRecarga = () => {
+    if (IS_PARTNER_PORTAL) return;
+    const m = document.getElementById('modalRecarga');
+    if (m) m.style.display = 'flex';
+};
 window.fecharRecarga = () => { document.getElementById('modalRecarga').style.display = 'none'; clearInterval(pixCheckInterval); };
 
 init();

@@ -8,7 +8,7 @@
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=22">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -27,6 +27,7 @@
                 <nav class="lp-nav">
                     <a href="#vantagens">Diferenciais</a>
                     <a href="#passo-a-passo">Como Funciona</a>
+                    <a class="lp-nav-fornecedor" href="/partner/">💰 Seja um fornecedor</a>
                     <div class="header-auth-group">
                         <button class="btn-login-header" onclick="abrirModal('authModal')">Entrar</button>
                         <button class="btn-auth-nav" onclick="abrirModal('authModal')">COMEÇAR AGORA</button>
@@ -78,7 +79,8 @@
                         <div class="lp-f-icon">🛡️</div>
                         <h3>Estorno Automático</h3>
                         <p>Transparência total: Se por qualquer motivo o SMS não chegar, o saldo volta para sua conta
-                            <strong>na hora</strong>.</p>
+                            <strong>na hora</strong>.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -153,21 +155,27 @@
                     </div>
                     <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
                 </div>
-                <div class="balance-mobile">
+                <div class="balance-mobile hide-for-partner">
                     <div class="balance-label">SALDO DISPONÍVEL</div>
                     <div class="balance-value" id="balance-display-mobile">R$ 0,00</div>
+                    <div class="mobile-fidelity-wrap">
+                        <span class="fidelity-label">NÍVEL</span>
+                        <span id="fidelity-badge-mobile" class="fidelity-badge badge-bronze">BRONZE</span>
+                    </div>
                     <button class="btn-recharge-full" onclick="abrirRecarga()">RECARREGAR AGORA</button>
                 </div>
                 <nav class="main-nav">
                     <a href="javascript:void(0)" onclick="showView('dashboard')" class="nav-item active"
-                        id="nav-dashboard"><span class="icon">⚡</span> Dashboard</a>
-                    <a href="javascript:void(0)" onclick="showView('my-numbers')" class="nav-item"
+                        id="nav-dashboard"><span class="icon">⚡</span> <span id="nav-dashboard-label">Dashboard</span></a>
+                    <a href="javascript:void(0)" onclick="showView('my-numbers')" class="nav-item hide-for-partner"
                         id="nav-my-numbers"><span class="icon">💼</span> Meus Números</a>
-                    <div class="nav-separator"></div>
-                    <a href="javascript:void(0)" onclick="abrirRecarga()" class="nav-item"><span class="icon">💰</span>
+                    <div class="nav-separator hide-for-partner"></div>
+                    <a href="javascript:void(0)" onclick="abrirRecarga()" class="nav-item hide-for-partner"><span class="icon">💰</span>
                         Recarregar Saldo</a>
-                    <a href="javascript:void(0)" onclick="showView('history')" class="nav-item" id="nav-history"><span
+                    <a href="javascript:void(0)" onclick="showView('history')" class="nav-item hide-for-partner" id="nav-history"><span
                             class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="showView('partners')" class="nav-item nav-partners-admin"
+                        id="nav-partners" style="display:none;"><span class="icon">◆</span> <span id="nav-partners-label">Financeiro</span></a>
                     <a href="javascript:void(0)" onclick="handleLogout()" class="nav-item"><span class="icon">🚪</span>
                         Sair</a>
                 </nav>
@@ -180,20 +188,26 @@
                 <header class="top-header">
                     <div class="header-left">
                         <button class="hamburger" onclick="toggleSidebar()">☰</button>
-                        <div class="search-bar">
+                        <div class="search-bar hide-for-partner">
                             <span class="search-icon">🔍</span>
                             <input type="text" placeholder="Buscar serviço..." id="service-search">
                         </div>
-                        <div id="stock-count"
+                        <div id="stock-count" class="hide-for-partner"
                             style="font-size: 10px; font-weight: 800; color: #D4AF37; margin-left: 15px; border: 1px solid rgba(212,175,55,0.3); padding: 4px 8px; border-radius: 4px; background: rgba(212,175,55,0.05);">
                             0 CHIPS ONLINE</div>
                     </div>
                     <div class="user-controls">
-                        <button class="btn-recharge" onclick="abrirRecarga()">+ RECARREGAR</button>
-                        <div class="user-profile">
+                        <span id="partner-header-wrap" class="partner-header-wrap" style="display:none;">
+                            <button type="button" class="btn-partner-lux" onclick="showView('partners')" id="btn-partner-hub">Financeiro</button>
+                        </span>
+                        <button class="btn-recharge hide-for-partner" onclick="abrirRecarga()">+ RECARREGAR</button>
+                        <div class="user-profile hide-for-partner">
                             <div class="balance-inline">
                                 <span class="balance-label-sm">SALDO</span>
-                                <span class="balance-value-sm" id="balance-display">R$ 0,00</span>
+                                <div class="balance-row">
+                                    <span class="balance-value-sm" id="balance-display">R$ 0,00</span>
+                                    <span id="fidelity-badge" class="fidelity-badge badge-bronze">BRONZE</span>
+                                </div>
                             </div>
                             <div class="user-avatar" title="Minha Conta">
                                 <span class="avatar-letters" id="user-initials">--</span>
@@ -202,30 +216,78 @@
                     </div>
                 </header>
 
-                <!-- VIEW: DASHBOARD (PADRÃO) -->
-                <section id="view-dashboard" class="content-grid app-view">
-                    <div class="services-container">
-                        <div class="section-header">
-                            <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
-                            <span class="count-badge" id="services-count">Carregando...</span>
+                <div id="partner-autonomy-strip" class="partner-autonomy-strip" style="display: none;" aria-label="Identidade e infraestrutura parceiro">
+                    <div class="partner-autonomy-inner">
+                        <div class="partner-autonomy-card partner-identity-card">
+                            <div class="partner-autonomy-label">Partner API Key · identidade fixa</div>
+                            <div class="partner-key-row">
+                                <input type="text" id="partner-api-key-field" class="partner-api-key-field" readonly autocomplete="off" placeholder="A carregar…" spellcheck="false">
+                                <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="copyPartnerApiKey()">Copiar</button>
+                            </div>
+                            <p id="partner-key-hint" class="partner-autonomy-hint" style="margin-top:8px;">A mesma chave liga o Polo Worker a esta conta. Guarde em cofre interno.</p>
                         </div>
-                        <div class="services-header-row">
-                            <span>SERVIÇO</span>
-                            <span>PREÇO</span>
-                            <span>AÇÃO</span>
+                        <div class="partner-autonomy-card">
+                            <div class="partner-autonomy-label">Polo Worker · Windows</div>
+                            <a id="partner-strip-download" class="btn-pix partner-autonomy-download" href="#" rel="noopener">Baixar .exe</a>
+                            <p class="partner-autonomy-hint">Instale no PC do polo; use a URL deste site e a chave acima.</p>
                         </div>
-                        <div class="services-list" id="services-grid"></div>
+                        <div class="partner-autonomy-card">
+                            <div class="partner-autonomy-label">Repasse (resumo)</div>
+                            <div id="partner-strip-finance-line" class="partner-autonomy-value">—</div>
+                            <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="showView('partners')">Financeiro &amp; saque</button>
+                        </div>
                     </div>
-                    <div class="active-sessions">
-                        <h2 class="section-title">NÚMEROS ATIVOS</h2>
-                        <div class="sessions-list" id="active-numbers">
-                            <div class="empty-state">Nenhum número solicitado no momento.</div>
+                </div>
+
+                <!-- VIEW: DASHBOARD — cliente (compra) vs parceiro (infra) -->
+                <section id="view-dashboard" class="content-grid app-view">
+                    <div id="client-purchase-dashboard" class="client-purchase-dashboard hide-for-partner">
+                        <div class="services-container">
+                            <div class="section-header">
+                                <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
+                                <span class="count-badge" id="services-count">Carregando...</span>
+                            </div>
+                            <div class="services-header-row">
+                                <span>SERVIÇO</span>
+                                <span>PREÇO</span>
+                                <span>AÇÃO</span>
+                            </div>
+                            <div class="services-list" id="services-grid"></div>
+                        </div>
+                        <div class="active-sessions">
+                            <h2 class="section-title">NÚMEROS ATIVOS</h2>
+                            <div class="sessions-list" id="active-numbers">
+                                <div class="empty-state">Nenhum número solicitado no momento.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="partner-infra-monitor" class="partner-infra-monitor" style="display:none;">
+                        <div class="section-header" style="margin-bottom: 16px;">
+                            <h2 class="section-title">MONITORAMENTO DE CHIPS</h2>
+                            <span class="count-badge">Infraestrutura do parceiro</span>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-bottom: 14px;">Estado dos modems e chips nos polos vinculados à sua conta (Partner API).</p>
+                        <button type="button" class="btn-partner-refresh" onclick="loadPartnerChipsMonitor()" style="margin-bottom:14px;">Atualizar</button>
+                        <div style="overflow-x: auto;">
+                            <table class="partner-table" id="table-partner-chips-monitor">
+                                <thead>
+                                    <tr>
+                                        <th>Polo</th>
+                                        <th>Porta</th>
+                                        <th>Número</th>
+                                        <th>Status chip</th>
+                                        <th>Polo / link</th>
+                                        <th>WA disponível</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
 
-                <!-- VIEW: MEUS NÚMEROS (HISTÓRICO SMS) -->
-                <section id="view-my-numbers" class="admin-section app-view" style="display:none; margin: 20px;">
+                <!-- VIEW: MEUS NÚMEROS (HISTÓRICO SMS) — apenas cliente -->
+                <section id="view-my-numbers" class="admin-section app-view hide-for-partner" style="display:none; margin: 20px;">
                     <h2 class="section-title">MEUS CÓDIGOS RECEBIDOS</h2>
                     <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Aqui aparecem todos os SMS que você já
                         recebeu com sucesso no FluxSMS.</p>
@@ -246,8 +308,8 @@
                     </div>
                 </section>
 
-                <!-- VIEW: HISTÓRICO (FINANCEIRO) -->
-                <section id="view-history" class="admin-section app-view" style="display:none; margin: 20px;">
+                <!-- VIEW: HISTÓRICO (FINANCEIRO) — apenas cliente -->
+                <section id="view-history" class="admin-section app-view hide-for-partner" style="display:none; margin: 20px;">
                     <h2 class="section-title">EXTRATO FINANCEIRO</h2>
                     <p style="color: rgba(255,255,255,0.4); margin-bottom: 20px;">Consulte suas recargas, débitos de
                         ativação e reembolsos.</p>
@@ -265,6 +327,55 @@
                                 <!-- Preenchido via app.js -->
                             </tbody>
                         </table>
+                    </div>
+                </section>
+
+                <!-- VIEW: PARCEIROS (parceiro: repasse + regras | admin: lista API) -->
+                <section id="view-partners" class="admin-section app-view partner-dashboard-view" style="display:none; margin: 20px;">
+                    <div id="partner-finance-panel" class="partner-finance-panel" style="display:none;">
+                        <h2 class="section-title partner-view-title">FINANCEIRO — REPASSES</h2>
+                        <p class="partner-view-sub">Regras oficiais de saque e valores liberados com base nos SMS recebidos nos seus chips (margem do contrato).</p>
+                        <div id="partner-finance-rules" class="partner-finance-rules"></div>
+                        <div id="partner-finance-stats" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; margin: 16px 0;"></div>
+                        <div style="max-width: 440px; padding: 16px; background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid rgba(212,175,55,0.28);">
+                            <label style="font-size: 12px; opacity: 0.85;">Valor do saque (R$)</label>
+                            <input type="number" id="partner-withdraw-amount" class="custom-value" min="400" step="0.01" placeholder="Mínimo R$ 400,00" style="width: 100%; margin: 8px 0;">
+                            <p id="partner-withdraw-fee-preview" style="font-size: 12px; margin: 0 0 10px; line-height: 1.45; color: rgba(255,255,255,0.72);">Taxa de processamento: R$ 5,00 | Você receberá: —</p>
+                            <label style="font-size: 12px; opacity: 0.85;">Chave PIX</label>
+                            <input type="text" id="partner-withdraw-pix" class="custom-value" placeholder="CPF, CNPJ, e-mail ou chave aleatória" style="width: 100%; margin: 8px 0;">
+                            <button type="button" id="partner-withdraw-btn" class="btn-pix" style="width: 100%; margin-top: 10px;" onclick="submitPartnerWithdraw()">Solicitar saque</button>
+                            <p id="partner-finance-msg" style="font-size: 11px; margin-top: 10px; color: rgba(255,255,255,0.5); line-height: 1.45;"></p>
+                        </div>
+                    </div>
+                    <div id="partner-admin-block" style="display:none;">
+                        <div class="partner-view-head">
+                            <div>
+                                <h2 class="section-title partner-view-title">PARCEIROS API</h2>
+                                <p class="partner-view-sub">Perfis com acesso à Partner API (<code>partner_profiles</code>). Lista completa: apenas administradores.</p>
+                            </div>
+                            <button type="button" class="btn-partner-refresh" onclick="loadPartnerProfiles()">Atualizar</button>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table class="partner-table" id="table-partners">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>E-mail</th>
+                                        <th>Nome</th>
+                                        <th>Saldo</th>
+                                        <th>Status</th>
+                                        <th>Margem %</th>
+                                        <th>Chips</th>
+                                        <th>Receita</th>
+                                        <th>Chips / receita</th>
+                                        <th>Criado em</th>
+                                        <th>API Key</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
             </main>
@@ -310,7 +421,8 @@
                     <h2 class="section-title" style="text-align:center; margin-bottom:20px;">ACESSO À PLATAFORMA</h2>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
+                        <input type="email" id="auth-email" class="custom-value" placeholder="seu@email.com"
+                            autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
@@ -329,7 +441,8 @@
                     </div>
                     <div class="input-group">
                         <label>E-mail</label>
-                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com" autocomplete="off">
+                        <input type="email" id="reg-email" class="custom-value" placeholder="seu@email.com"
+                            autocomplete="off">
                     </div>
                     <div class="input-group">
                         <label>Senha</label>
@@ -346,7 +459,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=15"></script>
+    <script src="dist/app.shield.js?v=25"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }

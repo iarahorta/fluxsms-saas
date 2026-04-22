@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FluxSMS Polo Worker (rascunho)</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; background: #111; color: #eee; }
+    body { margin: 0; padding: 16px; max-width: 880px; }
+    h1 { font-size: 1.1rem; color: #a78bfa; }
+    fieldset { border: 1px solid #333; border-radius: 8px; margin-bottom: 14px; padding: 12px; }
+    legend { padding: 0 8px; color: #94a3b8; }
+    label { display: block; font-size: 0.75rem; color: #94a3b8; margin-top: 8px; }
+    input, select, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #444; background: #1a1a1a; color: #fff; }
+    button { cursor: pointer; background: #4c1d95; border-color: #6d28d9; font-weight: 600; margin-top: 10px; }
+    button.secondary { background: #1e293b; }
+    #log { font-family: ui-monospace, monospace; font-size: 11px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 10px; height: 200px; overflow: auto; white-space: pre-wrap; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>FluxSMS · Polo Worker (rascunho)</h1>
+
+  <fieldset>
+    <legend>1 · Partner API &amp; Polo</legend>
+    <label>URL do backend</label>
+    <input id="backendUrl" placeholder="https://..." />
+    <label>Partner API Key (Bearer)</label>
+    <input id="partnerApiKey" type="password" autocomplete="off" placeholder="sk_live_..." />
+    <label>Chave do polo (<code>polos.chave_acesso</code>)</label>
+    <input id="poloChave" autocomplete="off" />
+    <label>HARDWARE_API_KEY (para POST /sms/deliver — ver README)</label>
+    <input id="hardwareApiKey" type="password" autocomplete="off" />
+    <button id="btnSaveConfig">Guardar configuração</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>2 · Portas COM</legend>
+    <button id="btnListSerial" class="secondary">Listar portas seriais</button>
+    <select id="selPort" size="4"></select>
+  </fieldset>
+
+  <fieldset>
+    <legend>3 · Registar chip no banco</legend>
+    <div class="row">
+      <div>
+        <label>Porta (ex.: COM3 ou id da lista)</label>
+        <input id="chipPorta" placeholder="COM3" />
+      </div>
+      <div>
+        <label>Número do chip (MSISDN)</label>
+        <input id="chipNumero" placeholder="+5511999990000" />
+      </div>
+    </div>
+    <label>Operadora (opcional)</label>
+    <input id="chipOperadora" placeholder="TIM" />
+    <button id="btnRegisterChip">Enviar para API (POST /partner-api/chips)</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>4 · Escutar pedidos de SMS (polling)</legend>
+    <p style="font-size:0.8rem;color:#888;margin:0;">Heartbeat + lista de ativações <code>waiting</code> a cada intervalo.</p>
+    <label>Intervalo (ms)</label>
+    <input id="pollMs" type="number" value="5000" min="2000" step="1000" />
+    <button id="btnTogglePoll" class="secondary">Iniciar / Parar escuta</button>
+    <p style="font-size:0.75rem;color:#666;">Quando o modem ler o código, use “Entregar SMS” com o <code>activation_id</code> da fila.</p>
+    <div class="row">
+      <div>
+        <label>activation_id</label>
+        <input id="actId" />
+      </div>
+      <div>
+        <label>sms_code</label>
+        <input id="smsCode" />
+      </div>
+    </div>
+    <label>chip_porta (igual ao registo)</label>
+    <input id="deliverPorta" placeholder="COM3" />
+    <button id="btnDeliver">Entregar SMS (POST /sms/deliver)</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Log</legend>
+    <div id="log"></div>
+  </fieldset>
+
+  <script src="src/renderer.js"></script>
+</body>
+</html>

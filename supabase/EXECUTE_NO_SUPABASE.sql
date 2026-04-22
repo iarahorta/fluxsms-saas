@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.chips (
 CREATE TABLE IF NOT EXISTS public.activations (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    chip_id         UUID REFERENCES public.chips(id),
+    chip_id         UUID REFERENCES public.chips(id) ON DELETE CASCADE,
     service         TEXT NOT NULL,
     service_name    TEXT NOT NULL,
     price           NUMERIC(8, 2) NOT NULL,
@@ -222,36 +222,44 @@ BEGIN
     RETURN jsonb_build_object('ok',true, 'creditado', v_coupon.amount);
 END; $$;
 
--- USUÁRIO: Solicitar SMS com Preço Dinâmico (Leva em conta custom_price)
+-- USUÁRIO: Solicitar SMS com Preço Dinâmico (Leva em conta Load Balance por Polo + RealTime Sync)
 CREATE OR REPLACE FUNCTION public.rpc_solicitar_sms_v2(
     p_user_id UUID, p_service TEXT, p_service_name TEXT, p_default_price NUMERIC
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_balance NUMERIC; v_chip RECORD; v_activation_id UUID; v_final_price NUMERIC;
 BEGIN
-    -- 1. Determina o preço final (Custom se existir, senão o Default enviado)
     SELECT COALESCE((SELECT price FROM custom_prices WHERE user_id = p_user_id AND service = p_service), p_default_price) 
     INTO v_final_price;
 
-    -- 2. Verifica saldo
     SELECT balance INTO v_balance FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF v_balance < v_final_price THEN RETURN jsonb_build_object('ok',false,'error','saldo_insuficiente','saldo',v_balance); END IF;
     
-    -- 3. Busca chip disponível (que não tenha tido venda recebida para este serviço específico)
-    SELECT * INTO v_chip FROM chips c
+    -- Busca chips priorizando POLOS com menor carga de trabalho (ativações pendentes)
+    SELECT c.* INTO v_chip 
+    FROM chips c
+    JOIN polos p ON c.polo_id = p.id
+    LEFT JOIN (
+        SELECT c2.polo_id, count(*) as carga_atual
+        FROM activations a JOIN chips c2 ON a.chip_id = c2.id
+        WHERE a.status IN ('pending', 'waiting')
+        GROUP BY c2.polo_id
+    ) load ON p.id = load.polo_id
     WHERE c.status = 'idle'
+    AND p.status = 'ONLINE'
+    AND p.ultima_comunicacao > NOW() - INTERVAL '90 seconds'
     AND NOT EXISTS (
         SELECT 1 FROM activations a
         WHERE a.chip_id = c.id
         AND a.service = p_service
         AND a.status = 'received'
     )
+    ORDER BY COALESCE(load.carga_atual, 0) ASC, random()
     LIMIT 1 FOR UPDATE SKIP LOCKED;
+    
     IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'error','sem_chips'); END IF;
     
-    -- 4. Processa
     UPDATE chips SET status='busy' WHERE id = v_chip.id;
     UPDATE profiles SET balance = balance - v_final_price WHERE id = p_user_id;
-    
     INSERT INTO activations (user_id,chip_id,service,service_name,price,phone_number,status)
     VALUES (p_user_id, v_chip.id, p_service, p_service_name, v_final_price, COALESCE(v_chip.numero,'AGUARDANDO'), 'waiting')
     RETURNING id INTO v_activation_id;
@@ -301,6 +309,47 @@ BEGIN
 END; $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_cleanup_old_data() TO authenticated;
+
+-- [STABILITY] Gari do Sistema: Monitora Polos e Estorna Saldo (Timeout 90s)
+CREATE OR REPLACE FUNCTION public.rpc_monitorar_e_estornar_v2()
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_rec RECORD;
+    v_refund_amount NUMERIC(10,2);
+    v_count_polos INT := 0; v_count_refunds INT := 0;
+BEGIN
+    UPDATE polos 
+    SET status = 'OFFLINE' 
+    WHERE (ultima_comunicacao < NOW() - INTERVAL '90 seconds' OR ultima_comunicacao IS NULL)
+    AND status != 'OFFLINE';
+    GET DIAGNOSTICS v_count_polos = ROW_COUNT;
+
+    FOR v_rec IN 
+        SELECT a.id, a.user_id, a.price, a.service_name 
+        FROM activations a JOIN chips c ON a.chip_id = c.id JOIN polos p ON c.polo_id = p.id
+        WHERE p.status = 'OFFLINE' AND a.status IN ('pending', 'waiting')
+    LOOP
+        SELECT t.amount INTO v_refund_amount
+        FROM transactions t
+        WHERE t.activation_id = v_rec.id
+          AND t.user_id = v_rec.user_id
+          AND t.type = 'debit'
+        ORDER BY t.created_at DESC
+        LIMIT 1;
+
+        IF v_refund_amount IS NULL THEN
+            v_refund_amount := v_rec.price;
+        END IF;
+
+        UPDATE profiles SET balance = balance + v_refund_amount WHERE id = v_rec.user_id;
+        UPDATE activations SET status = 'expired', updated_at = NOW() WHERE id = v_rec.id;
+        INSERT INTO transactions (user_id, activation_id, type, amount, description)
+        VALUES (v_rec.user_id, v_rec.id, 'refund', v_refund_amount, 'Estorno: Polo Offline (' || v_rec.service_name || ')');
+        v_count_refunds := v_count_refunds + 1;
+    END LOOP;
+    RETURN jsonb_build_object('ok', true, 'polos_offline', v_count_polos, 'estornos_realizados', v_count_refunds);
+END; $$;
+GRANT EXECUTE ON FUNCTION public.rpc_monitorar_e_estornar_v2 TO authenticated;
 
 -- ============================================================
 -- PARTE 7: CONFIGURAÇÃO DE SERVIÇOS E PREÇOS GLOBAIS

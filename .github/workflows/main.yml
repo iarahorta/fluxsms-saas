@@ -23,14 +23,16 @@ jobs:
           if [[ "${{ github.ref_name }}" == "staging" ]]; then
             echo "backend_url=https://fluxsms-staging-production.up.railway.app" >> $GITHUB_OUTPUT
             echo "railway_service=fluxsms-staging" >> $GITHUB_OUTPUT
-            echo "site_version=LAB-v10" >> $GITHUB_OUTPUT
+            echo "site_version=LAB-v11" >> $GITHUB_OUTPUT
           else
             echo "backend_url=https://fluxsms.com.br" >> $GITHUB_OUTPUT
             echo "railway_service=fluxsms-saas" >> $GITHUB_OUTPUT
-            echo "site_version=PROD-v10" >> $GITHUB_OUTPUT
+            echo "site_version=PROD-v11" >> $GITHUB_OUTPUT
           fi
 
       - name: Inject Backend URL into JS
+        env:
+          SITE_VERSION: ${{ steps.env.outputs.site_version }}
         run: |
           sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" _source_code_protected_/app.js
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/app.js
@@ -38,13 +40,20 @@ jobs:
           sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" _source_code_protected_/admin.js
           sed -i "s|__BACKEND_URL__|${{ steps.env.outputs.backend_url }}|g" _source_code_protected_/app.js
           sed -i "s|__BACKEND_URL__|${{ steps.env.outputs.backend_url }}|g" _source_code_protected_/admin.js
-          
-          # Injeta versão no HTML para controle de cache
-          sed -i "s|style.css?v=11|style.css?v=${{ steps.env.outputs.site_version }}|g" index.html
-          sed -i "s|app.shield.js?v=11|app.shield.js?v=${{ steps.env.outputs.site_version }}|g" index.html
+          # Injeta versão no HTML para controle de cache (qualquer ?v= anterior)
+          node <<'NODE'
+          const fs = require('fs');
+          const v = process.env.SITE_VERSION;
+          let html = fs.readFileSync('index.html', 'utf8');
+          html = html.replace(/style\.css\?v=[^"'>\s]+/g, 'style.css?v=' + v);
+          html = html.replace(/dist\/app\.shield\.js\?v=[^"'>\s]+/g, 'dist/app.shield.js?v=' + v);
+          fs.writeFileSync('index.html', html);
+          NODE
 
       - name: Install Dependencies
-        run: npm install
+        env:
+          NODE_ENV: development
+        run: npm install --no-fund --no-audit
 
       - name: Build Protected Logic
         run: node obfuscate.js

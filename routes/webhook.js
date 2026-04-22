@@ -158,12 +158,12 @@ router.post('/criar-pix', async (req, res) => {
 
     } catch (err) {
         const mpError = err.response?.data;
-        console.error('[CRIAR PIX] Erro:', JSON.stringify(mpError) || err.message);
+        const mpMsg = typeof mpError === 'object' ? JSON.stringify(mpError) : String(mpError);
+        console.error('[CRIAR PIX] Erro capturado:', mpMsg || err.message);
         
-        // Retornamos mais detalhes para o frontend conseguir debugar na tela
         return res.status(500).json({ 
             ok: false,
-            error: mpError?.message || 'Erro ao criar Pix', 
+            error: mpError?.message || 'Erro ao gerar Pix no gateway', 
             details: mpError?.cause || err.message 
         });
     }
