@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS | Programa de Fornecedores</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --gold: #d4af37;
+            --gold-dim: rgba(212, 175, 55, 0.35);
+            --card: rgba(18, 18, 18, 0.95);
+            --text: #f2f2f2;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .wrap {
+            min-height: 100vh;
+            padding: 40px 20px 56px;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.2), transparent),
+                linear-gradient(180deg, #111 0%, var(--bg) 50%);
+        }
+        .top-bar {
+            max-width: 900px;
+            margin: 0 auto 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem; }
+        .logo-flux { color: #fff; }
+        .logo-sms { color: var(--gold); }
+        .back-home {
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .back-home:hover { color: var(--gold); }
+        .hero {
+            max-width: 720px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--gold);
+            border: 1px solid var(--gold-dim);
+            padding: 8px 18px;
+            border-radius: 999px;
+            margin-bottom: 22px;
+        }
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(1.65rem, 4.5vw, 2.5rem);
+            font-weight: 800;
+            line-height: 1.15;
+            margin: 0 0 16px;
+        }
+        h1 span { color: var(--gold); }
+        .lead {
+            font-size: 1rem;
+            line-height: 1.65;
+            color: rgba(255,255,255,0.58);
+            margin: 0 auto 40px;
+            max-width: 560px;
+        }
+        .pillars {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            max-width: 900px;
+            margin: 0 auto 40px;
+        }
+        .pillar {
+            background: var(--card);
+            border: 1px solid rgba(212, 175, 55, 0.22);
+            border-radius: 14px;
+            padding: 22px 18px;
+            text-align: left;
+        }
+        .pillar strong {
+            display: block;
+            font-size: 1.05rem;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+        .pillar p {
+            margin: 0;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: rgba(255,255,255,0.65);
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 8px;
+        }
+        .btn {
+            min-width: 200px;
+            padding: 14px 26px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-decoration: none;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #e8c547, var(--gold));
+            color: #111;
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--gold);
+            border: 2px solid var(--gold-dim);
+        }
+        .btn-secondary:hover { border-color: var(--gold); color: #fff; }
+        .footnote {
+            margin-top: 48px;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.38);
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top-bar">
+            <div class="logo"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></div>
+            <a class="back-home" href="/">← Voltar ao site</a>
+        </div>
+        <div class="hero">
+            <div class="badge">Fornecedor · Infraestrutura</div>
+            <h1>Torne-se <span>fornecedor</span> oficial FluxSMS</h1>
+            <p class="lead">Suba os seus chips reais, rode o nosso software próprio no polo e receba repasse automático sobre as vendas geradas pela sua infraestrutura.</p>
+        </div>
+        <div class="pillars">
+            <div class="pillar">
+                <strong>60% de lucro</strong>
+                <p>Repasse fixo de <strong>60%</strong> sobre o valor de cada SMS recebido nos seus chips — regra clara, sem surpresas.</p>
+            </div>
+            <div class="pillar">
+                <strong>Software próprio (.exe)</strong>
+                <p>Polo Worker Windows: instalação simples, ligação segura à Partner API e monitorização dos modems no painel.</p>
+            </div>
+            <div class="pillar">
+                <strong>Pagamento em 24h</strong>
+                <p>Após carência de liberação do repasse, solicite saque (mín. R$ 400) com processamento alinhado ao prazo de <strong>24h/48h</strong> conforme o seu perfil no programa.</p>
+            </div>
+        </div>
+        <div class="actions">
+            <a class="btn btn-primary" href="/partner/register">Cadastrar</a>
+            <a class="btn btn-secondary" href="/?parceiro=login">Fazer login</a>
+        </div>
+        <p class="footnote">Programa destinado a operadores de infraestrutura (polos / chips). Não inclui compra de números virtuais para consumo próprio — após o login, o painel mostra apenas infraestrutura e financeiro.</p>
+    </div>
+</body>
+</html>

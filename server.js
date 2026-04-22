@@ -74,7 +74,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.2', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.3', ts: new Date().toISOString() }));
 
 // ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
 // Negar acesso manual a qualquer arquivo na pasta de fontes originais
@@ -144,10 +144,12 @@ app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
+const sendPartnerLanding = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
 app.get('/partner/register', sendPartnerRegister);
 app.get('/partner/register/', sendPartnerRegister);
 app.get('/partner-register.html', sendPartnerRegister);
-// Rota /partner removida: evitava confusão (redirecionava para JSON da API). Parceiros ficam no dashboard (admin).
+app.get('/partner/', sendPartnerLanding);
+app.get('/partner', (_req, res) => res.redirect(301, '/partner/'));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 

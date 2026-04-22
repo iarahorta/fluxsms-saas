@@ -85,6 +85,7 @@ async function init() {
         } else {
             renderServices([]);
             loadPartnerChipsMonitor();
+            showView('dashboard');
         }
     } else {
         fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
@@ -108,6 +109,20 @@ async function init() {
         });
     }
 
+    const parceiroLogin = new URLSearchParams(window.location.search).get('parceiro') === 'login';
+    if (parceiroLogin) {
+        if (!session && authModal) {
+            authModal.style.display = 'flex';
+            const login = document.getElementById('loginForm');
+            const signup = document.getElementById('signupForm');
+            if (login && signup) {
+                login.style.display = 'block';
+                signup.style.display = 'none';
+            }
+        }
+        history.replaceState({}, '', '/');
+    }
+
     db.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN') {
             currentUser = session?.user;
@@ -126,6 +141,7 @@ async function init() {
                     setupRealtime();
                 } else {
                     loadPartnerChipsMonitor();
+                    showView('dashboard');
                 }
             }
         } else if (event === 'SIGNED_OUT') {
@@ -541,6 +557,9 @@ async function updateUIForUser() {
     }
 
     document.body.classList.toggle('partner-mode', !!currentUserIsPartner);
+
+    const navDashLabel = document.getElementById('nav-dashboard-label');
+    if (navDashLabel) navDashLabel.textContent = currentUserIsPartner ? 'Infraestrutura' : 'Dashboard';
 
     if (currentUserIsPartner) {
         loadPartnerAutonomyStrip();

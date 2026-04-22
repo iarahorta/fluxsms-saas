@@ -1055,6 +1055,18 @@ overflow-y: auto;
     color: var(--flux-gold);
 }
 
+.lp-nav a.lp-nav-fornecedor {
+    color: var(--flux-gold);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    padding: 8px 14px;
+    border-radius: 8px;
+}
+
+.lp-nav a.lp-nav-fornecedor:hover {
+    background: rgba(212, 175, 55, 0.12);
+    color: #fff;
+}
+
 .footer-links {
     margin: 20px 0;
     display: flex;
