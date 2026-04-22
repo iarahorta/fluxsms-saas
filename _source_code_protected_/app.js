@@ -13,6 +13,7 @@ db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /** true quando o servidor injeta window.__FLUX_PARTNER_PORTAL (host parceiros.* ou Staging com FORCE_PARTNER_PORTAL=1). */
 const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true;
+const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
 
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
@@ -66,7 +67,7 @@ async function init() {
 
     const { data: { session } } = await db.auth.getSession();
     if (IS_PARTNER_PORTAL && !session) {
-        window.location.replace('/p/login');
+        window.location.replace(PARTNER_LOGIN_PATH);
         return;
     }
 
@@ -161,7 +162,7 @@ async function init() {
             currentUserIsPartner = false;
             document.body.classList.remove('partner-mode');
             if (IS_PARTNER_PORTAL) {
-                window.location.replace('/p/login');
+                window.location.replace(PARTNER_LOGIN_PATH);
                 return;
             }
             const partnerWrap = document.getElementById('partner-header-wrap');
@@ -552,7 +553,7 @@ async function updateUIForUser() {
     if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
         alert('Este portal é exclusivo para fornecedores com perfil parceiro activo.');
         await db.auth.signOut();
-        window.location.replace('/p/login');
+        window.location.replace(PARTNER_LOGIN_PATH);
         return;
     }
 

@@ -76,16 +76,24 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.5', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.6', ts: new Date().toISOString() }));
 
 /** Produção: host parceiros.* | Staging: FORCE_PARTNER_PORTAL=1 no Railway simula o mesmo isolamento. */
+function resolveRequestHost(req) {
+    const forwardedHostRaw = req.get('x-forwarded-host') || '';
+    const forwardedHost = forwardedHostRaw.split(',')[0].trim();
+    const rawHost = forwardedHost || req.get('host') || '';
+    return rawHost.split(':')[0].toLowerCase();
+}
+
 function isPartnerPortalHost(req) {
-    const host = (req.get('host') || '').split(':')[0].toLowerCase();
+    const host = resolveRequestHost(req);
     return host === 'parceiros.fluxsms.com.br' || host.startsWith('parceiros.');
 }
 
 function isPartnerPortalExperience(req) {
     if (process.env.FORCE_PARTNER_PORTAL === '1') return true;
+    if (req.path === '/portal' || req.path === '/portal/' || req.path.startsWith('/portal/')) return true;
     return isPartnerPortalHost(req);
 }
 
@@ -173,16 +181,20 @@ app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge
 // Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
 app.get('/', sendIndexHtml);
 app.get('/index.html', sendIndexHtml);
+app.get('/portal', sendIndexHtml);
+app.get('/portal/', (_req, res) => res.redirect(301, '/portal'));
 app.get('/p/login', (req, res) => {
     if (!isPartnerPortalExperience(req)) {
         return res.status(404).type('text/plain').send('Not found');
     }
     sendPartnerLoginPage(req, res);
 });
+app.get('/portal/login', sendPartnerLoginPage);
 const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
 const sendPartnerLanding = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
 app.get('/partner/register', sendPartnerRegister);
 app.get('/partner/register/', sendPartnerRegister);
+app.get('/portal/register', sendPartnerRegister);
 app.get('/partner-register.html', sendPartnerRegister);
 app.get('/partner/', sendPartnerLanding);
 app.get('/partner', (_req, res) => res.redirect(301, '/partner/'));

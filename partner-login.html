@@ -108,11 +108,15 @@
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
         const msgEl = document.getElementById('pl-msg');
         const btn = document.getElementById('pl-btn');
+        const isPortalFallback = location.pathname.startsWith('/portal/');
+        const portalHomePath = isPortalFallback ? '/portal' : '/';
+        const portalRegisterPath = isPortalFallback ? '/portal/register' : '/partner/register';
+        document.getElementById('pl-register').setAttribute('href', portalRegisterPath);
 
         (async function checkSession() {
             const { data: { session } } = await db.auth.getSession();
             if (session) {
-                window.location.replace('/');
+                window.location.replace(portalHomePath);
             }
         })();
 
@@ -133,7 +137,7 @@
             try {
                 const { error } = await db.auth.signInWithPassword({ email: email, password: password });
                 if (error) throw error;
-                window.location.replace('/');
+                window.location.replace(portalHomePath);
             } catch (e) {
                 setMsg(e.message || String(e));
             } finally {

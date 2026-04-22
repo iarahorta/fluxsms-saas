@@ -206,6 +206,7 @@
 
         function fluxPartnerPortalBase() {
             var h = location.hostname;
+            if (location.pathname.startsWith('/portal')) return location.origin + '/portal';
             if (/^parceiros\./i.test(h) || /railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1') {
                 return location.origin;
             }
