@@ -123,6 +123,7 @@ function sendIndexHtml(req, res) {
 }
 
 const sendPartnerLoginPage = (_req, res) => res.sendFile(path.join(__dirname, 'partner-login.html'));
+const sendPartnerLandingPage = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
 
 // ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
 // Negar acesso manual a qualquer arquivo na pasta de fontes originais
@@ -201,13 +202,15 @@ app.get('/p/login', (req, res) => {
 });
 app.get('/portal/login', sendPartnerLoginPage);
 const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
+app.get('/partner', sendPartnerLandingPage);
+app.get('/partner/', sendPartnerLandingPage);
+app.get('/partner-landing.html', sendPartnerLandingPage);
+app.get('/partner/login', (_req, res) => res.redirect(301, '/portal/login'));
+app.get('/partner/login/', (_req, res) => res.redirect(301, '/portal/login'));
 app.get('/partner/register', (_req, res) => res.redirect(301, '/portal/register'));
 app.get('/partner/register/', (_req, res) => res.redirect(301, '/portal/register'));
 app.get('/portal/register', sendPartnerRegister);
 app.get('/partner-register.html', (_req, res) => res.redirect(301, '/portal/register'));
-app.get('/partner/', (_req, res) => res.redirect(301, '/portal'));
-app.get('/partner', (_req, res) => res.redirect(301, '/portal'));
-app.get(/^\/partner(?:\/.*)?$/i, (_req, res) => res.redirect(301, '/portal'));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
