@@ -74,7 +74,7 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.1', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.2', ts: new Date().toISOString() }));
 
 // ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
 // Negar acesso manual a qualquer arquivo na pasta de fontes originais
@@ -140,9 +140,13 @@ publicFolders.forEach(folder => {
 // Executável Polo Worker (coloque FluxSMS-Polo-Worker-Portable.exe na pasta /downloads ou defina POLO_WORKER_DOWNLOAD_URL)
 app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));
 
-// Arquivos individuais na raiz permitidos
+// Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/partner/register', (req, res) => res.sendFile(path.join(__dirname, 'partner-register.html')));
+app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
+app.get('/partner/register', sendPartnerRegister);
+app.get('/partner/register/', sendPartnerRegister);
+app.get('/partner-register.html', sendPartnerRegister);
 // Rota /partner removida: evitava confusão (redirecionava para JSON da API). Parceiros ficam no dashboard (admin).
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));

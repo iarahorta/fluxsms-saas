@@ -4,6 +4,8 @@ const { requirePartnerUser } = require('../middleware/partnerSession');
 const router = express.Router();
 
 const MIN_WITHDRAWAL_BRL = 400;
+const WITHDRAWAL_FEE_BRL = 5;
+const PARTNER_REPASSE_RATE = 0.6; /* 60% fixo sobre valor da venda (SMS recebido) */
 const NEW_PARTNER_DAYS = 90;
 const HOLD_HOURS_NOVO = 48;
 const HOLD_HOURS_ANTIGO = 24;
@@ -14,10 +16,7 @@ function round2(n) {
 
 router.use(requirePartnerUser);
 
-/**
- * Carência por crédito: parceiro "novo" (primeiros 90 dias do partner_profiles) = 48h;
- * "antigo" = 24h. saque_prioritario = sem carência.
- */
+/** Cálculo interno (incl. saque_prioritario). Nunca exposto ao parceiro na API. */
 function effectiveHoldHours(partnerProfile) {
     if (partnerProfile.saque_prioritario) return 0;
     const created = new Date(partnerProfile.created_at).getTime();
@@ -70,8 +69,21 @@ async function loadReservedWithdrawals(supabase, partnerId) {
     return round2(sum);
 }
 
+/** Resposta pública do parceiro: sem campos internos (ex.: saque_prioritario). */
+function partnerFacingRules(base) {
+    return {
+        min_withdrawal_brl: base.min_withdrawal_brl,
+        withdrawal_fee_brl: base.withdrawal_fee_brl,
+        hold_hours_novo: base.hold_hours_novo,
+        hold_hours_antigo: base.hold_hours_antigo,
+        novo_period_days: base.novo_period_days,
+        is_novo_parceiro: base.is_novo_parceiro,
+        repasse_percent: 60
+    };
+}
+
 async function buildFinanceSummary(supabase, partnerProfile) {
-    const margin = Number(partnerProfile.margin_percent || 0) / 100;
+    const margin = PARTNER_REPASSE_RATE;
     const holdHours = effectiveHoldHours(partnerProfile);
     const createdMs = new Date(partnerProfile.created_at).getTime();
     const isNovoParceiro = Date.now() - createdMs < NEW_PARTNER_DAYS * 24 * 60 * 60 * 1000;
@@ -99,19 +111,17 @@ async function buildFinanceSummary(supabase, partnerProfile) {
     const saquesReservados = await loadReservedWithdrawals(supabase, partnerProfile.id);
     const disponivelParaSolicitar = round2(Math.max(0, repasseLiberado - saquesReservados));
 
+    const internalRules = {
+        min_withdrawal_brl: MIN_WITHDRAWAL_BRL,
+        withdrawal_fee_brl: WITHDRAWAL_FEE_BRL,
+        hold_hours_novo: HOLD_HOURS_NOVO,
+        hold_hours_antigo: HOLD_HOURS_ANTIGO,
+        novo_period_days: NEW_PARTNER_DAYS,
+        is_novo_parceiro: isNovoParceiro
+    };
+
     return {
-        rules: {
-            min_withdrawal_brl: MIN_WITHDRAWAL_BRL,
-            hold_hours_novo: HOLD_HOURS_NOVO,
-            hold_hours_antigo: HOLD_HOURS_ANTIGO,
-            novo_period_days: NEW_PARTNER_DAYS,
-            is_novo_parceiro: isNovoParceiro,
-            saque_prioritario: !!partnerProfile.saque_prioritario,
-            effective_hold_hours: holdHours,
-            help:
-                'Repasse = margem % sobre o valor de cada SMS recebido nos seus chips (regra comercial: 60% para parceiros FluxSMS). ' +
-                'Carência após a data do recebimento; com saque prioritário ativo pela equipe FluxSMS, a carência não se aplica.'
-        },
+        rules: partnerFacingRules(internalRules),
         totals: {
             repasse_total: repasseTotal,
             repasse_liberado: repasseLiberado,
@@ -137,7 +147,8 @@ router.get('/summary', async (req, res) => {
 
 /**
  * POST /api/partner/finance/withdraw
- * body: { amount: number, pix_destination?: string }
+ * body: { amount: number (bruto retirado do repasse), pix_destination?: string }
+ * Taxa fixa R$ 5 — valor líquido a pagar = amount - 5 (registado em net_amount).
  */
 router.post('/withdraw', async (req, res) => {
     const supabase = req.app.get('supabase');
@@ -157,6 +168,15 @@ router.post('/withdraw', async (req, res) => {
             min_brl: MIN_WITHDRAWAL_BRL
         });
     }
+    if (amount <= WITHDRAWAL_FEE_BRL) {
+        return res.status(400).json({
+            ok: false,
+            error: 'amount_must_exceed_fee',
+            fee_brl: WITHDRAWAL_FEE_BRL
+        });
+    }
+
+    const netAmount = round2(amount - WITHDRAWAL_FEE_BRL);
 
     try {
         const summary = await buildFinanceSummary(supabase, req.partnerProfile);
@@ -175,10 +195,12 @@ router.post('/withdraw', async (req, res) => {
                 partner_id: req.partnerProfile.id,
                 user_id: req.partnerUserId,
                 amount,
+                fee_brl: WITHDRAWAL_FEE_BRL,
+                net_amount: netAmount,
                 pix_destination: pixDestination || null,
                 status: 'pending'
             })
-            .select('id, amount, status, created_at')
+            .select('id, amount, fee_brl, net_amount, status, created_at')
             .maybeSingle();
 
         if (insErr) {
@@ -188,7 +210,7 @@ router.post('/withdraw', async (req, res) => {
         return res.status(201).json({
             ok: true,
             withdrawal: row,
-            message: 'Pedido registrado. O financeiro FluxSMS processará conforme fila e validação dos dados PIX.'
+            message: 'Pedido registado. O financeiro FluxSMS processará o pagamento do valor líquido após validação (taxa de processamento já considerada).'
         });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'withdraw_failed', detail: err.message });
@@ -198,3 +220,4 @@ router.post('/withdraw', async (req, res) => {
 module.exports = router;
 module.exports.buildFinanceSummary = buildFinanceSummary;
 module.exports.MIN_WITHDRAWAL_BRL = MIN_WITHDRAWAL_BRL;
+module.exports.WITHDRAWAL_FEE_BRL = WITHDRAWAL_FEE_BRL;

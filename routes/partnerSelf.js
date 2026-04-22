@@ -41,12 +41,16 @@ router.get('/bootstrap', async (req, res) => {
 
         const finance = await buildFinanceSummary(supabase, req.partnerProfile);
 
+        const repassePct = finance && finance.rules && finance.rules.repasse_percent != null
+            ? Number(finance.rules.repasse_percent)
+            : 60;
+
         return res.json({
             ok: true,
             partner: {
                 id: req.partnerProfile.id,
                 partner_code: req.partnerProfile.partner_code,
-                margin_percent: req.partnerProfile.margin_percent
+                repasse_percent: repassePct
             },
             api_key_prefix: keyRow?.key_prefix || null,
             api_key_plain: apiKeyPlain,

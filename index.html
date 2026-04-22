@@ -221,8 +221,7 @@
                         <div class="partner-autonomy-card partner-identity-card">
                             <div class="partner-autonomy-label">Partner API Key · identidade fixa</div>
                             <div class="partner-key-row">
-                                <input type="password" id="partner-api-key-field" class="partner-api-key-field" readonly autocomplete="off" placeholder="A carregar…" spellcheck="false">
-                                <button type="button" class="btn-partner-refresh partner-autonomy-btn" id="partner-key-reveal-btn" onclick="togglePartnerApiKeyReveal()">Revelar</button>
+                                <input type="text" id="partner-api-key-field" class="partner-api-key-field" readonly autocomplete="off" placeholder="A carregar…" spellcheck="false">
                                 <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="copyPartnerApiKey()">Copiar</button>
                             </div>
                             <p id="partner-key-hint" class="partner-autonomy-hint" style="margin-top:8px;">A mesma chave liga o Polo Worker a esta conta. Guarde em cofre interno.</p>
@@ -242,7 +241,7 @@
 
                 <!-- VIEW: DASHBOARD — cliente (compra) vs parceiro (infra) -->
                 <section id="view-dashboard" class="content-grid app-view">
-                    <div id="client-purchase-dashboard" class="client-purchase-dashboard">
+                    <div id="client-purchase-dashboard" class="client-purchase-dashboard hide-for-partner">
                         <div class="services-container">
                             <div class="section-header">
                                 <h2 class="section-title">SERVIÇOS DISPONÍVEIS</h2>
@@ -341,6 +340,7 @@
                         <div style="max-width: 440px; padding: 16px; background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid rgba(212,175,55,0.28);">
                             <label style="font-size: 12px; opacity: 0.85;">Valor do saque (R$)</label>
                             <input type="number" id="partner-withdraw-amount" class="custom-value" min="400" step="0.01" placeholder="Mínimo R$ 400,00" style="width: 100%; margin: 8px 0;">
+                            <p id="partner-withdraw-fee-preview" style="font-size: 12px; margin: 0 0 10px; line-height: 1.45; color: rgba(255,255,255,0.72);">Taxa de processamento: R$ 5,00 | Você receberá: —</p>
                             <label style="font-size: 12px; opacity: 0.85;">Chave PIX</label>
                             <input type="text" id="partner-withdraw-pix" class="custom-value" placeholder="CPF, CNPJ, e-mail ou chave aleatória" style="width: 100%; margin: 8px 0;">
                             <button type="button" id="partner-withdraw-btn" class="btn-pix" style="width: 100%; margin-top: 10px;" onclick="submitPartnerWithdraw()">Solicitar saque</button>
@@ -459,7 +459,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="dist/app.shield.js?v=22"></script>
+    <script src="dist/app.shield.js?v=23"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }

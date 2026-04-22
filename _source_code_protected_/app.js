@@ -103,7 +103,9 @@ async function init() {
 
     const partnerWithdrawAmt = document.getElementById('partner-withdraw-amount');
     if (partnerWithdrawAmt) {
-        partnerWithdrawAmt.addEventListener('input', () => updatePartnerWithdrawButtonState(_partnerFinanceSummaryCache));
+        partnerWithdrawAmt.addEventListener('input', () => {
+            updatePartnerWithdrawButtonState(_partnerFinanceSummaryCache);
+        });
     }
 
     db.auth.onAuthStateChange(async (event, session) => {
@@ -284,10 +286,9 @@ async function loadPartnerAutonomyStrip() {
     const dl = document.getElementById('partner-strip-download');
     const keyField = document.getElementById('partner-api-key-field');
     const keyHint = document.getElementById('partner-key-hint');
-    const revealBtn = document.getElementById('partner-key-reveal-btn');
     if (keyField) {
         keyField.value = '';
-        keyField.type = 'password';
+        keyField.type = 'text';
         keyField.placeholder = 'A carregar…';
     }
     if (finLine) finLine.textContent = '…';
@@ -303,20 +304,21 @@ async function loadPartnerAutonomyStrip() {
             return;
         }
         _partnerApiKeyPlainCache = j.api_key_plain || '';
-        if (j.partner && j.partner.margin_percent != null) {
-            _partnerMarginPercent = Number(j.partner.margin_percent);
+        if (j.partner && j.partner.repasse_percent != null) {
+            _partnerMarginPercent = Number(j.partner.repasse_percent);
+        } else if (j.finance && j.finance.rules && j.finance.rules.repasse_percent != null) {
+            _partnerMarginPercent = Number(j.finance.rules.repasse_percent);
         }
         if (keyField) {
             keyField.value = _partnerApiKeyPlainCache || '';
-            keyField.type = 'password';
-            keyField.placeholder = _partnerApiKeyPlainCache ? '' : 'Chave legada sem cofre — peça rotação no Admin Hub.';
+            keyField.type = 'text';
+            keyField.placeholder = _partnerApiKeyPlainCache ? '' : 'Chave indisponível — contacte a FluxSMS.';
         }
         if (keyHint) {
             keyHint.textContent = _partnerApiKeyPlainCache
                 ? 'Identidade fixa. O Polo Worker deve enviar o HWID na primeira ligação; outro PC será bloqueado.'
-                : 'Não foi possível ler a chave completa (cofre). A equipa FluxSMS pode rotacionar no Admin Hub.';
+                : 'Não foi possível ler a chave completa (cofre). Contacte a equipa FluxSMS.';
         }
-        if (revealBtn) revealBtn.textContent = 'Revelar';
         const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
         if (finLine) {
             finLine.textContent = `Repasse (${Number(_partnerMarginPercent || 60)}%): liberado R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível saque R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
@@ -329,22 +331,9 @@ async function loadPartnerAutonomyStrip() {
     }
 }
 
-window.togglePartnerApiKeyReveal = function () {
-    const keyField = document.getElementById('partner-api-key-field');
-    const revealBtn = document.getElementById('partner-key-reveal-btn');
-    if (!keyField || !_partnerApiKeyPlainCache) return;
-    if (keyField.type === 'password') {
-        keyField.type = 'text';
-        if (revealBtn) revealBtn.textContent = 'Ocultar';
-    } else {
-        keyField.type = 'password';
-        if (revealBtn) revealBtn.textContent = 'Revelar';
-    }
-};
-
 window.copyPartnerApiKey = async function () {
     if (!_partnerApiKeyPlainCache) {
-        alert('Chave completa indisponível neste painel. Contacte a FluxSMS ou use rotação no Admin Hub.');
+        alert('Chave completa indisponível neste painel. Contacte a FluxSMS.');
         return;
     }
     try {
@@ -590,38 +579,22 @@ function formatPartnerChipsCell(chips) {
     }).join('');
 }
 
-window.generatePartnerApiKeyFromDashboard = async function (partnerProfileId) {
-    if (!currentUserIsAdmin) {
-        alert('Apenas administradores podem gerar API Key.');
+function updatePartnerWithdrawFeePreview(lastSummary) {
+    const amtEl = document.getElementById('partner-withdraw-amount');
+    const previewEl = document.getElementById('partner-withdraw-fee-preview');
+    if (!previewEl) return;
+    const fee = (lastSummary && lastSummary.rules && lastSummary.rules.withdrawal_fee_brl != null)
+        ? Number(lastSummary.rules.withdrawal_fee_brl)
+        : 5;
+    const raw = amtEl && amtEl.value ? String(amtEl.value).replace(',', '.') : '';
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v) || v <= 0) {
+        previewEl.innerHTML = `Taxa de processamento: R$ ${fee.toFixed(2)} | Você receberá: <strong>—</strong>`;
         return;
     }
-    const label = window.prompt('Rótulo da chave (ex.: Worker Lab):', 'Dashboard');
-    if (label === null) return;
-    const { data: { session } } = await db.auth.getSession();
-    if (!session) {
-        alert('Faça login novamente.');
-        return;
-    }
-    try {
-        const res = await fetch(`${BACKEND_URL}/api/admin/partners/${partnerProfileId}/api-keys`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ label: label || 'Dashboard' })
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok || !j.ok) {
-            alert('Erro: ' + (j.detail || j.error || res.statusText));
-            return;
-        }
-        window.prompt('COPIE AGORA a Partner API Key (mostrada uma única vez):', j.api_key);
-        loadPartnerProfiles();
-    } catch (e) {
-        alert('Falha: ' + (e.message || e));
-    }
-};
+    const net = Math.max(0, Math.round((v - fee) * 100) / 100);
+    previewEl.innerHTML = `Taxa de processamento: R$ ${fee.toFixed(2)} | Você receberá: <strong>R$ ${net.toFixed(2)}</strong>`;
+}
 
 function updatePartnerWithdrawButtonState(lastSummary) {
     const btn = document.getElementById('partner-withdraw-btn');
@@ -629,10 +602,14 @@ function updatePartnerWithdrawButtonState(lastSummary) {
     if (!btn || !amtEl) return;
     const minBrl = (lastSummary && lastSummary.rules && lastSummary.rules.min_withdrawal_brl) ? lastSummary.rules.min_withdrawal_brl : 400;
     const maxBrl = (lastSummary && lastSummary.totals) ? Number(lastSummary.totals.disponivel_para_solicitar || 0) : 0;
+    const fee = (lastSummary && lastSummary.rules && lastSummary.rules.withdrawal_fee_brl != null)
+        ? Number(lastSummary.rules.withdrawal_fee_brl)
+        : 5;
     const v = parseFloat(String(amtEl.value).replace(',', '.'));
-    const ok = Number.isFinite(v) && v >= minBrl && v <= maxBrl + 0.009 && maxBrl >= minBrl;
+    const ok = Number.isFinite(v) && v > fee && v >= minBrl && v <= maxBrl + 0.009 && maxBrl >= minBrl;
     btn.disabled = !ok;
     btn.style.opacity = ok ? '1' : '0.45';
+    updatePartnerWithdrawFeePreview(lastSummary);
 }
 
 let _partnerFinanceSummaryCache = null;
@@ -664,18 +641,19 @@ async function loadPartnerFinanceSummary() {
         _partnerFinanceSummaryCache = j;
         const r = j.rules || {};
         const t = j.totals || {};
-        const prazoLabel = r.saque_prioritario
-            ? 'Saque prioritário ativo: a carência de 48h/24h <strong>não se aplica</strong> à sua conta.'
-            : (r.is_novo_parceiro
-                ? `Parceiro <strong>novo</strong> (menos de ${r.novo_period_days || 90} dias no programa): cada repasse só entra no saque após <strong>${r.hold_hours_novo || 48}h</strong> da data do SMS recebido.`
-                : `Parceiro <strong>consolidado</strong>: carência de <strong>${r.hold_hours_antigo || 24}h</strong> após cada SMS recebido.`);
+        const repassePct = Number(r.repasse_percent || 60);
+        _partnerMarginPercent = repassePct;
+        const feeBrl = r.withdrawal_fee_brl != null ? Number(r.withdrawal_fee_brl) : 5;
+        const prazoLabel = r.is_novo_parceiro
+            ? `Parceiro <strong>novo</strong> (menos de ${r.novo_period_days || 90} dias no programa): cada repasse só entra no saque após <strong>${r.hold_hours_novo || 48}h</strong> da data do SMS recebido.`
+            : `Parceiro <strong>consolidado</strong>: carência de <strong>${r.hold_hours_antigo || 24}h</strong> após cada SMS recebido.`;
 
         rulesEl.innerHTML = `
             <ul style="margin:0; padding-left:18px; line-height:1.55; font-size:0.88rem; color:rgba(255,255,255,0.88);">
-                <li><strong>Repasse comercial:</strong> ${Number(_partnerMarginPercent || 60)}% sobre o valor de cada SMS recebido nos seus chips.</li>
+                <li><strong>Repasse comercial:</strong> ${repassePct}% sobre o valor de cada SMS recebido nos seus chips.</li>
                 <li><strong>Mínimo para saque:</strong> R$ ${(r.min_withdrawal_brl || 400).toFixed(2)} — valores menores não podem ser solicitados.</li>
                 <li><strong>Prazos (carência sobre o repasse):</strong> ${prazoLabel}</li>
-                <li><strong>Prioridade admin:</strong> se a FluxSMS marcar sua conta como prioritária, as carências acima deixam de valer para o cálculo do valor liberado.</li>
+                <li><strong>Taxa de processamento por saque:</strong> R$ ${feeBrl.toFixed(2)} por solicitação (descontada do valor pedido; o pagamento é do <strong>valor líquido</strong>).</li>
             </ul>`;
 
         const stat = (label, val, color) => `
@@ -691,9 +669,10 @@ async function loadPartnerFinanceSummary() {
             stat('Disponível p/ solicitar agora', `R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)}`, 'var(--flux-gold)');
 
         if (msgEl) {
-            msgEl.innerHTML = 'O botão de saque só habilita quando o valor estiver entre o <strong>mínimo</strong> e o <strong>disponível para solicitar</strong>. Pedidos ficam como pendentes até o financeiro FluxSMS.';
+            msgEl.innerHTML = 'O botão de saque só habilita quando o valor estiver entre o <strong>mínimo</strong> e o <strong>disponível para solicitar</strong>, e for <strong>maior que a taxa de processamento</strong>. Pedidos ficam como pendentes até o financeiro FluxSMS.';
         }
         updatePartnerWithdrawButtonState(j);
+        updatePartnerWithdrawFeePreview(j);
     } catch (e) {
         rulesEl.innerHTML = `<p style="color:#e085a0;">${escapeHtml(e.message || String(e))}</p>`;
     }
@@ -729,7 +708,13 @@ window.submitPartnerWithdraw = async function () {
             alert('Não foi possível registrar o saque: ' + (j.detail || j.error || res.statusText) + min + extra);
             return;
         }
-        if (msgEl) msgEl.textContent = j.message || 'Pedido registrado.';
+        if (msgEl) {
+            const w = j.withdrawal || {};
+            const gross = w.amount != null ? Number(w.amount) : amount;
+            const fee = w.fee_brl != null ? Number(w.fee_brl) : 5;
+            const net = w.net_amount != null ? Number(w.net_amount) : Math.max(0, Math.round((gross - fee) * 100) / 100);
+            msgEl.textContent = `Pedido registado. Bruto: R$ ${gross.toFixed(2)} · Taxa: R$ ${fee.toFixed(2)} · Você receberá: R$ ${net.toFixed(2)} (após validação).`;
+        }
         if (amtEl) amtEl.value = '';
         await loadPartnerFinanceSummary();
         loadPartnerAutonomyStrip();
@@ -790,9 +775,7 @@ async function loadPartnerProfiles() {
             const created = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '—';
             const nChips = p.chip_count != null ? p.chip_count : (p.chips || []).length;
             const rev = p.revenue_total != null ? Number(p.revenue_total).toFixed(2) : '0.00';
-            const keyCell = currentUserIsAdmin
-                ? `<button type="button" class="btn-partner-refresh" style="padding:6px 10px;font-size:10px;" onclick="generatePartnerApiKeyFromDashboard('${p.id}')">Gerar API Key</button>`
-                : '<span style="opacity:0.35;font-size:10px;">—</span>';
+            const keyCell = '<span style="opacity:0.55;font-size:10px;">Chave única no cadastro</span>';
             return `
         <tr>
             <td><code>${escapeHtml(p.partner_code)}</code></td>

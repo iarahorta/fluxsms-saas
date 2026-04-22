@@ -40,6 +40,52 @@ async function requireFluxAdmin(req, res, next) {
 router.use(requireFluxAdmin);
 
 /**
+ * PATCH /api/admin/partners/:partnerProfileId/withdrawals/:withdrawalId
+ * body: { status: 'approved' | 'paid' | 'rejected' | 'pending' }
+ * Na primeira aprovação/pagamento, regista fee_applied_at (taxa administrativa R$ 5).
+ */
+router.patch('/:partnerProfileId/withdrawals/:withdrawalId', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId, withdrawalId } = req.params;
+    const status = req.body && req.body.status ? String(req.body.status).toLowerCase() : '';
+    const allowed = ['approved', 'paid', 'rejected', 'pending'];
+    if (!allowed.includes(status)) {
+        return res.status(400).json({ ok: false, error: 'invalid_status' });
+    }
+    try {
+        const { data: row, error: fErr } = await supabase
+            .from('partner_withdrawal_requests')
+            .select('id, status, fee_applied_at')
+            .eq('id', withdrawalId)
+            .eq('partner_id', partnerProfileId)
+            .maybeSingle();
+
+        if (fErr || !row) {
+            return res.status(404).json({ ok: false, error: 'withdrawal_not_found' });
+        }
+
+        const updates = { status, updated_at: new Date().toISOString() };
+        if ((status === 'approved' || status === 'paid') && row.status === 'pending' && !row.fee_applied_at) {
+            updates.fee_applied_at = new Date().toISOString();
+        }
+
+        const { data: out, error: uErr } = await supabase
+            .from('partner_withdrawal_requests')
+            .update(updates)
+            .eq('id', withdrawalId)
+            .select('id, status, amount, fee_brl, net_amount, fee_applied_at')
+            .maybeSingle();
+
+        if (uErr) {
+            return res.status(500).json({ ok: false, error: 'update_failed', detail: uErr.message });
+        }
+        return res.json({ ok: true, withdrawal: out });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
+/**
  * PATCH /api/admin/partners/:partnerProfileId
  * body: { saque_prioritario: boolean } — prioridade financeira (ignora carência 48h/24h nos cálculos).
  */
