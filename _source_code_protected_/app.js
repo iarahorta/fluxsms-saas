@@ -45,6 +45,7 @@ let chipsDisponiveis = 0;
 let serviceStocks = {};
 let isRealtimeActive = false;
 let chatWidgetBooted = false;
+let tawkVisibilitySyncStarted = false;
 
 // === ELEMENTOS ===
 const landingView = document.getElementById('landing-view');
@@ -95,8 +96,10 @@ function bootChatWidget() {
         s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}/default?lang=pt`;
         s1.charset = 'UTF-8';
         s1.setAttribute('crossorigin', '*');
+        s1.id = 'flux-tawk-script';
         document.head.appendChild(s1);
         chatWidgetBooted = true;
+        ensureTawkWidgetVisible();
         return;
     }
 
@@ -110,6 +113,27 @@ function bootChatWidget() {
         chatWidgetBooted = true;
         return;
     }
+}
+
+function ensureTawkWidgetVisible() {
+    if (tawkVisibilitySyncStarted) return;
+    tawkVisibilitySyncStarted = true;
+    const run = () => {
+        try {
+            if (window.Tawk_API && typeof window.Tawk_API.showWidget === 'function') {
+                window.Tawk_API.showWidget();
+            }
+        } catch (_e) { }
+    };
+    run();
+    setInterval(() => {
+        if (!shouldBootChatWidget()) return;
+        const hasScript = !!document.getElementById('flux-tawk-script');
+        if (!hasScript && !chatWidgetBooted) {
+            bootChatWidget();
+        }
+        run();
+    }, 5000);
 }
 
 function unscrambleSMS(text) {
