@@ -15,6 +15,7 @@ db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 const IS_PORTAL_PATH = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
 const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true && IS_PORTAL_PATH;
 const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
+const ROOT_ADMIN_EMAIL = 'iarachorta@gmail.com';
 
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
@@ -255,6 +256,7 @@ window.showView = function (viewName) {
 
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
+    if (viewName === 'security') loadSecurityPanel();
     if (viewName === 'partners') loadPartnerProfiles();
     if (viewName === 'dashboard' && currentUserIsPartner) loadPartnerChipsMonitor();
 };
@@ -338,6 +340,95 @@ async function handleAuth(type) {
 async function handleLogout() {
     await db.auth.signOut();
 }
+
+function loadSecurityPanel() {
+    const adminBlock = document.getElementById('security-admin-block');
+    if (adminBlock) {
+        const canManageOthers = currentUserIsAdmin && currentUser?.email?.toLowerCase() === ROOT_ADMIN_EMAIL;
+        adminBlock.style.display = canManageOthers ? 'block' : 'none';
+    }
+    const selfMsg = document.getElementById('security-self-msg');
+    const adminMsg = document.getElementById('security-admin-msg');
+    if (selfMsg) selfMsg.textContent = '';
+    if (adminMsg) adminMsg.textContent = '';
+}
+
+window.submitSelfPasswordChange = async function () {
+    const passEl = document.getElementById('security-self-password');
+    const confEl = document.getElementById('security-self-password-confirm');
+    const msgEl = document.getElementById('security-self-msg');
+    const password = passEl ? passEl.value : '';
+    const confirm = confEl ? confEl.value : '';
+
+    if (!password || password.length < 8) {
+        if (msgEl) msgEl.textContent = 'A senha precisa ter pelo menos 8 caracteres.';
+        return;
+    }
+    if (password !== confirm) {
+        if (msgEl) msgEl.textContent = 'A confirmação da senha não confere.';
+        return;
+    }
+
+    const { error } = await db.auth.updateUser({ password });
+    if (error) {
+        if (msgEl) msgEl.textContent = 'Falha ao atualizar senha: ' + error.message;
+        return;
+    }
+
+    if (passEl) passEl.value = '';
+    if (confEl) confEl.value = '';
+    if (msgEl) msgEl.textContent = 'Senha atualizada com sucesso.';
+};
+
+window.submitAdminPasswordChange = async function () {
+    const msgEl = document.getElementById('security-admin-msg');
+    const emailEl = document.getElementById('security-admin-email');
+    const passEl = document.getElementById('security-admin-password');
+    const email = emailEl ? emailEl.value.trim().toLowerCase() : '';
+    const newPassword = passEl ? passEl.value : '';
+
+    const canManageOthers = currentUserIsAdmin && currentUser?.email?.toLowerCase() === ROOT_ADMIN_EMAIL;
+    if (!canManageOthers) {
+        if (msgEl) msgEl.textContent = 'Apenas a conta admin autorizada pode trocar senha de outros usuários.';
+        return;
+    }
+    if (!email) {
+        if (msgEl) msgEl.textContent = 'Informe o e-mail do usuário.';
+        return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+        if (msgEl) msgEl.textContent = 'A nova senha precisa ter no mínimo 8 caracteres.';
+        return;
+    }
+
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        if (msgEl) msgEl.textContent = 'Sessão expirada. Faça login novamente.';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/admin/security/reset-password`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, new_password: newPassword })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            if (msgEl) msgEl.textContent = 'Falha: ' + (j.detail || j.error || res.statusText);
+            return;
+        }
+
+        if (emailEl) emailEl.value = '';
+        if (passEl) passEl.value = '';
+        if (msgEl) msgEl.textContent = 'Senha do usuário atualizada com sucesso.';
+    } catch (err) {
+        if (msgEl) msgEl.textContent = 'Erro de rede: ' + (err.message || String(err));
+    }
+};
 
 // === PIX ===
 const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
@@ -722,6 +813,7 @@ async function updateUIForUser() {
     }
 
     syncPartnerPanelsVisibility();
+    loadSecurityPanel();
 }
 
 function escapeHtml(str) {

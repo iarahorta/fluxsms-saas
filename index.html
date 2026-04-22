@@ -7,8 +7,8 @@
     <title>FluxSMS | Números Virtuais de Elite</title>
     <meta name="description"
         content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
-    <link rel="icon" type="image/png" href="/favicon.png?v=2.1.3">
-    <link rel="stylesheet" href="/style.css?v=2.1.3">
+    <link rel="icon" type="image/png" href="/favicon.png?v=2.1.4">
+    <link rel="stylesheet" href="/style.css?v=2.1.4">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
@@ -59,7 +59,7 @@
                     </div>
                 </div>
                 <div class="hero-image">
-                    <img src="/assets/hero_luxury.png?v=2.1.3" alt="FluxSMS Luxury SIM" id="hero-img-main">
+                    <img src="/assets/hero_luxury.png?v=2.1.4" alt="FluxSMS Luxury SIM" id="hero-img-main">
                 </div>
             </div>
         </section>
@@ -156,7 +156,7 @@
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-top">
                     <div class="logo-area">
-                        <img src="/assets/logo.png?v=2.1.3" alt="FluxSMS" class="logo-img"
+                        <img src="/assets/logo.png?v=2.1.4" alt="FluxSMS" class="logo-img"
                             onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
                         <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span
                                 class="logo-sms">SMS</span></span>
@@ -182,6 +182,8 @@
                         Recarregar Saldo</a>
                     <a href="javascript:void(0)" onclick="showView('history')" class="nav-item hide-for-partner" id="nav-history"><span
                             class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="showView('security')" class="nav-item hide-for-partner" id="nav-security"><span
+                            class="icon">🔐</span> Segurança</a>
                     <a href="/partner" class="nav-item nav-item-fornecedor-mobile"><span class="icon">💰</span>
                         Seja um fornecedor</a>
                     <a href="javascript:void(0)" onclick="showView('partners')" class="nav-item nav-partners-admin"
@@ -353,6 +355,31 @@
                     </div>
                 </section>
 
+                <!-- VIEW: SEGURANÇA — cliente + admin -->
+                <section id="view-security" class="admin-section app-view hide-for-partner" style="display:none; margin: 20px;">
+                    <h2 class="section-title">SEGURANÇA DA CONTA</h2>
+                    <p style="color: rgba(255,255,255,0.45); margin: 10px 0 18px;">Altere sua senha com segurança sem precisar acessar o banco manualmente.</p>
+
+                    <div style="max-width: 480px; padding: 16px; background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid rgba(212,175,55,0.22);">
+                        <label style="font-size: 12px; opacity: 0.85;">Nova senha</label>
+                        <input type="password" id="security-self-password" class="custom-value" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                        <label style="font-size: 12px; opacity: 0.85;">Confirmar nova senha</label>
+                        <input type="password" id="security-self-password-confirm" class="custom-value" placeholder="Repita a nova senha" autocomplete="new-password">
+                        <button type="button" class="btn-pix" onclick="submitSelfPasswordChange()">Atualizar minha senha</button>
+                        <p id="security-self-msg" style="font-size: 11px; margin-top: 10px; color: rgba(255,255,255,0.65);"></p>
+                    </div>
+
+                    <div id="security-admin-block" style="display:none; max-width: 560px; margin-top: 18px; padding: 16px; background: rgba(40, 12, 12, 0.2); border-radius: 12px; border: 1px solid rgba(212,175,55,0.22);">
+                        <h3 style="font-size: 13px; color: var(--flux-gold); margin-bottom: 10px;">Painel Admin (somente conta autorizada)</h3>
+                        <label style="font-size: 12px; opacity: 0.85;">E-mail do usuário</label>
+                        <input type="email" id="security-admin-email" class="custom-value" placeholder="usuario@email.com" autocomplete="off">
+                        <label style="font-size: 12px; opacity: 0.85;">Nova senha do usuário</label>
+                        <input type="password" id="security-admin-password" class="custom-value" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                        <button type="button" class="btn-pix" onclick="submitAdminPasswordChange()">Trocar senha do usuário</button>
+                        <p id="security-admin-msg" style="font-size: 11px; margin-top: 10px; color: rgba(255,255,255,0.65);"></p>
+                    </div>
+                </section>
+
                 <!-- VIEW: PARCEIROS (parceiro: repasse + regras | admin: lista API) -->
                 <section id="view-partners" class="admin-section app-view partner-dashboard-view" style="display:none; margin: 20px;">
                     <div id="partner-finance-panel" class="partner-finance-panel" style="display:none;">
@@ -482,7 +509,7 @@
 
 
     <!-- SCRIPTS -->
-    <script src="/dist/app.shield.js?v=2.1.3"></script>
+    <script src="/dist/app.shield.js?v=2.1.4"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function toggleLandingMenu() {

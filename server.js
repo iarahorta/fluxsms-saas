@@ -11,6 +11,7 @@ const webhookRouter = require('./routes/webhook');
 const smsRouter = require('./routes/sms');
 const partnerApiRouter = require('./routes/partnerApi');
 const adminPartnersRouter = require('./routes/adminPartners');
+const adminSecurityRouter = require('./routes/adminSecurity');
 const partnerFinanceRouter = require('./routes/partnerFinance');
 const partnerOnboardingRouter = require('./routes/partnerOnboarding');
 const partnerSelfRouter = require('./routes/partnerSelf');
@@ -79,12 +80,13 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
 app.use('/partner-api', partnerApiRouter); // API universal para parceiros
 app.use('/api/admin/partners', adminPartnersRouter); // Dashboard admin: lista de parceiros (JWT + is_admin)
+app.use('/api/admin/security', adminSecurityRouter); // Admin raiz: gestão de senhas de usuários
 app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resumo repasse + pedido de saque (JWT + is_partner)
 app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autónomo: ativar perfil parceiro (JWT)
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
-const VERSION = '2.1.3';
+const VERSION = '2.1.4';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
