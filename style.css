@@ -1831,15 +1831,4 @@ body.flux-partner-portal.partner-mode #view-dashboard {
     padding: 8px 0 24px;
 }
 
-/* Tawk.to: ocultar "attention grabber" (chamada visual). */
-[class*="tawk-attention"],
-[id*="tawk-attention"],
-[class*="attention-grabber"],
-[id*="attention-grabber"] {
-    display: none !important;
-}
-
-/* Evita barra lateral extra por overflow horizontal */
-html, body {
-    overflow-x: hidden;
-}
+/* Tawk.to: sem ocultaç?o forçada global (evita esconder o widget inteiro). */
