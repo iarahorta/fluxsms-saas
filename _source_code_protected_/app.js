@@ -63,24 +63,11 @@ function shouldBootChatWidget() {
 function bootChatWidget() {
     if (chatWidgetBooted || !shouldBootChatWidget()) return;
     const cfg = window.__FLUX_CHAT_CONFIG || {};
-    const providerRaw = String(cfg.provider || '').toLowerCase();
-    const provider = providerRaw.includes('tawk') ? 'tawk' : providerRaw;
     const hasCrisp = !!cfg.crispWebsiteId;
     const hasTawk = !!(cfg.tawkPropertyId && cfg.tawkWidgetId);
 
-    if (provider === 'crisp' && hasCrisp) {
-        window.$crisp = window.$crisp || [];
-        window.CRISP_WEBSITE_ID = cfg.crispWebsiteId;
-        const s = document.createElement('script');
-        s.src = 'https://client.crisp.chat/l.js';
-        s.async = true;
-        document.head.appendChild(s);
-        chatWidgetBooted = true;
-        return;
-    }
-
-    // Fallback robusto: se provider vier inválido/incompatível, mas houver IDs Tawk, sobe Tawk.
-    if ((provider === 'tawk' || !hasCrisp || !provider) && hasTawk) {
+    // Prioridade total para Tawk quando IDs estiverem presentes.
+    if (hasTawk) {
         window.Tawk_API = window.Tawk_API || {};
         window.Tawk_LoadStart = new Date();
         window.Tawk_API.visitor = {
@@ -91,8 +78,6 @@ function bootChatWidget() {
                 window.Tawk_API.setAttributes({
                     name: 'Cliente FluxSMS'
                 }, function (_error) { });
-
-                // Força textos do painel para PT-BR dentro do schema solicitado.
                 window.Tawk_API.localize = {
                     en: {
                         chat_window: {
@@ -112,6 +97,18 @@ function bootChatWidget() {
         s1.setAttribute('crossorigin', '*');
         document.head.appendChild(s1);
         chatWidgetBooted = true;
+        return;
+    }
+
+    if (provider === 'crisp' && hasCrisp) {
+        window.$crisp = window.$crisp || [];
+        window.CRISP_WEBSITE_ID = cfg.crispWebsiteId;
+        const s = document.createElement('script');
+        s.src = 'https://client.crisp.chat/l.js';
+        s.async = true;
+        document.head.appendChild(s);
+        chatWidgetBooted = true;
+        return;
     }
 }
 
