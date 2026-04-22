@@ -11,7 +11,7 @@ let currentUser = null;
 
 db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/** true quando index é servido em parceiros.fluxsms.com.br (flag injectada no head pelo server.js) */
+/** true quando o servidor injeta window.__FLUX_PARTNER_PORTAL (host parceiros.* ou Staging com FORCE_PARTNER_PORTAL=1). */
 const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true;
 
 // === LISTA DE SERVIÇOS ===
@@ -65,6 +65,11 @@ async function init() {
     }
 
     const { data: { session } } = await db.auth.getSession();
+    if (IS_PARTNER_PORTAL && !session) {
+        window.location.replace('/p/login');
+        return;
+    }
+
     toggleViews(session);
 
     setupRealtimeChips();
@@ -118,7 +123,7 @@ async function init() {
     }
 
     const parceiroLogin = new URLSearchParams(window.location.search).get('parceiro') === 'login';
-    if (!session && authModal && (IS_PARTNER_PORTAL || parceiroLogin)) {
+    if (!IS_PARTNER_PORTAL && !session && authModal && parceiroLogin) {
         authModal.style.display = 'flex';
         const login = document.getElementById('loginForm');
         const signup = document.getElementById('signupForm');
@@ -126,17 +131,13 @@ async function init() {
             login.style.display = 'block';
             signup.style.display = 'none';
         }
-    }
-    if (parceiroLogin) {
-        history.replaceState({}, '', IS_PARTNER_PORTAL ? (window.location.pathname || '/') : '/');
-    } else if (IS_PARTNER_PORTAL && !session) {
-        history.replaceState({}, '', window.location.pathname || '/');
+        history.replaceState({}, '', '/');
     }
 
     db.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN') {
             currentUser = session?.user;
-            authModal.style.display = 'none';
+            if (!IS_PARTNER_PORTAL && authModal) authModal.style.display = 'none';
             toggleViews(session);
             if (session) {
                 if (PARTNER_UI_FORCE_VISIBLE) {
@@ -160,7 +161,7 @@ async function init() {
             currentUserIsPartner = false;
             document.body.classList.remove('partner-mode');
             if (IS_PARTNER_PORTAL) {
-                window.location.reload();
+                window.location.replace('/p/login');
                 return;
             }
             const partnerWrap = document.getElementById('partner-header-wrap');
@@ -549,37 +550,42 @@ async function updateUIForUser() {
     currentUserIsPartner = !!profile.is_partner;
 
     if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
-        alert('Este portal (parceiros.fluxsms.com.br) é exclusivo para fornecedores com perfil parceiro. Use fluxsms.com.br para contas de cliente.');
+        alert('Este portal é exclusivo para fornecedores com perfil parceiro activo.');
         await db.auth.signOut();
+        window.location.replace('/p/login');
         return;
     }
 
-    const b = `R$ ${profile.balance.toFixed(2)}`;
-    if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
-    if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
+    if (!IS_PARTNER_PORTAL) {
+        const b = `R$ ${profile.balance.toFixed(2)}`;
+        if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
+        if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
 
-    // --- FIDELIDADE INTELIGENTE ---
-    const total = profile.total_recharged || 0;
-    let pClass = 'badge-bronze';
-    userFidelityLevel = 'BRONZE';
-    userDiscountFactor = 0;
+        // --- FIDELIDADE INTELIGENTE ---
+        const total = profile.total_recharged || 0;
+        let pClass = 'badge-bronze';
+        userFidelityLevel = 'BRONZE';
+        userDiscountFactor = 0;
 
-    if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
-    else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
-    else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
+        if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
+        else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
+        else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
 
-    const b1 = document.getElementById('fidelity-badge');
-    const b2 = document.getElementById('fidelity-badge-mobile');
-    if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
-    if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
-    // ------------------------------
+        const b1 = document.getElementById('fidelity-badge');
+        const b2 = document.getElementById('fidelity-badge-mobile');
+        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
+        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+        // ------------------------------
+    }
 
     if (document.getElementById('user-initials') && profile.full_name) {
         document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     }
     const partnerWrap = document.getElementById('partner-header-wrap');
     const navPartners = document.getElementById('nav-partners');
-    const showPartnerUi = !!profile.is_admin || PARTNER_UI_FORCE_VISIBLE || currentUserIsPartner;
+    const showPartnerUi = IS_PARTNER_PORTAL
+        ? !!currentUserIsPartner
+        : (!!profile.is_admin || PARTNER_UI_FORCE_VISIBLE || currentUserIsPartner);
     if (partnerWrap) partnerWrap.style.display = showPartnerUi ? 'inline-flex' : 'none';
     if (navPartners) navPartners.style.display = showPartnerUi ? 'flex' : 'none';
 

@@ -187,7 +187,7 @@
         </div>
 
         <div class="footer-links">
-            <a id="pr-login-portal" href="https://parceiros.fluxsms.com.br/?parceiro=login">Já tenho conta — entrar</a>
+            <a id="pr-login-portal" href="https://parceiros.fluxsms.com.br/p/login">Já tenho conta — entrar</a>
             <a href="/termos/">Termos</a>
         </div>
     </div>
@@ -204,15 +204,19 @@
         const msgEl = document.getElementById('pr-msg');
         const btn = document.getElementById('pr-submit');
 
-        function fluxPartnerPortalOrigin() {
+        function fluxPartnerPortalBase() {
             var h = location.hostname;
-            if (/railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1') return location.origin;
+            if (/^parceiros\./i.test(h) || /railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1') {
+                return location.origin;
+            }
             return 'https://parceiros.fluxsms.com.br';
         }
+        function fluxPartnerLoginUrl() {
+            return fluxPartnerPortalBase() + '/p/login';
+        }
         (function () {
-            var po = fluxPartnerPortalOrigin();
             var a = document.getElementById('pr-login-portal');
-            if (a) a.setAttribute('href', po + '/?parceiro=login');
+            if (a) a.setAttribute('href', fluxPartnerLoginUrl());
         })();
 
         function setMsg(text, ok) {
@@ -256,7 +260,7 @@
 
                 let session = data.session;
                 if (!session && data.user) {
-                    setMsg('Se o projeto exigir confirmação de e-mail, abra o link enviado e depois entre em fluxsms.com → Parceiros. A tentar login imediato…');
+                    setMsg('Se o projeto exigir confirmação de e-mail, abra o link enviado e depois entre no portal de parceiros em ' + fluxPartnerLoginUrl() + '. A tentar login imediato…');
                     const login = await db.auth.signInWithPassword({ email: email, password: password });
                     if (login.error) throw login.error;
                     session = login.data.session;
@@ -271,7 +275,7 @@
                     window.prompt('COPIE AGORA a sua Partner API Key (única, fixa, vincula ao 1.º PC do Worker). Guarde em local seguro:', act.api_key);
                 }
                 setMsg('Conta pronta. A redirecionar para o painel…', true);
-                window.location.href = fluxPartnerPortalOrigin() + '/';
+                window.location.href = fluxPartnerPortalBase() + '/';
             } catch (e) {
                 setMsg(e.message || String(e));
             } finally {
