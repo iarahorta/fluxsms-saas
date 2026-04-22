@@ -11,6 +11,9 @@ let currentUser = null;
 
 db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+/** true quando index é servido em parceiros.fluxsms.com.br (flag injectada no head pelo server.js) */
+const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true;
+
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
     { id: 'whatsapp', name: 'WhatsApp', price: 6.10 },
@@ -56,6 +59,11 @@ async function init() {
         return;
     }
 
+    if (IS_PARTNER_PORTAL) {
+        document.body.classList.add('flux-partner-portal');
+        document.title = 'FluxSMS | Portal Parceiros';
+    }
+
     const { data: { session } } = await db.auth.getSession();
     toggleViews(session);
 
@@ -87,7 +95,7 @@ async function init() {
             loadPartnerChipsMonitor();
             showView('dashboard');
         }
-    } else {
+    } else if (!IS_PARTNER_PORTAL) {
         fetchGlobalServices().catch(e => console.log("Erro ao carregar preços"));
         loadChipsCount();
         renderServices(SERVICES);
@@ -110,17 +118,19 @@ async function init() {
     }
 
     const parceiroLogin = new URLSearchParams(window.location.search).get('parceiro') === 'login';
-    if (parceiroLogin) {
-        if (!session && authModal) {
-            authModal.style.display = 'flex';
-            const login = document.getElementById('loginForm');
-            const signup = document.getElementById('signupForm');
-            if (login && signup) {
-                login.style.display = 'block';
-                signup.style.display = 'none';
-            }
+    if (!session && authModal && (IS_PARTNER_PORTAL || parceiroLogin)) {
+        authModal.style.display = 'flex';
+        const login = document.getElementById('loginForm');
+        const signup = document.getElementById('signupForm');
+        if (login && signup) {
+            login.style.display = 'block';
+            signup.style.display = 'none';
         }
-        history.replaceState({}, '', '/');
+    }
+    if (parceiroLogin) {
+        history.replaceState({}, '', IS_PARTNER_PORTAL ? (window.location.pathname || '/') : '/');
+    } else if (IS_PARTNER_PORTAL && !session) {
+        history.replaceState({}, '', window.location.pathname || '/');
     }
 
     db.auth.onAuthStateChange(async (event, session) => {
@@ -149,12 +159,16 @@ async function init() {
             currentUserIsAdmin = false;
             currentUserIsPartner = false;
             document.body.classList.remove('partner-mode');
+            if (IS_PARTNER_PORTAL) {
+                window.location.reload();
+                return;
+            }
             const partnerWrap = document.getElementById('partner-header-wrap');
             const navPartners = document.getElementById('nav-partners');
             if (partnerWrap) partnerWrap.style.display = 'none';
             if (navPartners) navPartners.style.display = 'none';
             toggleViews(null);
-            if (landingView.style.display === 'none') {
+            if (!IS_PARTNER_PORTAL && landingView.style.display === 'none') {
                 window.location.reload();
             }
         }
@@ -162,6 +176,16 @@ async function init() {
 }
 
 function toggleViews(session) {
+    if (IS_PARTNER_PORTAL) {
+        landingView.style.display = 'none';
+        if (session) {
+            dashboardView.style.display = 'block';
+            showView('dashboard');
+        } else {
+            dashboardView.style.display = 'none';
+        }
+        return;
+    }
     if (session) {
         landingView.style.display = 'none';
         dashboardView.style.display = 'block';
@@ -175,6 +199,10 @@ function toggleViews(session) {
 // === NAVEGAÇÃO DE ABAS (SPA) ===
 window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
+
+    if (IS_PARTNER_PORTAL && (viewName === 'my-numbers' || viewName === 'history')) {
+        viewName = 'dashboard';
+    }
 
     if (currentUserIsPartner && (viewName === 'my-numbers' || viewName === 'history')) {
         viewName = 'dashboard';
@@ -519,6 +547,13 @@ async function updateUIForUser() {
 
     currentUserIsAdmin = !!profile.is_admin;
     currentUserIsPartner = !!profile.is_partner;
+
+    if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
+        alert('Este portal (parceiros.fluxsms.com.br) é exclusivo para fornecedores com perfil parceiro. Use fluxsms.com.br para contas de cliente.');
+        await db.auth.signOut();
+        return;
+    }
+
     const b = `R$ ${profile.balance.toFixed(2)}`;
     if (document.getElementById('balance-display')) document.getElementById('balance-display').innerText = b;
     if (document.getElementById('balance-display-mobile')) document.getElementById('balance-display-mobile').innerText = b;
@@ -548,7 +583,7 @@ async function updateUIForUser() {
     if (partnerWrap) partnerWrap.style.display = showPartnerUi ? 'inline-flex' : 'none';
     if (navPartners) navPartners.style.display = showPartnerUi ? 'flex' : 'none';
 
-    if (profile.is_admin && !document.getElementById('btn-admin-link')) {
+    if (profile.is_admin && !IS_PARTNER_PORTAL && !document.getElementById('btn-admin-link')) {
         const nav = document.querySelector('.main-nav');
         const a = document.createElement('a');
         a.id = 'btn-admin-link'; a.href = 'admindiretoria/index.html'; a.className = 'nav-item';
@@ -996,7 +1031,11 @@ function updateCardWithSMS(id, code) {
     }
 }
 
-window.abrirRecarga = () => { document.getElementById('modalRecarga').style.display = 'flex'; };
+window.abrirRecarga = () => {
+    if (IS_PARTNER_PORTAL) return;
+    const m = document.getElementById('modalRecarga');
+    if (m) m.style.display = 'flex';
+};
 window.fecharRecarga = () => { document.getElementById('modalRecarga').style.display = 'none'; clearInterval(pixCheckInterval); };
 
 init();

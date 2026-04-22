@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const proxy = require('express-http-proxy');
@@ -40,13 +41,14 @@ app.use('/supabase-api', proxy(process.env.SUPABASE_URL, {
 }));
 
 // ─── Middlewares Base ─────────────────────────────────────────
-app.use(cors({ 
+app.use(cors({
     origin: [
-        'https://fluxsms.com.br', 
+        'https://fluxsms.com.br',
         'https://www.fluxsms.com.br',
-        'https://fluxsms-staging-production.up.railway.app' // Liberando Laboratório
+        'https://parceiros.fluxsms.com.br',
+        'https://fluxsms-staging-production.up.railway.app'
     ],
-    credentials: true 
+    credentials: true
 }));
 
 // express.json() agora fica DEPOIS do proxy
@@ -74,7 +76,27 @@ app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autóno
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
 // Health check
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.3', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '2.0.4', ts: new Date().toISOString() }));
+
+function isPartnerPortalHost(req) {
+    const host = (req.get('host') || '').split(':')[0].toLowerCase();
+    return host === 'parceiros.fluxsms.com.br' || host.startsWith('parceiros.');
+}
+
+function sendIndexHtml(req, res) {
+    try {
+        if (!isPartnerPortalHost(req)) {
+            return res.sendFile(path.join(__dirname, 'index.html'));
+        }
+        let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+        if (!html.includes('window.__FLUX_PARTNER_PORTAL=true')) {
+            html = html.replace('<head>', '<head>\n    <script>window.__FLUX_PARTNER_PORTAL=true</script>');
+        }
+        res.type('html').send(html);
+    } catch (err) {
+        res.status(500).send('index_read_failed');
+    }
+}
 
 // ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
 // Negar acesso manual a qualquer arquivo na pasta de fontes originais
@@ -141,8 +163,8 @@ publicFolders.forEach(folder => {
 app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));
 
 // Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/', sendIndexHtml);
+app.get('/index.html', sendIndexHtml);
 const sendPartnerRegister = (_req, res) => res.sendFile(path.join(__dirname, 'partner-register.html'));
 const sendPartnerLanding = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
 app.get('/partner/register', sendPartnerRegister);
