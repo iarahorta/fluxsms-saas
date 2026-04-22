@@ -79,6 +79,25 @@ function bootChatWidget() {
     if (provider === 'tawk' && cfg.tawkPropertyId && cfg.tawkWidgetId) {
         window.Tawk_API = window.Tawk_API || {};
         window.Tawk_LoadStart = new Date();
+        window.Tawk_API.onLoad = function () {
+            try {
+                window.Tawk_API.setAttributes({
+                    name: 'Cliente FluxSMS'
+                }, function (_error) { });
+
+                // Força textos do painel para PT-BR dentro do schema solicitado.
+                window.Tawk_API.localize = {
+                    en: {
+                        chat_window: {
+                            live_chat: 'Suporte FluxSMS',
+                            away_message: 'No momento não estamos online, deixe sua mensagem.',
+                            send_message: 'Enviar Mensagem',
+                            input_placeholder: 'Digite sua dúvida aqui...'
+                        }
+                    }
+                };
+            } catch (_e) { }
+        };
         const s1 = document.createElement('script');
         s1.async = true;
         s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}`;

@@ -1830,3 +1830,11 @@ body.flux-partner-portal.partner-mode #view-dashboard {
     width: 100%;
     padding: 8px 0 24px;
 }
+
+/* Tawk.to: ocultar "attention grabber" (m?ozinha/chamada visual). */
+[class*="tawk-attention"],
+[id*="tawk-attention"],
+iframe[title*="attention" i],
+iframe[title*="grabber" i] {
+    display: none !important;
+}
