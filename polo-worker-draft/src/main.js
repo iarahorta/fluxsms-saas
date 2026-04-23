@@ -517,7 +517,7 @@ async function fetchUpdateInfo() {
     return { ok: false, error: 'Resposta inválida do servidor.' };
   }
   const remote = String(data.version || '').trim();
-  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.1.exe`;
+  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.2.exe`;
   const notes = String(data.notes || '').trim();
   if (!remote) {
     return { ok: false, error: 'Ficheiro desktop-update.json sem campo «version».' };
@@ -813,14 +813,46 @@ ipcMain.handle('partner:modems', async () => {
   } catch (err) {
     pushLog(`[WARN] Monitor API indisponível: ${err.message || err}`);
   }
+  try {
+    const polo_chave2 = String(store.get('poloChave') || '').trim();
+    const { data: chipPayload } = await apiClient().get('/partner-api/worker/chips', { params: { polo_chave: polo_chave2 } });
+    if (chipPayload && chipPayload.ok) {
+      (chipPayload.chips || []).forEach((c) => {
+        const port = String(c.porta || '').toUpperCase();
+        if (!port) return;
+        if (!map[port]) {
+          map[port] = {
+            porta: c.porta || port,
+            numero: '—',
+            operadora: c.operadora || '—',
+            status: 'OFF',
+            profit: 0,
+            lastActivationAt: null
+          };
+        }
+        const rawNum = c.numero != null ? String(c.numero).trim() : '';
+        if (rawNum && rawNum !== '—') {
+          const digits = rawNum.replace(/\D/g, '');
+          if (digits.length >= 8 && (map[port].numero === '—' || !map[port].numero)) {
+            map[port].numero = digits;
+          }
+        }
+        if (c.operadora && String(c.operadora).trim() && map[port].operadora === '—') {
+          map[port].operadora = String(c.operadora);
+        }
+      });
+    }
+  } catch (err2) {
+    pushLog(`[WARN] Chips API indisponível: ${err2.message || err2}`);
+  }
   return Object.values(map).sort((a, b) => String(a.porta).localeCompare(String(b.porta)));
 });
 
 ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
   const poloChave = String(store.get('poloChave') || '').trim();
   const port = String(porta || '').trim();
-  if (!poloChave || !port) {
-    return { ok: false, error: 'Sessão ou porta inválida.' };
+  if (!port) {
+    return { ok: false, error: 'Porta inválida.' };
   }
   const client = apiClient();
   try {

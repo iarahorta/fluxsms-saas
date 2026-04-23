@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.1.exe",
-  "notes": "0.4.1: instalador com nome versionado (FluxSMS.x.y.z.exe) para validação imediata da versão; update in-place automático; AppData preservado; importação TXT (CCID + número) mantida."
+  "version": "0.4.2",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.2.exe",
+  "notes": "0.4.2: correção polo/estação (código parceiro vs chave) + lista de chips no monitor; modal de vendas sem 403 em estação única."
 }
