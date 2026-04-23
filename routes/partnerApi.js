@@ -104,6 +104,29 @@ async function resolvePoloForPartnerWorker(supabase, partnerId, poloChaveRaw) {
   };
 }
 
+async function listPolosFromPartner(supabase, partnerId) {
+  const { data, error } = await supabase
+    .from('polos')
+    .select('id, partner_profile_id, nome, status, ultima_comunicacao')
+    .eq('partner_profile_id', partnerId);
+  if (error) {
+    return { ok: false, status: 500, body: { ok: false, error: 'polos_list_failed', detail: error.message } };
+  }
+  const polos = data || [];
+  if (!polos.length) {
+    return {
+      ok: false,
+      status: 404,
+      body: {
+        ok: false,
+        error: 'polo_nao_encontrado',
+        detail: 'Nenhuma estação (polo) ligada a este parceiro. Peça à FluxSMS para criar/vincular a estação.'
+      }
+    };
+  }
+  return { ok: true, polos };
+}
+
 router.get('/docs', (_req, res) => {
   res.json({
     ok: true,
@@ -186,16 +209,15 @@ router.post('/chips', async (req, res) => {
  */
 router.get('/worker/activations', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const polo_chave = req.query.polo_chave;
     try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
+        const polosScope = await listPolosFromPartner(supabase, req.partner.id);
+        if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+        const poloIds = polosScope.polos.map((p) => p.id);
 
         const { data: chips, error: chipErr } = await supabase
             .from('chips')
             .select('id, porta, numero')
-            .eq('polo_id', polo.id);
+            .in('polo_id', poloIds);
         if (chipErr) {
             return res.status(500).json({ ok: false, error: 'chips_list_failed', detail: chipErr.message });
         }
@@ -235,21 +257,20 @@ router.get('/worker/activations', async (req, res) => {
  */
 router.get('/worker/chips', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const polo_chave = req.query.polo_chave;
     try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
+        const polosScope = await listPolosFromPartner(supabase, req.partner.id);
+        if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+        const poloIds = polosScope.polos.map((p) => p.id);
 
         const { data: chips, error: chipErr } = await supabase
             .from('chips')
             .select('id, porta, numero, status, operadora, disponivel_em')
-            .eq('polo_id', polo.id)
+            .in('polo_id', poloIds)
             .order('porta');
         if (chipErr) {
             return res.status(500).json({ ok: false, error: 'chips_list_failed', detail: chipErr.message });
         }
-        return res.json({ ok: true, chips: chips || [], polo: { id: polo.id, nome: polo.nome } });
+        return res.json({ ok: true, chips: chips || [], polos: polosScope.polos });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'worker_chips_failed', detail: err.message });
     }
@@ -261,7 +282,6 @@ router.get('/worker/chips', async (req, res) => {
  */
 router.get('/worker/chip-activations', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const polo_chave = req.query.polo_chave;
     const porta = req.query.porta;
     if (porta == null || String(porta).trim() === '') {
         return res.status(400).json({ ok: false, error: 'polo_chave_e_porta_obrigatorias' });
@@ -269,14 +289,14 @@ router.get('/worker/chip-activations', async (req, res) => {
     const portaNorm = String(porta).trim();
     const portaUpper = portaNorm.toUpperCase();
     try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
+        const polosScope = await listPolosFromPartner(supabase, req.partner.id);
+        if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+        const poloIds = polosScope.polos.map((p) => p.id);
 
         const { data: chipRows, error: cErr } = await supabase
             .from('chips')
-            .select('id, porta, numero, operadora')
-            .eq('polo_id', polo.id);
+            .select('id, porta, numero, operadora, polo_id')
+            .in('polo_id', poloIds);
         if (cErr) {
             return res.status(500).json({ ok: false, error: 'chip_lookup_failed', detail: cErr.message });
         }
@@ -288,9 +308,10 @@ router.get('/worker/chip-activations', async (req, res) => {
                 ok: true,
                 activations: [],
                 chip: null,
-                polo: { nome: polo.nome, status: polo.status, ultima: polo.ultima_comunicacao }
+                polo: null
             });
         }
+        const polo = polosScope.polos.find((p) => p.id === chip.polo_id) || null;
 
         const { data: activations, error: actErr } = await supabase
             .from('activations')
@@ -307,7 +328,7 @@ router.get('/worker/chip-activations', async (req, res) => {
             ok: true,
             activations: activations || [],
             chip,
-            polo: { nome: polo.nome, status: polo.status, ultima: polo.ultima_comunicacao }
+            polo: polo ? { nome: polo.nome, status: polo.status, ultima: polo.ultima_comunicacao } : null
         });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'chip_activations_failed', detail: err.message });
