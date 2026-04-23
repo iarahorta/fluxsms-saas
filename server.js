@@ -288,9 +288,14 @@ app.get('/download/desktop-update.json', (_req, res) => {
 app.use(
     '/download',
     express.static(path.join(__dirname, 'public', 'download'), {
-        maxAge: 7 * 86400000,
-        setHeaders(res) {
-            res.set('Cache-Control', 'public, max-age=604800');
+        maxAge: 0,
+        setHeaders(res, filePath) {
+            if (String(filePath).toLowerCase().endsWith('fluxsms_setup.exe')) {
+                // Instalador nunca deve ficar em cache para evitar download de versão antiga.
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                return;
+            }
+            res.set('Cache-Control', 'public, max-age=300, must-revalidate');
         }
     })
 );
