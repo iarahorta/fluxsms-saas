@@ -28,7 +28,7 @@ Thumbs.db
 secrets.json
 
 # Instalador e artefatos do electron-builder (regerar: cd polo-worker-draft && npm run build-exe)
-public/download/FluxSMS_Setup.exe
+# v0.1.2: FluxSMS_Setup.exe versionado pro deploy Railway — blockmap ainda ignorado
 public/download/FluxSMS_Setup.exe.blockmap
 public/download/win-unpacked/
 public/download/builder-debug.yml
