@@ -1,5 +1,5 @@
 {
-  "version": "0.1.3",
+  "version": "0.4.0",
   "url": "https://fluxsms.com.br/download/FluxSMS_Setup.exe",
-  "notes": "0.1.3: atualização in-place (NSIS encerra o app, substitui ficheiros, reabre); dados em AppData preservados; Importar TXT em destaque; modal de vendas/ativações; sem mensagens de erro técnicas na área principal."
+  "notes": "0.4.0: release estável para instalação única; atualização in-place automática; AppData preservado; importação TXT (CCID + número) no login e no painel; monitoramento sem logs técnicos na tela principal."
 }
