@@ -1,6 +1,6 @@
 {
   "name": "fluxsms-polo-worker",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "FluxSMS Desktop — parceiros (Polo Worker + API + COM)",
   "author": "FluxSMS",
@@ -25,7 +25,7 @@
   "build": {
     "appId": "com.fluxsms.poloworker",
     "productName": "FluxSMS Desktop",
-    "artifactName": "FluxSMS_Setup.${ext}",
+    "artifactName": "FluxSMS.${version}.${ext}",
     "directories": {
       "output": "../public/download"
     },

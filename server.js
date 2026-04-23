@@ -21,6 +21,25 @@ const { validateInput } = require('./middleware/validate');
 const app = express();
 app.set('trust proxy', 1);
 
+function getDesktopUpdateMeta() {
+    try {
+        const fp = path.join(__dirname, 'public', 'download', 'desktop-update.json');
+        const raw = fs.readFileSync(fp, 'utf8');
+        const data = JSON.parse(raw);
+        const remoteUrl = String(data.url || '').trim();
+        if (!remoteUrl) return { path: '/download/FluxSMS_Setup.exe' };
+        try {
+            const u = new URL(remoteUrl);
+            return { path: `${u.pathname}${u.search || ''}` };
+        } catch {
+            if (remoteUrl.startsWith('/')) return { path: remoteUrl };
+            return { path: '/download/FluxSMS_Setup.exe' };
+        }
+    } catch {
+        return { path: '/download/FluxSMS_Setup.exe' };
+    }
+}
+
 // Redirecionamentos explícitos (legado) — antes de tudo, para o Railway/Cloud não devolver 404.
 app.get([
     '/downloads/FluxSMS-Polo-Worker-Portable.exe',
@@ -29,7 +48,7 @@ app.get([
     '/download/FluxSMS-Polo-Worker-Portable.EXE'
 ], (req, res) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-    return res.redirect(301, '/download/FluxSMS_Setup.exe');
+    return res.redirect(302, getDesktopUpdateMeta().path);
 });
 
 // Instalador legado — DEVE ficar antes de qualquer outro middleware / router
@@ -48,12 +67,12 @@ app.use((req, res, next) => {
         /^\/download\/FluxSMS-Polo-Worker-Portable\.exe\/?$/i.test(p)
     ) {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-        return res.redirect(301, '/download/FluxSMS_Setup.exe');
+        return res.redirect(302, getDesktopUpdateMeta().path);
     }
     // Qualquer /downloads/*.exe (exceto redirect específico acima) ainda comum em links viejos
     if (/^\/downloads\/[^/]+\.exe\/?$/i.test(p) && !/^\/downloads\/FluxSMS_Setup\.exe\/?$/i.test(p)) {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-        return res.redirect(301, '/download/FluxSMS_Setup.exe');
+        return res.redirect(302, getDesktopUpdateMeta().path);
     }
     next();
 });
@@ -284,13 +303,13 @@ app.get('/download/desktop-update.json', (_req, res) => {
     res.sendFile(fp);
 });
 
-// Instalador Windows (parceiros) — URL canónica: /download/FluxSMS_Setup.exe
+// Instalador Windows (parceiros) — URL canónica versionada em desktop-update.json
 app.use(
     '/download',
     express.static(path.join(__dirname, 'public', 'download'), {
         maxAge: 0,
         setHeaders(res, filePath) {
-            if (String(filePath).toLowerCase().endsWith('fluxsms_setup.exe')) {
+            if (String(filePath).toLowerCase().endsWith('.exe')) {
                 // Instalador nunca deve ficar em cache para evitar download de versão antiga.
                 res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
                 return;
@@ -299,10 +318,11 @@ app.use(
         }
     })
 );
-// Legado: redireciona nomes / caminhos antigos do instalador parceiro
-app.get('/downloads/FluxSMS_Setup.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
-app.get('/downloads/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
-app.get('/download/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
+// Legado: redireciona nomes / caminhos antigos do instalador parceiro para o artefacto atual
+app.get('/download/FluxSMS_Setup.exe', (_req, res) => res.redirect(302, getDesktopUpdateMeta().path));
+app.get('/downloads/FluxSMS_Setup.exe', (_req, res) => res.redirect(302, getDesktopUpdateMeta().path));
+app.get('/downloads/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(302, getDesktopUpdateMeta().path));
+app.get('/download/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(302, getDesktopUpdateMeta().path));
 // Pasta /downloads mantida para README ou ficheiros opcionais locais (não enviada no deploy se .railwayignore excluir downloads/)
 if (fs.existsSync(path.join(__dirname, 'downloads'))) {
     app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));

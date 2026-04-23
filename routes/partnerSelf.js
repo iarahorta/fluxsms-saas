@@ -11,13 +11,13 @@ function workerDownloadUrl(req) {
         .split(',')[0]
         .trim();
     const host = req.get('host') || 'fluxsms.com.br';
-    const sameOrigin = `${rawProto}://${host}/download/FluxSMS_Setup.exe`;
+    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.4.1.exe`;
 
     const envUrl = (process.env.POLO_WORKER_DOWNLOAD_URL || '').trim();
     if (!envUrl) return sameOrigin;
 
     // Produção: URL canónica (Railway) — use o mesmo path em fluxsms.com.br
-    if (/fluxsms\.com\.br\/download\/FluxSMS_Setup\.exe/i.test(envUrl)) {
+    if (/fluxsms\.com\.br\/download\/FluxSMS(\.|_)\d+\.\d+\.\d+\.exe/i.test(envUrl)) {
         return envUrl;
     }
 
