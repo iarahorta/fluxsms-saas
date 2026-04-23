@@ -517,7 +517,7 @@ async function fetchUpdateInfo() {
     return { ok: false, error: 'Resposta inválida do servidor.' };
   }
   const remote = String(data.version || '').trim();
-  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.4.exe`;
+  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.5.exe`;
   const notes = String(data.notes || '').trim();
   if (!remote) {
     return { ok: false, error: 'Ficheiro desktop-update.json sem campo «version».' };
@@ -846,6 +846,19 @@ ipcMain.handle('partner:modems', async () => {
     pushLog(`[WARN] Chips API indisponível: ${err2.message || err2}`);
   }
   return Object.values(map).sort((a, b) => String(a.porta).localeCompare(String(b.porta)));
+});
+
+ipcMain.handle('partner:rescan', async () => {
+  if (!workerRunning) {
+    const start = startWorker();
+    if (!start.ok) return { ok: false, error: start.error || 'Falha ao iniciar core.' };
+    return { ok: true, restarted: false, started: true };
+  }
+  // Reinicia o core para forçar nova varredura de portas/chips sem fechar o app.
+  stopWorker();
+  const start = startWorker();
+  if (!start.ok) return { ok: false, error: start.error || 'Falha ao reiniciar core.' };
+  return { ok: true, restarted: true, started: true };
 });
 
 ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {

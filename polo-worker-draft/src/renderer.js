@@ -421,7 +421,20 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
   setStatus('CORE OFFLINE', false);
 });
 
-document.getElementById('btn-refresh').addEventListener('click', refreshModems);
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  if (lastSyncEl) lastSyncEl.textContent = 'Atualização: reiniciando leitura dos chips...';
+  try {
+    const r = await poloWorker.forceRescan();
+    if (!r || !r.ok) {
+      if (lastSyncEl) lastSyncEl.textContent = `Falha ao atualizar: ${(r && r.error) || 'erro desconhecido'}`;
+      return;
+    }
+    await setStatusAndCcid();
+    await refreshModems();
+  } catch (err) {
+    if (lastSyncEl) lastSyncEl.textContent = `Falha ao atualizar: ${err.message || err}`;
+  }
+});
 
 if (btnUpdateCheck) {
   btnUpdateCheck.addEventListener('click', async () => {

@@ -1,5 +1,5 @@
 {
-  "version": "0.4.4",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.4.exe",
+  "version": "0.4.5",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.5.exe",
   "notes": "0.4.3: release leve de lançamento com importação TXT/JSON no front, modelo de lista para download e compatibilidade preservada com o core."
 }

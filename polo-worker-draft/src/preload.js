@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('poloWorker', {
   appLogout: () => ipcRenderer.invoke('app:logout'),
   serialList: () => ipcRenderer.invoke('serial:list'),
   modemRows: () => ipcRenderer.invoke('partner:modems'),
+  forceRescan: () => ipcRenderer.invoke('partner:rescan'),
   chipHistory: (porta) => ipcRenderer.invoke('partner:chipHistory', { porta }),
   ccidImportTxt: (rawText) => ipcRenderer.invoke('ccid:importTxt', { rawText }),
   updatesCheck: () => ipcRenderer.invoke('updates:check'),
