@@ -67,6 +67,14 @@
     .ccid-line { font-size: 12px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
     .ccid-line.ok { color: #7af0a2; }
     .ccid-line.err { color: #f0a0a0; }
+    .ccid-model-link {
+      color: var(--gold);
+      font-size: 11px;
+      text-decoration: underline;
+      cursor: pointer;
+      opacity: 0.92;
+    }
+    .ccid-model-link:hover { opacity: 1; }
     .hint { font-size: 12px; color: var(--muted); margin: 0; }
     .update-strip { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     h2.modem-h2 { margin: 10px 0 4px; color: var(--gold); font-size: 14px; }
@@ -160,10 +168,10 @@
       <div id="login-msg"></div>
       <div class="ccid-hero" style="margin-top:16px;padding:14px;border-radius:12px;border:1px solid var(--border);">
         <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--gold);">CCID + número (TXT)</p>
-        <p class="hint" style="margin:0 0 10px;">Ficheiro .TXT — um par por linha. <strong>Importe para deixar de ver —</strong> na tabela de modems.</p>
+        <p class="hint" style="margin:0 0 10px;">Ficheiro .TXT ou .JSON — um par por linha/chave. <strong>Importe para deixar de ver —</strong> na tabela de modems. <a href="#" class="ccid-model-link" id="ccid-model-link-login">Baixar Modelo de Lista</a></p>
         <div class="row-actions" style="justify-content:flex-start;">
           <button type="button" class="btn-txt-hero" id="btn-ccid-import-login">Importar lista TXT (CCID + Número)</button>
-          <input type="file" id="ccid-file-input-login" accept=".txt,text/plain" />
+          <input type="file" id="ccid-file-input-login" accept=".txt,.json,text/plain,application/json" />
           <span id="ccid-import-status-login" class="ccid-line">Nenhuma lista importada.</span>
         </div>
       </div>
@@ -172,7 +180,8 @@
     <section id="app-pane" class="pane" style="display:none;">
       <div class="app-toolbar">
         <button type="button" class="btn-txt-hero" id="btn-ccid-import">Importar TXT (CCID + Número)</button>
-        <input type="file" id="ccid-file-input" accept=".txt,text/plain" />
+        <input type="file" id="ccid-file-input" accept=".txt,.json,text/plain,application/json" />
+        <a href="#" class="ccid-model-link" id="ccid-model-link-app">Baixar Modelo de Lista</a>
         <span id="status-chip" class="status-chip" title="Estado do core">CORE OFFLINE</span>
         <button id="btn-refresh" class="secondary" type="button">Atualizar monitoramento</button>
         <button id="btn-update-check" class="secondary" type="button">Verificar atualização</button>

@@ -93,6 +93,95 @@ function updateCcidImportBanner(status) {
   applyCcidTextToStatusEl(ccidImportStatusLogin, status);
 }
 
+function parsePairsFromTxt(rawText) {
+  const out = [];
+  const lines = String(rawText || '').split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith(';')) continue;
+    let parts;
+    if (line.includes('\t')) parts = line.split(/\t/).map((s) => s.trim()).filter(Boolean);
+    else if (line.includes('|')) parts = line.split('|').map((s) => s.trim()).filter(Boolean);
+    else if (line.includes(';')) parts = line.split(';').map((s) => s.trim()).filter(Boolean);
+    else if (line.includes(',')) parts = line.split(',').map((s) => s.trim()).filter(Boolean);
+    else {
+      const nums = line.match(/\d{8,}/g);
+      if (nums && nums.length >= 2) parts = [nums[0], nums[1]];
+      else continue;
+    }
+    if (!parts || parts.length < 2) continue;
+    const a = String(parts[0] || '').replace(/\D/g, '');
+    const b = String(parts[1] || '').replace(/\D/g, '');
+    if (!a || !b) continue;
+    const ccid = a.length >= b.length ? a : b;
+    const numero = a.length >= b.length ? b : a;
+    if (ccid.length >= 10 && numero.length >= 8) out.push([ccid, numero]);
+  }
+  return out;
+}
+
+function parsePairsFromJson(rawText) {
+  const json = JSON.parse(String(rawText || '{}'));
+  const out = [];
+  if (Array.isArray(json)) {
+    json.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const ccidRaw = row.CCID || row.ccid || row.chip || row.iccid || '';
+      const numRaw = row.NUMERO || row.numero || row.number || row.phone || '';
+      const ccid = String(ccidRaw).replace(/\D/g, '');
+      const numero = String(numRaw).replace(/\D/g, '');
+      if (ccid.length >= 10 && numero.length >= 8) out.push([ccid, numero]);
+    });
+    return out;
+  }
+  if (json && typeof json === 'object') {
+    Object.entries(json).forEach(([k, v]) => {
+      const ccid = String(k).replace(/\D/g, '');
+      const numero = String(v == null ? '' : v).replace(/\D/g, '');
+      if (ccid.length >= 10 && numero.length >= 8) out.push([ccid, numero]);
+    });
+  }
+  return out;
+}
+
+function normalizeImportToWorkerText(fileName, rawText) {
+  const lower = String(fileName || '').toLowerCase();
+  let pairs = [];
+  if (lower.endsWith('.json')) {
+    pairs = parsePairsFromJson(rawText);
+  } else {
+    pairs = parsePairsFromTxt(rawText);
+    if (!pairs.length) {
+      try {
+        pairs = parsePairsFromJson(rawText);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  if (!pairs.length) {
+    throw new Error('Nenhum par CCID+número válido encontrado. Use TXT/JSON no modelo indicado.');
+  }
+  // Entrega em formato canónico já limpo para manter compatibilidade com o core atual.
+  return pairs.map(([ccid, numero]) => `${ccid};${numero}`).join('\n');
+}
+
+function downloadCcidModelFile() {
+  const model = {
+    '8955000000000000001': '5511999999999',
+    '8955000000000000002': '5511888888888'
+  };
+  const blob = new Blob([`${JSON.stringify(model, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'modelo_ccid_numero.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function wireCcidImport({ btn, fileInput, statusEl }) {
   if (!btn || !fileInput || !statusEl) return;
   btn.addEventListener('click', () => {
@@ -106,7 +195,8 @@ function wireCcidImport({ btn, fileInput, statusEl }) {
     statusEl.textContent = 'A ler ficheiro…';
     try {
       const rawText = await file.text();
-      const result = await poloWorker.ccidImportTxt(rawText);
+      const normalized = normalizeImportToWorkerText(file.name, rawText);
+      const result = await poloWorker.ccidImportTxt(normalized);
       if (!result.ok) {
         statusEl.textContent = result.error || 'Falha na importação.';
         statusEl.classList.add('err');
@@ -362,6 +452,20 @@ wireCcidImport({
   fileInput: ccidFileInputLogin,
   statusEl: ccidImportStatusLogin
 });
+const ccidModelLinkApp = document.getElementById('ccid-model-link-app');
+const ccidModelLinkLogin = document.getElementById('ccid-model-link-login');
+if (ccidModelLinkApp) {
+  ccidModelLinkApp.addEventListener('click', (e) => {
+    e.preventDefault();
+    downloadCcidModelFile();
+  });
+}
+if (ccidModelLinkLogin) {
+  ccidModelLinkLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    downloadCcidModelFile();
+  });
+}
 
 async function boot() {
   try {

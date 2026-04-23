@@ -1,5 +1,5 @@
 {
-  "version": "0.4.2",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.2.exe",
+  "version": "0.4.3",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.4.3.exe",
   "notes": "0.4.2: correção polo/estação (código parceiro vs chave) + lista de chips no monitor; modal de vendas sem 403 em estação única."
 }

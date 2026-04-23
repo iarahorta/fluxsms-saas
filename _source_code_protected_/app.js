@@ -671,14 +671,14 @@ async function loadPartnerAutonomyStrip() {
         if (dl) {
             const raw = (j.worker_download_url || '').trim();
             const broken = /Polo-Worker-Portable|\/downloads\//i.test(raw);
-            const href = broken || !raw ? '/download/FluxSMS.0.4.2.exe' : raw;
+            const href = broken || !raw ? '/download/FluxSMS.0.4.3.exe' : raw;
             dl.href = href;
-            dl.setAttribute('download', 'FluxSMS.0.4.2.exe');
+            dl.setAttribute('download', 'FluxSMS.0.4.3.exe');
             dl.onclick = function (ev) {
                 ev.preventDefault();
                 const a = document.createElement('a');
                 a.href = href;
-                a.download = 'FluxSMS.0.4.2.exe';
+                a.download = 'FluxSMS.0.4.3.exe';
                 a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
