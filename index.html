@@ -255,10 +255,11 @@
                     <div class="partner-lux-finance" id="partner-finance-ribbon" aria-label="Resumo financeiro">
                         <div class="partner-lux-finance-inner">
                             <div id="partner-strip-finance-line" class="partner-lux-finance-line">—</div>
+                            <button type="button" class="btn-partner-lux" id="partner-access-toggle" aria-expanded="false" onclick="togglePartnerAccessBox(event)">Mostrar chave de acesso</button>
                             <button type="button" class="btn-partner-lux" onclick="showView('partners')">Financeiro e saque</button>
                         </div>
                     </div>
-                    <div class="partner-lux-keybox" aria-label="Sua chave de acesso">
+                    <div class="partner-lux-keybox" id="partner-lux-keybox" style="display:none;" aria-label="Sua chave de acesso">
                         <h2 class="partner-lux-keybox-title">Sua Chave de Acesso</h2>
                         <p class="partner-lux-keybox-lead">E-mail, senha, a <strong>chave de integração (API)</strong> e a <strong>CHAVE DO PARCEIRO</strong> abaixo — tudo o que o app pede no primeiro acesso.</p>
                         <div class="partner-lux-profile-mini">

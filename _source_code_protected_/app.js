@@ -607,6 +607,13 @@ async function loadPartnerAutonomyStrip() {
     const strip = document.getElementById('partner-autonomy-strip');
     if (!strip || !db || !currentUserIsPartner) return;
     strip.style.display = 'block';
+    const keyBox = document.getElementById('partner-lux-keybox');
+    const keyToggle = document.getElementById('partner-access-toggle');
+    if (keyBox) keyBox.style.display = 'none';
+    if (keyToggle) {
+        keyToggle.textContent = 'Mostrar chave de acesso';
+        keyToggle.setAttribute('aria-expanded', 'false');
+    }
     const finLine = document.getElementById('partner-strip-finance-line');
     const dl = document.getElementById('partner-strip-download');
     const keyField = document.getElementById('partner-api-key-field');
@@ -772,6 +779,17 @@ window.copyPartnerApiKey = async function () {
         window.prompt('Copie manualmente:', _partnerApiKeyPlainCache);
     }
     updatePartnerProfileApiPreview();
+};
+
+window.togglePartnerAccessBox = function (ev) {
+    if (ev) ev.preventDefault();
+    const box = document.getElementById('partner-lux-keybox');
+    const btn = document.getElementById('partner-access-toggle');
+    if (!box || !btn) return;
+    const opening = box.style.display === 'none' || box.style.display === '';
+    box.style.display = opening ? 'block' : 'none';
+    btn.textContent = opening ? 'Ocultar chave de acesso' : 'Mostrar chave de acesso';
+    btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
 };
 
 async function loadPartnerChipsMonitor() {
