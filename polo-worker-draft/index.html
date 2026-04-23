@@ -52,7 +52,12 @@
     .btn-txt-hero {
       background: linear-gradient(135deg, #f0d78c, #c9a227);
       color: #111; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+      flex-shrink: 0;
+      white-space: nowrap;
+      box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.5), 0 6px 22px rgba(0, 0, 0, 0.45);
+      z-index: 1;
     }
+    .app-toolbar .btn-txt-hero { order: -1; }
     .status-chip {
       display: inline-flex; align-items: center; gap: 7px; border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.28); color: #ddd; font-size: 12px; padding: 6px 12px; user-select: none;
@@ -86,6 +91,14 @@
     .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
     .modal-backdrop.open { display: flex; }
     .num-modal { background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; max-width: 920px; width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.65); }
+    .num-modal-strip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px;
+      background: linear-gradient(180deg, #2c2c2c 0%, #222 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #b8b8b8;
+    }
+    .num-modal-strip-dot { width: 9px; height: 9px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
     .num-modal-hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
     .num-modal-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .led { width: 12px; height: 12px; border-radius: 50%; background: #2d2; flex-shrink: 0; }
@@ -158,9 +171,9 @@
 
     <section id="app-pane" class="pane" style="display:none;">
       <div class="app-toolbar">
-        <span id="status-chip" class="status-chip" title="Estado do core">CORE OFFLINE</span>
-        <button type="button" class="btn-txt-hero" id="btn-ccid-import">Importar lista TXT (CCID + Número)</button>
+        <button type="button" class="btn-txt-hero" id="btn-ccid-import">Importar TXT (CCID + Número)</button>
         <input type="file" id="ccid-file-input" accept=".txt,text/plain" />
+        <span id="status-chip" class="status-chip" title="Estado do core">CORE OFFLINE</span>
         <button id="btn-refresh" class="secondary" type="button">Atualizar monitoramento</button>
         <button id="btn-update-check" class="secondary" type="button">Verificar atualização</button>
         <button id="btn-logout" class="secondary" type="button">Sair</button>
@@ -193,6 +206,7 @@
 
   <div id="num-modal-backdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="num-modal-headline">
     <div class="num-modal" onclick="event.stopPropagation();">
+      <div class="num-modal-strip" aria-hidden="true"><span class="num-modal-strip-dot"></span> Informação · vendas e ativações</div>
       <div class="num-modal-hd">
         <div class="num-modal-title">
           <span class="led" id="num-modal-led" aria-hidden="true"></span>
@@ -205,7 +219,7 @@
       </div>
       <div class="num-modal-body">
         <div class="num-modal-left">
-          <p class="act-sub" id="act-count">Ativações (0)</p>
+          <p class="act-sub" id="act-count">Vendas / ativações (0)</p>
           <div style="overflow-x:auto">
             <table class="act-table" id="act-table">
               <thead>

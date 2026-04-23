@@ -157,8 +157,8 @@ async function refreshModems() {
       modemTableBody.appendChild(tr);
     }
     lastSyncEl.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
-  } catch (err) {
-    lastSyncEl.textContent = `Falha ao atualizar: ${err.message || err}`;
+  } catch {
+    lastSyncEl.textContent = 'Última atualização: em pausa (toque em «Atualizar monitoramento»).';
   }
 }
 
@@ -187,7 +187,7 @@ async function openNumberModal(r) {
     `;
   }
   if (actTbody) actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.7">A carregar…</td></tr>';
-  if (actCount) actCount.textContent = 'Ativações (—)';
+  if (actCount) actCount.textContent = 'Vendas / ativações (—)';
   if (actErr) { actErr.style.display = 'none'; actErr.textContent = ''; }
   if (numModalBackdrop) {
     numModalBackdrop.classList.add('open');
@@ -200,7 +200,7 @@ async function openNumberModal(r) {
       if (actTbody) {
         actTbody.innerHTML = '';
       }
-      if (actCount) actCount.textContent = 'Ativações (0)';
+      if (actCount) actCount.textContent = 'Vendas / ativações (0)';
       if (actErr) {
         actErr.textContent = emsg + (res && res.status ? ` (${res.status})` : '');
         actErr.style.display = 'block';
@@ -208,7 +208,7 @@ async function openNumberModal(r) {
       return;
     }
     const list = res.activations || [];
-    if (actCount) actCount.textContent = `Ativações (${list.length})`;
+    if (actCount) actCount.textContent = `Vendas / ativações (${list.length})`;
     if (!list.length) {
       if (actTbody) {
         actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.65">Sem ativações registadas (ou chip ainda não consta no servidor com esta porta).</td></tr>';
@@ -260,7 +260,7 @@ function applyUpdateCheckResult(r, { quiet } = {}) {
   updateBanner.classList.remove('err');
   if (!r.ok) {
     if (!quiet) {
-      updateBanner.textContent = r.error || 'Não foi possível verificar atualizações.';
+      updateBanner.textContent = 'Não foi possível verificar atualizações neste momento.';
       updateBanner.classList.add('err');
     }
     btnUpdateDownload.style.display = 'none';
@@ -339,8 +339,8 @@ if (btnUpdateCheck) {
     try {
       const r = await poloWorker.updatesCheck();
       applyUpdateCheckResult(r, { quiet: false });
-    } catch (e) {
-      applyUpdateCheckResult({ ok: false, error: e.message || String(e) }, { quiet: false });
+    } catch {
+      applyUpdateCheckResult({ ok: false }, { quiet: false });
     }
   });
 }

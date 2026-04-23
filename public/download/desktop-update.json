@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
+  "version": "0.1.3",
   "url": "https://fluxsms.com.br/download/FluxSMS_Setup.exe",
-  "notes": "0.1.2: interface parceiro — modal de ativações ao tocar no modem, import CCID+TXT em destaque, sem consola de logs, linhas ON/OFF, auth API (Bearer + X-API-Key + X-Flux-Hwid), CHAVE DO PARCEIRO."
+  "notes": "0.1.3: atualização in-place (NSIS encerra o app, substitui ficheiros, reabre); dados em AppData preservados; Importar TXT em destaque; modal de vendas/ativações; sem mensagens de erro técnicas na área principal."
 }

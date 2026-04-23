@@ -1,6 +1,6 @@
 {
   "name": "fluxsms-polo-worker",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "FluxSMS Desktop — parceiros (Polo Worker + API + COM)",
   "author": "FluxSMS",
@@ -58,7 +58,8 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "allowElevation": false,
+      "allowElevation": true,
+      "include": "build/installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,
