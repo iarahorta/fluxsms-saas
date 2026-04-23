@@ -6,13 +6,31 @@ const { decryptPartnerApiKeySecret } = require('../lib/partnerKeyVault');
 const router = express.Router();
 
 function workerDownloadUrl(req) {
-    const envUrl = process.env.POLO_WORKER_DOWNLOAD_URL;
-    if (envUrl && String(envUrl).trim()) {
-        return String(envUrl).trim();
+    const rawProto = (req.headers['x-forwarded-proto'] || req.protocol || 'https')
+        .toString()
+        .split(',')[0]
+        .trim();
+    const host = req.get('host') || 'fluxsms.com.br';
+    const sameOrigin = `${rawProto}://${host}/download/FluxSMS_Setup.exe`;
+
+    const envUrl = (process.env.POLO_WORKER_DOWNLOAD_URL || '').trim();
+    if (!envUrl) return sameOrigin;
+
+    // Produção: URL canónica (Railway) — use o mesmo path em fluxsms.com.br
+    if (/fluxsms\.com\.br\/download\/FluxSMS_Setup\.exe/i.test(envUrl)) {
+        return envUrl;
     }
-    const proto = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.get('host');
-    return `${proto}://${host}/downloads/FluxSMS-Polo-Worker-Portable.exe`;
+
+    // Legado: Portable, pasta /downloads/ antiga, ou qualquer .exe nessa pasta
+    if (
+        /FluxSMS-Polo-Worker-Portable\.exe/i.test(envUrl) ||
+        /\/downloads\/[^/]+\.exe(\?|$)/i.test(envUrl) ||
+        /\/download\/FluxSMS-Polo-Worker-Portable\.exe/i.test(envUrl)
+    ) {
+        return sameOrigin;
+    }
+
+    return envUrl;
 }
 
 router.use(requirePartnerUser);
@@ -39,6 +57,19 @@ router.get('/bootstrap', async (req, res) => {
 
         const apiKeyPlain = keyRow ? decryptPartnerApiKeySecret(keyRow) : null;
 
+        let userEmail = null;
+        let userName = null;
+        try {
+            const { data: uData } = await supabase.auth.getUser(req.partnerAuthToken);
+            if (uData?.user) {
+                userEmail = uData.user.email || null;
+                const m = uData.user.user_metadata || {};
+                userName = m.full_name || m.name || m.display_name || null;
+            }
+        } catch {
+            /* continua com null */
+        }
+
         const finance = await buildFinanceSummary(supabase, req.partnerProfile);
 
         const repassePct = finance && finance.rules && finance.rules.repasse_percent != null
@@ -47,6 +78,8 @@ router.get('/bootstrap', async (req, res) => {
 
         return res.json({
             ok: true,
+            user_email: userEmail,
+            user_name: userName,
             partner: {
                 id: req.partnerProfile.id,
                 partner_code: req.partnerProfile.partner_code,
@@ -54,6 +87,7 @@ router.get('/bootstrap', async (req, res) => {
             },
             api_key_prefix: keyRow?.key_prefix || null,
             api_key_plain: apiKeyPlain,
+            api_key_status: apiKeyPlain ? 'ok' : (keyRow ? 'decrypt_failed' : 'no_active_key'),
             finance,
             worker_download_url: workerDownloadUrl(req)
         });

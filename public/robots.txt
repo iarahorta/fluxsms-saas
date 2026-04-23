@@ -1,0 +1,14 @@
+# FluxSMS — https://fluxsms.com.br
+User-agent: *
+Allow: /
+
+# Áreas técnicas e APIs (não indexar)
+Disallow: /api/
+Disallow: /partner-api/
+Disallow: /webhook/
+Disallow: /sms/
+Disallow: /supabase-api/
+Disallow: /debug/
+Disallow: /admindiretoria/
+
+Sitemap: https://fluxsms.com.br/sitemap.xml

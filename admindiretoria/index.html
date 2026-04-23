@@ -313,21 +313,21 @@
 
         <div class="admin-grid">
 
-            <!-- Gerenciamento de Polos (Workers Físicos) -->
+            <!-- Gerenciamento de Parceiros (Workers Físicos) -->
             <section class="admin-section" style="grid-column: 1 / -1;">
-                <h2>Gestão de Polos (Modem Hubs Máster)</h2>
+                <h2>Gestão de Parceiros (Modem Hubs)</h2>
                 <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                    <input type="text" id="polo-nome-input" placeholder="Nome do Local (Ex: Casa Ju)" 
+                    <input type="text" id="polo-nome-input" placeholder="Nome do Parceiro/Local (Ex: Parceiro SP)" 
                            style="flex: 1; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 10px; color: white;">
-                    <button onclick="gerarPolo()" class="btn-action" style="white-space: nowrap; font-weight: bold;">+ CRIAR POLO AGORA</button>
+                    <button onclick="gerarPolo()" class="btn-action" style="white-space: nowrap; font-weight: bold;">+ CRIAR PARCEIRO AGORA</button>
                 </div>
                 
                 <div style="overflow-x: auto;">
                     <table id="table-polos">
                         <thead>
                             <tr>
-                                <th>Nome do Polo</th>
-                                <th>Chave Mestra (Copie para a Ju/Jo)</th>
+                                <th>Nome do Parceiro</th>
+                                <th>CHAVE DO PARCEIRO (estação)</th>
                                 <th>Chips Ativos</th>
                                 <th>Status/Último Ping</th>
                                 <th>Ações</th>
@@ -342,9 +342,9 @@
 
             <!-- Partner API Keys (CEO — sem SQL) -->
             <section class="admin-section" id="section-partner-api" style="grid-column: 1 / -1;">
-                <h2>Parceiros — Partner API Key</h2>
+                <h2>Parceiros — Chave de integração (API)</h2>
                 <p style="font-size:0.8rem;color:rgba(255,255,255,0.45);margin-bottom:16px;">
-                    Gere chaves para o <strong>Polo Worker</strong> (.exe). A chave em texto só aparece uma vez no prompt — guarde em local seguro.
+                    Gere a <strong>chave de integração</strong> (API) usada com o <strong>FluxSMS Desktop</strong> e a <strong>CHAVE DO PARCEIRO</strong>. Cada chave de API mostrada no prompt é única.
                 </p>
                 <div style="overflow-x:auto;">
                     <table id="table-partner-api">
@@ -498,7 +498,7 @@
         </div>
     </div>
 
-    <script src="../dist/admin.shield.js?v=13"></script>
+    <script src="../dist/admin.shield.js?v=14"></script>
     <script>
         // Medida de Segurança: Bloqueio de Clique Direito
         document.addEventListener('contextmenu', event => event.preventDefault());

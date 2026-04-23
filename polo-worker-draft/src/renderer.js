@@ -1,104 +1,395 @@
 /* global poloWorker */
 
-function log(...args) {
-  const el = document.getElementById('log');
-  const line = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a, null, 2))).join(' ');
-  el.textContent = `${new Date().toISOString()} ${line}\n` + el.textContent;
+const loginPane = document.getElementById('login-pane');
+const appPane = document.getElementById('app-pane');
+const statusChip = document.getElementById('status-chip');
+const modemTableBody = document.getElementById('modem-table-body');
+const lastSyncEl = document.getElementById('last-sync');
+const ccidFileInput = document.getElementById('ccid-file-input');
+const ccidImportStatus = document.getElementById('ccid-import-status');
+const ccidFileInputLogin = document.getElementById('ccid-file-input-login');
+const ccidImportStatusLogin = document.getElementById('ccid-import-status-login');
+const appVersionLabel = document.getElementById('app-version-label');
+const updateBanner = document.getElementById('update-banner');
+const btnUpdateCheck = document.getElementById('btn-update-check');
+const btnUpdateDownload = document.getElementById('btn-update-download');
+
+const numModalBackdrop = document.getElementById('num-modal-backdrop');
+const numModalLed = document.getElementById('num-modal-led');
+const numModalHeadline = document.getElementById('num-modal-headline');
+const numModalSub = document.getElementById('num-modal-sub');
+const numModalClose = document.getElementById('num-modal-close');
+const actTbody = document.getElementById('act-tbody');
+const actCount = document.getElementById('act-count');
+const actErr = document.getElementById('act-err');
+const numSideMeta = document.getElementById('num-side-meta');
+
+let refreshTimer = null;
+let lastModalPorta = null;
+
+function setStatus(text, ok) {
+  statusChip.textContent = text;
+  statusChip.className = ok ? 'status-chip ok' : 'status-chip';
 }
 
-async function loadConfigIntoForm() {
-  const c = await poloWorker.configGet();
-  document.getElementById('backendUrl').value = c.backendUrl || '';
-  document.getElementById('poloChave').value = c.poloChave || '';
-  document.getElementById('partnerApiKey').placeholder = c.partnerApiKey || 'cole a Partner API Key';
-  document.getElementById('hardwareApiKey').placeholder = c.hasHardwareKey ? '********' : 'cole HARDWARE_API_KEY';
+function showLogin(show) {
+  loginPane.style.display = show ? 'block' : 'none';
+  appPane.style.display = show ? 'none' : 'block';
 }
 
-document.getElementById('btnSaveConfig').addEventListener('click', async () => {
+function fmtDate(v) {
+  if (!v) return '—';
   try {
-    await poloWorker.configSet({
-      backendUrl: document.getElementById('backendUrl').value,
-      partnerApiKey: document.getElementById('partnerApiKey').value,
-      poloChave: document.getElementById('poloChave').value,
-      hardwareApiKey: document.getElementById('hardwareApiKey').value
-    });
-    log('Configuração guardada.');
-    await loadConfigIntoForm();
-  } catch (e) {
-    log('Erro ao guardar:', e.message || e);
+    return new Date(v).toLocaleString('pt-BR');
+  } catch {
+    return '—';
   }
-});
+}
 
-document.getElementById('btnListSerial').addEventListener('click', async () => {
+function fmtShortId(uuid) {
+  if (!uuid) return '—';
+  const s = String(uuid);
+  if (s.length > 20) return `${s.slice(0, 8)}…${s.slice(-4)}`;
+  return s;
+}
+
+function labelActivationStatus(status) {
+  const m = {
+    received: 'Sucesso',
+    cancelled: 'Cancelado',
+    expired: 'Expirado',
+    waiting: 'A aguardar',
+    pending: 'Pendente'
+  };
+  return m[status] || status || '—';
+}
+
+function rowClassForAct(status) {
+  if (status === 'received') return 'act-ok';
+  if (status === 'cancelled' || status === 'expired') return 'act-bad';
+  return 'act-pending';
+}
+
+function applyCcidTextToStatusEl(el, status) {
+  if (!el) return;
+  const n = Number(status?.ccidUserPairsCount || 0);
+  const at = status?.ccidLastImportAt;
+  el.classList.remove('ok', 'err');
+  if (n > 0) {
+    const when = at
+      ? new Date(at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : '';
+    el.textContent = when
+      ? `Lista: ${n} par(es) · ${when}`
+      : `Lista: ${n} par(es).`;
+    el.classList.add('ok');
+  } else {
+    el.textContent = 'Nenhum TXT. Use «Importar lista» para mapear CCID → número.';
+  }
+}
+
+function updateCcidImportBanner(status) {
+  applyCcidTextToStatusEl(ccidImportStatus, status);
+  applyCcidTextToStatusEl(ccidImportStatusLogin, status);
+}
+
+function wireCcidImport({ btn, fileInput, statusEl }) {
+  if (!btn || !fileInput || !statusEl) return;
+  btn.addEventListener('click', () => {
+    fileInput.value = '';
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    statusEl.classList.remove('ok', 'err');
+    statusEl.textContent = 'A ler ficheiro…';
+    try {
+      const rawText = await file.text();
+      const result = await poloWorker.ccidImportTxt(rawText);
+      if (!result.ok) {
+        statusEl.textContent = result.error || 'Falha na importação.';
+        statusEl.classList.add('err');
+        return;
+      }
+      statusEl.textContent = `OK: ${result.importedLines} linha(s) · ${result.userPairsTotal} par(es).`;
+      statusEl.classList.add('ok');
+      const st = await poloWorker.appStatus();
+      updateCcidImportBanner(st);
+      await setStatusAndCcid();
+      await refreshModems();
+    } catch (err) {
+      statusEl.textContent = err.message || String(err);
+      statusEl.classList.add('err');
+    }
+  });
+}
+
+async function setStatusAndCcid() {
+  const status = await poloWorker.appStatus();
+  setStatus(status.workerRunning ? 'CORE ONLINE' : 'CORE OFFLINE', status.workerRunning);
+  updateCcidImportBanner(status);
+}
+
+async function refreshModems() {
   try {
-    const ports = await poloWorker.serialList();
-    const sel = document.getElementById('selPort');
-    sel.innerHTML = '';
-    ports.forEach((p) => {
-      const opt = document.createElement('option');
-      opt.value = p.path;
-      opt.textContent = `${p.path} ${p.friendlyName ? '— ' + p.friendlyName : ''}`;
-      sel.appendChild(opt);
+    const rows = await poloWorker.modemRows();
+    modemTableBody.innerHTML = '';
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      const on = String(r.status || 'OFF').toUpperCase() === 'ON';
+      tr.className = on ? 'modem-row--on' : 'modem-row--off';
+      tr.dataset.porta = r.porta || '';
+      tr.innerHTML = `
+        <td>${r.porta || '—'}</td>
+        <td>${r.numero || '—'}</td>
+        <td>${r.operadora || '—'}</td>
+        <td><span class="${on ? 'pill-on' : 'pill-off'}">${on ? 'ON' : 'OFF'}</span></td>
+        <td>R$ ${Number(r.profit || 0).toFixed(2)}</td>
+        <td>${fmtDate(r.lastActivationAt)}</td>
+      `;
+      tr.addEventListener('click', () => openNumberModal(r));
+      modemTableBody.appendChild(tr);
     });
-    log('Portas:', ports.length);
-  } catch (e) {
-    log('serial:list erro:', e.message || e);
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem detectado ainda.</td>';
+      modemTableBody.appendChild(tr);
+    }
+    lastSyncEl.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
+  } catch (err) {
+    lastSyncEl.textContent = `Falha ao atualizar: ${err.message || err}`;
   }
-});
+}
 
-document.getElementById('selPort').addEventListener('change', () => {
-  const sel = document.getElementById('selPort');
-  if (sel.value) document.getElementById('chipPorta').value = sel.value;
-});
+async function openNumberModal(r) {
+  if (!r || !r.porta) return;
+  lastModalPorta = r.porta;
+  if (numModalLed) {
+    const on = String(r.status || 'OFF').toUpperCase() === 'ON';
+    numModalLed.className = on ? 'led' : 'led led-off';
+  }
+  if (numModalHeadline) {
+    const d = String(r.numero || '').replace(/\D/g, '');
+    if (d.length >= 8) {
+      const n = d.startsWith('55') ? d : `55${d}`;
+      numModalHeadline.textContent = `Brasil +${n}`;
+    } else {
+      numModalHeadline.textContent = 'Detalhe do modem';
+    }
+  }
+  if (numModalSub) numModalSub.textContent = `Porta ${r.porta} · clique fora para fechar`;
+  if (numSideMeta) {
+    numSideMeta.innerHTML = `
+      <div><strong>Operadora</strong> ${(r.operadora && r.operadora !== '—') ? r.operadora : '—'}</div>
+      <div><strong>Porta</strong> ${r.porta || '—'}</div>
+      <div><strong>Lucro (monitor)</strong> R$ ${Number(r.profit || 0).toFixed(2)}</div>
+    `;
+  }
+  if (actTbody) actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.7">A carregar…</td></tr>';
+  if (actCount) actCount.textContent = 'Ativações (—)';
+  if (actErr) { actErr.style.display = 'none'; actErr.textContent = ''; }
+  if (numModalBackdrop) {
+    numModalBackdrop.classList.add('open');
+  }
 
-document.getElementById('btnRegisterChip').addEventListener('click', async () => {
   try {
-    const data = await poloWorker.registerChip({
-      porta: document.getElementById('chipPorta').value,
-      numero: document.getElementById('chipNumero').value || null,
-      operadora: document.getElementById('chipOperadora').value || null
-    });
-    log('Chip registado:', data);
-  } catch (e) {
-    const msg = e.response?.data || e.message || e;
-    log('registerChip erro:', msg);
-    if (e.response?.status === 423) alert('Em Quarentena (WhatsApp): ' + (e.response?.data?.detail || ''));
+    const res = await poloWorker.chipHistory(r.porta);
+    if (!res || !res.ok) {
+      const emsg = (res && res.error) || 'Falha ao carregar';
+      if (actTbody) {
+        actTbody.innerHTML = '';
+      }
+      if (actCount) actCount.textContent = 'Ativações (0)';
+      if (actErr) {
+        actErr.textContent = emsg + (res && res.status ? ` (${res.status})` : '');
+        actErr.style.display = 'block';
+      }
+      return;
+    }
+    const list = res.activations || [];
+    if (actCount) actCount.textContent = `Ativações (${list.length})`;
+    if (!list.length) {
+      if (actTbody) {
+        actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.65">Sem ativações registadas (ou chip ainda não consta no servidor com esta porta).</td></tr>';
+      }
+      return;
+    }
+    if (actTbody) {
+      const esc = (s) => String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      actTbody.innerHTML = list.map((a) => {
+        const cls = rowClassForAct(a.status);
+        const val = a.price != null ? `R$ ${Number(a.price).toFixed(2)}` : '—';
+        const sn = esc(a.service_name || a.service || '—');
+        return `<tr class="${cls}">
+          <td><code style="font-size:11px">${esc(fmtShortId(a.id))}</code></td>
+          <td>${sn}</td>
+          <td>${val}</td>
+          <td>${esc(labelActivationStatus(a.status))}</td>
+          <td>${esc(fmtDate(a.created_at))}</td>
+        </tr>`;
+      }).join('');
+    }
+  } catch (err) {
+    if (actTbody) actTbody.innerHTML = '';
+    if (actErr) {
+      actErr.textContent = err.message || String(err);
+      actErr.style.display = 'block';
+    }
   }
+}
+
+function closeNumberModal() {
+  if (numModalBackdrop) numModalBackdrop.classList.remove('open');
+  lastModalPorta = null;
+}
+
+if (numModalClose) numModalClose.addEventListener('click', closeNumberModal);
+if (numModalBackdrop) {
+  numModalBackdrop.addEventListener('click', () => closeNumberModal());
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeNumberModal();
 });
 
-let pollTimer = null;
-document.getElementById('btnTogglePoll').addEventListener('click', () => {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-    log('Polling parado.');
+function applyUpdateCheckResult(r, { quiet } = {}) {
+  if (!updateBanner || !btnUpdateDownload) return;
+  updateBanner.classList.remove('err');
+  if (!r.ok) {
+    if (!quiet) {
+      updateBanner.textContent = r.error || 'Não foi possível verificar atualizações.';
+      updateBanner.classList.add('err');
+    }
+    btnUpdateDownload.style.display = 'none';
+    delete btnUpdateDownload.dataset.url;
     return;
   }
-  const ms = Math.max(2000, parseInt(document.getElementById('pollMs').value, 10) || 5000);
-  pollTimer = setInterval(async () => {
-    try {
-      await poloWorker.heartbeat();
-      const pending = await poloWorker.pendingActivations();
-      const n = (pending.activations || []).length;
-      if (n > 0) log(`Fila: ${n} waiting`, pending.activations);
-    } catch (e) {
-      log('poll erro:', e.response?.data || e.message || e);
-    }
-  }, ms);
-  log('Polling iniciado a cada', ms, 'ms');
-});
-
-document.getElementById('btnDeliver').addEventListener('click', async () => {
-  try {
-    const data = await poloWorker.deliverSms({
-      activation_id: document.getElementById('actId').value,
-      sms_code: document.getElementById('smsCode').value,
-      chip_porta: document.getElementById('deliverPorta').value
-    });
-    log('Deliver:', data);
-  } catch (e) {
-    log('deliver erro:', e.response?.data || e.message || e);
+  if (r.updateAvailable) {
+    updateBanner.textContent = `Nova versão ${r.remoteVersion} disponível (esta: ${r.localVersion}).`;
+    updateBanner.style.color = '#f0d878';
+    btnUpdateDownload.style.display = 'inline-block';
+    btnUpdateDownload.dataset.url = r.downloadUrl || '';
+    return;
   }
+  updateBanner.style.color = '';
+  btnUpdateDownload.style.display = 'none';
+  delete btnUpdateDownload.dataset.url;
+  if (!quiet) {
+    updateBanner.textContent = `Está na última versão (${r.localVersion}).`;
+  } else {
+    updateBanner.textContent = '';
+  }
+}
+
+async function checkUpdatesQuiet() {
+  try {
+    const r = await poloWorker.updatesCheck();
+    applyUpdateCheckResult(r, { quiet: true });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function startDashboard() {
+  showLogin(false);
+  await setStatusAndCcid();
+  await refreshModems();
+  checkUpdatesQuiet();
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshModems, 10000);
+}
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  const apiKey = document.getElementById('login-api-key').value.trim();
+  const poloChave = document.getElementById('login-polo-key').value.trim();
+  const backendUrl = document.getElementById('login-backend').value.trim();
+  const rememberMe = document.getElementById('login-remember').checked;
+  const msg = document.getElementById('login-msg');
+  msg.textContent = 'A validar…';
+  const result = await poloWorker.authLogin({ email, password, apiKey, rememberMe, poloChave, backendUrl });
+  if (!result.ok) {
+    msg.textContent = result.error || 'Falha no login.';
+    return;
+  }
+  msg.textContent = '';
+  await startDashboard();
 });
 
-loadConfigIntoForm().catch((e) => log('init', e));
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await poloWorker.appLogout();
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+  closeNumberModal();
+  showLogin(true);
+  setStatus('CORE OFFLINE', false);
+});
+
+document.getElementById('btn-refresh').addEventListener('click', refreshModems);
+
+if (btnUpdateCheck) {
+  btnUpdateCheck.addEventListener('click', async () => {
+    if (updateBanner) updateBanner.textContent = 'A verificar…';
+    try {
+      const r = await poloWorker.updatesCheck();
+      applyUpdateCheckResult(r, { quiet: false });
+    } catch (e) {
+      applyUpdateCheckResult({ ok: false, error: e.message || String(e) }, { quiet: false });
+    }
+  });
+}
+if (btnUpdateDownload) {
+  btnUpdateDownload.addEventListener('click', async () => {
+    const url = btnUpdateDownload.dataset.url;
+    if (!url) return;
+    await poloWorker.updatesOpenDownload(url);
+  });
+}
+
+wireCcidImport({
+  btn: document.getElementById('btn-ccid-import'),
+  fileInput: ccidFileInput,
+  statusEl: ccidImportStatus
+});
+wireCcidImport({
+  btn: document.getElementById('btn-ccid-import-login'),
+  fileInput: ccidFileInputLogin,
+  statusEl: ccidImportStatusLogin
+});
+
+async function boot() {
+  try {
+    const meta = await poloWorker.appMeta();
+    const v = meta && meta.version ? String(meta.version) : '—';
+    if (appVersionLabel) appVersionLabel.textContent = `v${v}`;
+    document.title = `FluxSMS Desktop v${v}`;
+  } catch {
+    if (appVersionLabel) appVersionLabel.textContent = 'v?';
+  }
+  try {
+    const s0 = await poloWorker.appStatus();
+    updateCcidImportBanner(s0);
+  } catch {
+    /* */
+  }
+  const saved = await poloWorker.authGetSaved();
+  document.getElementById('login-email').value = saved.email || '';
+  document.getElementById('login-password').value = saved.password || '';
+  document.getElementById('login-api-key').value = saved.apiKey || '';
+  document.getElementById('login-polo-key').value = '';
+  document.getElementById('login-backend').value = 'https://fluxsms.com.br';
+  document.getElementById('login-remember').checked = !!saved.rememberMe;
+  showLogin(true);
+  setStatus('CORE OFFLINE', false);
+}
+
+boot().catch((err) => {
+  const el = document.getElementById('login-msg');
+  if (el) el.textContent = err.message || String(err);
+});

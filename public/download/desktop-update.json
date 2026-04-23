@@ -1,0 +1,5 @@
+{
+  "version": "0.1.2",
+  "url": "https://fluxsms.com.br/download/FluxSMS_Setup.exe",
+  "notes": "0.1.2: interface parceiro — modal de ativações ao tocar no modem, import CCID+TXT em destaque, sem consola de logs, linhas ON/OFF, auth API (Bearer + X-API-Key + X-Flux-Hwid), CHAVE DO PARCEIRO."
+}

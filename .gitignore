@@ -10,7 +10,6 @@ backend/node_modules/
 # dist/ (Removido para permitir blindagem em produção)
 .next/
 polo-worker-draft/dist-exe/
-downloads/*.exe
 
 # Logs
 *.log
@@ -27,3 +26,14 @@ Thumbs.db
 *.pem
 *.key
 secrets.json
+
+# Instalador e artefatos do electron-builder (regerar: cd polo-worker-draft && npm run build-exe)
+public/download/FluxSMS_Setup.exe
+public/download/FluxSMS_Setup.exe.blockmap
+public/download/win-unpacked/
+public/download/builder-debug.yml
+public/download/.icon-ico/
+downloads/FluxSMS_Setup.exe
+downloads/FluxSMS_Setup.exe.blockmap
+downloads/win-unpacked/
+.cursor/mcp.json

@@ -16,6 +16,7 @@ const IS_PORTAL_PATH = typeof window !== 'undefined' && window.location.pathname
 const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true && IS_PORTAL_PATH;
 const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
 const ROOT_ADMIN_EMAIL = 'iarachorta@gmail.com';
+const SUPPORT_EMAIL = String(window.__FLUX_APP_CONFIG?.supportEmail || 'suporte@fluxsms.com.br').toLowerCase();
 
 // === LISTA DE SERVIÇOS ===
 let SERVICES = [
@@ -46,6 +47,7 @@ let serviceStocks = {};
 let isRealtimeActive = false;
 let chatWidgetBooted = false;
 let tawkVisibilitySyncStarted = false;
+let profileCompletionShown = false;
 
 // === ELEMENTOS ===
 const landingView = document.getElementById('landing-view');
@@ -64,8 +66,10 @@ function shouldBootChatWidget() {
 function bootChatWidget() {
     if (chatWidgetBooted || !shouldBootChatWidget()) return;
     const cfg = window.__FLUX_CHAT_CONFIG || {};
+    const tawkPropertyId = String(cfg.tawkPropertyId || '').trim();
+    const tawkWidgetId = String(cfg.tawkWidgetId || '').trim();
     const hasCrisp = !!cfg.crispWebsiteId;
-    const hasTawk = !!(cfg.tawkPropertyId && cfg.tawkWidgetId);
+    const hasTawk = !!(tawkPropertyId && tawkWidgetId);
 
     // Prioridade total para Tawk quando IDs estiverem presentes.
     if (hasTawk) {
@@ -93,7 +97,8 @@ function bootChatWidget() {
         };
         const s1 = document.createElement('script');
         s1.async = true;
-        s1.src = `https://embed.tawk.to/${cfg.tawkPropertyId}/${cfg.tawkWidgetId}/default?lang=pt`;
+        // URL oficial do Tawk (sem sufixo /default quando widgetId já é informado)
+        s1.src = `https://embed.tawk.to/${tawkPropertyId}/${tawkWidgetId}`;
         s1.charset = 'UTF-8';
         s1.setAttribute('crossorigin', '*');
         s1.id = 'flux-tawk-script';
@@ -173,7 +178,7 @@ async function init() {
 
     setupRealtimeChips();
 
-    // 🧹 GATILHO DO GARI: Monitora Polos e estorna saldo se houver queda (Distributed Cron)
+    // 🧹 GATILHO DO GARI: monitora ligação das estações e estorna saldo se houver queda
     // Run once at start and then every 30 seconds
     const runGari = async () => { try { await db.rpc('rpc_monitorar_e_estornar_v2'); } catch (e) { } };
     runGari();
@@ -258,6 +263,7 @@ async function init() {
             }
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
+            profileCompletionShown = false;
             currentUserIsAdmin = false;
             currentUserIsPartner = false;
             document.body.classList.remove('partner-mode');
@@ -288,6 +294,7 @@ function forceClientHomeButtons() {
 }
 
 function toggleViews(session) {
+    document.body.classList.toggle('app-dashboard-mode', !!session);
     if (IS_PARTNER_PORTAL) {
         landingView.style.display = 'none';
         if (session) {
@@ -402,6 +409,23 @@ async function loadTransactionHistory() {
     `}).join('');
 }
 
+function normalizeWhatsapp(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 13) return '';
+    if (digits.startsWith('55')) return `+${digits}`;
+    return `+55${digits}`;
+}
+
+async function upsertContactProfile({ whatsapp, preferredOperator }) {
+    if (!db || !currentUser) return { ok: false, error: 'no_session' };
+    const patch = {};
+    if (whatsapp) patch.whatsapp = whatsapp;
+    if (preferredOperator) patch.preferred_operator = preferredOperator;
+    if (!Object.keys(patch).length) return { ok: true };
+    const { error } = await db.from('profiles').update(patch).eq('id', currentUser.id);
+    return error ? { ok: false, error: error.message } : { ok: true };
+}
+
 // === AUTHENTICATION ===
 async function handleAuth(type) {
     try {
@@ -415,10 +439,21 @@ async function handleAuth(type) {
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const name = document.getElementById('reg-name').value;
-            if (!email || !password || !name) { alert("Preencha todos os campos."); return; }
-            const { data, error } = await db.auth.signUp({ email, password, options: { data: { full_name: name } } });
+            const rawWhatsapp = document.getElementById('reg-whatsapp')?.value || '';
+            const whatsapp = normalizeWhatsapp(rawWhatsapp);
+            if (!email || !password || !name || !whatsapp) { alert("Preencha todos os campos, incluindo WhatsApp com DDD."); return; }
+            const { data, error } = await db.auth.signUp({
+                email,
+                password,
+                options: { data: { full_name: name, whatsapp } }
+            });
             if (error) { alert('Erro: ' + (error.message || 'Falha no cadastro (verifique as variáveis de ambiente)')); return; }
             if (!data.session && data.user) await db.auth.signInWithPassword({ email, password });
+            const { data: { session } } = await db.auth.getSession();
+            if (session?.user?.id) {
+                currentUser = session.user;
+                await upsertContactProfile({ whatsapp });
+            }
         }
     } catch (err) { console.error("Erro no handleAuth:", err); }
 }
@@ -426,6 +461,45 @@ async function handleAuth(type) {
 async function handleLogout() {
     await db.auth.signOut();
 }
+
+function openProfileCompletionModal(initialWhatsapp) {
+    const modal = document.getElementById('profileCompletionModal');
+    const input = document.getElementById('profile-whatsapp');
+    const msg = document.getElementById('profile-completion-msg');
+    if (!modal || !input) return;
+    if (msg) msg.textContent = `Canal oficial de suporte: ${SUPPORT_EMAIL}`;
+    input.value = initialWhatsapp || '';
+    modal.style.display = 'flex';
+}
+
+window.closeProfileCompletionModal = function () {
+    const modal = document.getElementById('profileCompletionModal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.submitProfileCompletion = async function () {
+    const input = document.getElementById('profile-whatsapp');
+    const msg = document.getElementById('profile-completion-msg');
+    const normalized = normalizeWhatsapp(input ? input.value : '');
+    if (!normalized) {
+        if (msg) msg.textContent = 'Informe um WhatsApp válido com DDD.';
+        return;
+    }
+    const res = await upsertContactProfile({ whatsapp: normalized });
+    if (!res.ok) {
+        if (msg) msg.textContent = `Falha ao salvar: ${res.error || 'erro desconhecido'}`;
+        return;
+    }
+    if (msg) msg.textContent = 'WhatsApp salvo com sucesso.';
+    setTimeout(() => {
+        window.closeProfileCompletionModal();
+    }, 700);
+};
+
+window.saveOperatorPreference = async function (operator) {
+    const val = ['any', 'vivo', 'claro', 'tim', 'oi'].includes(operator) ? operator : 'any';
+    await upsertContactProfile({ preferredOperator: val });
+};
 
 function loadSecurityPanel() {
     const adminBlock = document.getElementById('security-admin-block');
@@ -524,6 +598,10 @@ let initialBalance = 0;
 
 let _partnerApiKeyPlainCache = '';
 let _partnerMarginPercent = 60;
+let _partnerBootstrapPartner = null;
+let _partnerBootstrapUserEmail = '';
+let _partnerBootstrapUserName = '';
+let _partnerBootstrapKeyStatus = '';
 
 async function loadPartnerAutonomyStrip() {
     const strip = document.getElementById('partner-autonomy-strip');
@@ -550,6 +628,9 @@ async function loadPartnerAutonomyStrip() {
             if (keyField) keyField.placeholder = j.detail || j.error || res.statusText;
             return;
         }
+        _partnerBootstrapUserEmail = (j.user_email && String(j.user_email).trim()) || '';
+        _partnerBootstrapUserName = (j.user_name && String(j.user_name).trim()) || '';
+        _partnerBootstrapKeyStatus = (j.api_key_status && String(j.api_key_status).trim()) || '';
         _partnerApiKeyPlainCache = j.api_key_plain || '';
         if (j.partner && j.partner.repasse_percent != null) {
             _partnerMarginPercent = Number(j.partner.repasse_percent);
@@ -559,40 +640,143 @@ async function loadPartnerAutonomyStrip() {
         if (keyField) {
             keyField.value = _partnerApiKeyPlainCache || '';
             keyField.type = 'text';
-            keyField.placeholder = _partnerApiKeyPlainCache ? '' : 'Chave indisponível — contacte a FluxSMS.';
+            if (_partnerApiKeyPlainCache) {
+                keyField.placeholder = '';
+            } else if (_partnerBootstrapKeyStatus === 'decrypt_failed') {
+                keyField.placeholder = 'Erro do servidor ao ler a chave (cofre).';
+            } else {
+                keyField.placeholder = 'Sem API Key ativa — use «Gerar API Key» no admin.';
+            }
         }
         if (keyHint) {
-            keyHint.textContent = _partnerApiKeyPlainCache
-                ? 'Identidade fixa. O Polo Worker deve enviar o HWID na primeira ligação; outro PC será bloqueado.'
-                : 'Não foi possível ler a chave completa (cofre). Contacte a equipa FluxSMS.';
+            if (_partnerApiKeyPlainCache) {
+                keyHint.textContent = 'Guarde esta chave em local seguro. Cada perfil tem uma chave de integração associada à sua conta.';
+            } else if (_partnerBootstrapKeyStatus === 'decrypt_failed') {
+                keyHint.textContent = 'Não foi possível carregar a chave de integração. Contacte a FluxSMS.';
+            } else {
+                keyHint.textContent = 'Peça à equipa FluxSMS para ativar a chave de integração do seu perfil.';
+            }
         }
         const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
         if (finLine) {
             finLine.textContent = `Repasse (${Number(_partnerMarginPercent || 60)}%): liberado R$ ${Number(t.repasse_liberado || 0).toFixed(2)} · Disponível saque R$ ${Number(t.disponivel_para_solicitar || 0).toFixed(2)} (mín. R$ 400)`;
         }
-        if (dl && j.worker_download_url) {
-            dl.href = j.worker_download_url;
+        if (dl) {
+            const raw = (j.worker_download_url || '').trim();
+            const broken = /Polo-Worker-Portable|\/downloads\//i.test(raw);
+            const href = broken || !raw ? '/download/FluxSMS_Setup.exe' : raw;
+            dl.href = href;
+            dl.setAttribute('download', 'FluxSMS_Setup.exe');
+            dl.onclick = function (ev) {
+                ev.preventDefault();
+                const a = document.createElement('a');
+                a.href = href;
+                a.download = 'FluxSMS_Setup.exe';
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            };
         }
+        _partnerBootstrapPartner = j.partner || null;
+        await renderPartnerProfileStaticFromSession();
+        updatePartnerProfileApiPreview();
+        loadPartnerChipsMonitor();
     } catch (e) {
         if (keyField) keyField.placeholder = e.message || String(e);
     }
 }
 
+async function renderPartnerProfileStaticFromSession() {
+    if (!currentUserIsPartner || !db) return;
+    const { data: { session } } = await db.auth.getSession();
+    const u = session?.user;
+    const emailEl = document.getElementById('partner-profile-email');
+    const nameEl = document.getElementById('partner-profile-name');
+    const codeEl = document.getElementById('partner-profile-code');
+    if (emailEl) emailEl.textContent = _partnerBootstrapUserEmail || u?.email || '—';
+    const metaName = u?.user_metadata?.full_name || u?.user_metadata?.name;
+    if (nameEl) nameEl.textContent = _partnerBootstrapUserName || metaName || '—';
+    if (codeEl) codeEl.textContent = (_partnerBootstrapPartner && _partnerBootstrapPartner.partner_code) ? _partnerBootstrapPartner.partner_code : '—';
+}
+
+function updatePartnerProfileApiPreview() {
+    const el = document.getElementById('partner-profile-api-preview');
+    if (!el) return;
+    const k = _partnerApiKeyPlainCache || '';
+    if (!k) {
+        if (_partnerBootstrapKeyStatus === 'decrypt_failed') {
+            el.textContent = '— (erro cofre)';
+        } else if (_partnerBootstrapKeyStatus === 'no_active_key') {
+            el.textContent = '— (gere a chave no admin)';
+        } else {
+            el.textContent = '— (a carregar…)';
+        }
+        return;
+    }
+    el.textContent = k.length > 18 ? `${k.slice(0, 10)}…${k.slice(-6)}` : k;
+}
+
+function ensurePartnerProfileKeysVisible() {
+    /* painel antigo removido — fluxo único na faixa luxo */
+}
+
+window.togglePartnerProfileKeysPanel = function (ev) {
+    if (ev) ev.preventDefault();
+    const body = document.getElementById('partner-profile-keys-body');
+    const btn = document.getElementById('partner-profile-keys-toggle');
+    const chev = document.getElementById('partner-profile-keys-chevron');
+    if (!body || !btn) return;
+    const opening = body.style.display === 'none' || body.style.display === '';
+    body.style.display = opening ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (chev) chev.textContent = opening ? '▴' : '▾';
+};
+
+function renderPartnerPolosKeysList(polos) {
+    const wrap = document.getElementById('partner-polos-keys-list');
+    if (!wrap) return;
+    const list = polos || [];
+    if (!list.length) {
+        wrap.innerHTML = '<p class="partner-lux-hint" style="margin:0; color: rgba(255,255,255,0.55);">Ainda não há estação vinculada. A equipa FluxSMS liga a sua estação — depois a <strong>chave do parceiro</strong> aparece aqui.</p>';
+        return;
+    }
+    wrap.innerHTML = list.map((p) => {
+        const nome = escapeHtml(p.nome || 'Estação');
+        const chave = p.chave_acesso || '';
+        const chJson = JSON.stringify(chave);
+        return `<div class="partner-polo-key-card"><h4>${nome}</h4><div class="partner-polo-key-row"><code class="pk-code">${escapeHtml(chave)}</code><button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="copyPartnerPoloKey(${chJson})">COPIAR CHAVE</button></div></div>`;
+    }).join('');
+}
+
+window.copyPartnerPoloKey = async function (key) {
+    const k = key ? String(key) : '';
+    if (!k) return;
+    try {
+        await navigator.clipboard.writeText(k);
+        alert('Chave do parceiro copiada. Cole no FluxSMS Desktop no campo indicado no login.');
+    } catch {
+        window.prompt('Copie manualmente:', k);
+    }
+};
+
 window.copyPartnerApiKey = async function () {
     if (!_partnerApiKeyPlainCache) {
-        alert('Chave completa indisponível neste painel. Contacte a FluxSMS.');
+        alert('Chave de integração indisponível neste painel. Contacte a FluxSMS.');
         return;
     }
     try {
         await navigator.clipboard.writeText(_partnerApiKeyPlainCache);
-        alert('Chave copiada para a área de transferência.');
+        alert('Chave de integração copiada. Cole no FluxSMS Desktop (campo de chave de integração).');
     } catch {
         window.prompt('Copie manualmente:', _partnerApiKeyPlainCache);
     }
+    updatePartnerProfileApiPreview();
 };
 
 async function loadPartnerChipsMonitor() {
     const tbody = document.querySelector('#table-partner-chips-monitor tbody');
+    const tableChips = document.getElementById('table-partner-chips-monitor');
     if (!tbody || !currentUserIsPartner || !db) return;
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">A carregar…</td></tr>';
     try {
@@ -604,11 +788,17 @@ async function loadPartnerChipsMonitor() {
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
             tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</td></tr>`;
+            renderPartnerPolosKeysList([]);
+            if (tableChips) tableChips.classList.remove('partner-chips-one-station');
             return;
         }
+        const polosList = j.polos || [];
+        const nStations = polosList.length;
+        if (tableChips) tableChips.classList.toggle('partner-chips-one-station', nStations === 1);
+        renderPartnerPolosKeysList(polosList);
         const rows = j.chips || [];
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;">Nenhum chip nos seus polos. Use o Polo Worker para registar modems.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:0.6;">Nenhum chip ainda. Quando o FluxSMS Desktop estiver a correr, os modems surgem aqui.</td></tr>';
             return;
         }
         tbody.innerHTML = rows.map((c) => {
@@ -617,15 +807,15 @@ async function loadPartnerChipsMonitor() {
                     ? escapeHtml(new Date(c.disponivel_em).toLocaleString('pt-BR'))
                     : '—')
                 : '—';
-            const poloLine = c.polo_ultima
+            const commLine = c.polo_ultima
                 ? `${escapeHtml(c.polo_status || '—')} · ${escapeHtml(new Date(c.polo_ultima).toLocaleString('pt-BR'))}`
                 : escapeHtml(c.polo_status || '—');
             return `<tr>
-                <td>${escapeHtml(c.polo_nome || '—')}</td>
+                <td class="partner-col-station">${escapeHtml(c.polo_nome || '—')}</td>
                 <td><code>${escapeHtml(c.porta || '')}</code></td>
                 <td>${escapeHtml(c.numero || '—')}</td>
                 <td>${escapeHtml(c.status || '')}</td>
-                <td style="font-size:0.75rem;">${poloLine}</td>
+                <td style="font-size:0.75rem;">${commLine}</td>
                 <td style="font-size:0.75rem;">${wa}</td>
             </tr>`;
         }).join('');
@@ -700,7 +890,7 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
 
-    // Busca chips de Polos (No lab, ignoramos a trava de 90s se for o Polo de Teste)
+    // Busca chips (no lab, ignoramos a trava de 90s se for a estação de teste)
     const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
     const isLab = window.location.hostname.includes('railway.app');
 
@@ -784,6 +974,7 @@ function getWhatsappBasePriceForCurrentUser() {
 
 function updateLaunchTimerBanner() {
     const banner = document.getElementById('launch-timer-banner');
+    const card = document.getElementById('launch-timer-card');
     const daysEl = document.getElementById('launch-timer-days');
     if (!banner || !daysEl) return;
     const days = getLaunchPromoDaysRemaining();
@@ -791,8 +982,10 @@ function updateLaunchTimerBanner() {
         const suffix = days === 1 ? '1 dia' : `${days} dias`;
         daysEl.textContent = suffix;
         banner.style.display = 'block';
+        if (card) card.style.display = 'block';
     } else {
         banner.style.display = 'none';
+        if (card) card.style.display = 'none';
     }
 }
 
@@ -834,6 +1027,11 @@ async function updateUIForUser() {
     currentUserIsAdmin = !!profile.is_admin;
     currentUserIsPartner = !!profile.is_partner;
 
+    const operatorSelect = document.getElementById('operator-preference');
+    if (operatorSelect) {
+        operatorSelect.value = profile.preferred_operator || 'any';
+    }
+
     if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
         alert('Este portal é exclusivo para fornecedores com perfil parceiro activo.');
         await db.auth.signOut();
@@ -867,6 +1065,12 @@ async function updateUIForUser() {
         // ------------------------------
     }
 
+    const needsWhatsapp = !normalizeWhatsapp(profile.whatsapp || '');
+    if (currentUser && needsWhatsapp && !profileCompletionShown) {
+        profileCompletionShown = true;
+        openProfileCompletionModal('');
+    }
+
     if (document.getElementById('user-initials') && profile.full_name) {
         document.getElementById('user-initials').innerText = profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     }
@@ -896,6 +1100,7 @@ async function updateUIForUser() {
     } else {
         const strip = document.getElementById('partner-autonomy-strip');
         if (strip) strip.style.display = 'none';
+        _partnerBootstrapPartner = null;
     }
 
     syncPartnerPanelsVisibility();
@@ -913,11 +1118,11 @@ function escapeHtml(str) {
 
 function formatPartnerChipsCell(chips) {
     if (!chips || !chips.length) {
-        return '<span style="opacity:0.45;font-size:0.78rem;">Vincule polos em <code>partner_profile_id</code></span>';
+        return '<span style="opacity:0.45;font-size:0.78rem;">Sem chips nesta vista; contacte a equipa se precisar de ligação.</span>';
     }
     return chips.map((c) => {
         const label = c.numero || c.porta || c.id;
-        const polo = c.polo_nome ? ` <span style="opacity:0.5">(${escapeHtml(c.polo_nome)})</span>` : '';
+        const est = c.polo_nome ? ` <span style="opacity:0.5">(${escapeHtml(c.polo_nome)})</span>` : '';
         let wa = '';
         if (c.disponivel_em) {
             const until = new Date(c.disponivel_em);
@@ -925,7 +1130,7 @@ function formatPartnerChipsCell(chips) {
                 wa = ` <span class="partner-wa-lock">WA quarentena até ${until.toLocaleString('pt-BR')}</span>`;
             }
         }
-        return `<div class="partner-chip-line"><strong>${escapeHtml(String(label))}</strong>${polo} · R$ ${Number(c.revenue_total || 0).toFixed(2)} · <span style="opacity:0.75">${escapeHtml(c.status || '')}</span>${wa}</div>`;
+        return `<div class="partner-chip-line"><strong>${escapeHtml(String(label))}</strong>${est} · R$ ${Number(c.revenue_total || 0).toFixed(2)} · <span style="opacity:0.75">${escapeHtml(c.status || '')}</span>${wa}</div>`;
     }).join('');
 }
 
@@ -1238,12 +1443,7 @@ function renderActivationCard(act) {
 
     const displayCode = unscrambleSMS(act.sms_code);
 
-    // TRAVA 2: Botão CANCELAR bloqueado por 2 minutos
     const createdAt = act.created_at ? new Date(act.created_at).getTime() : Date.now();
-    const LOCK_MS = 2 * 60 * 1000; // 2 minutos
-    const msUntilUnlock = Math.max(0, (createdAt + LOCK_MS) - Date.now());
-    const cancelDisabled = msUntilUnlock > 0 ? 'disabled class="btn-waiting"' : ''; // 🛡️ Removido style inline
-    const cancelLabel = msUntilUnlock > 0 ? 'AGUARDE (2min)' : 'CANCELAR';
 
     const h = `
         <div class="session-card" id="${act.id}">
@@ -1255,20 +1455,12 @@ function renderActivationCard(act) {
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
-            <div id="actions-${act.id}">${act.status === 'waiting' ? `<button id="btn-cancel-${act.id}" onclick="cancelActivation('${act.id}')" ${cancelDisabled}>${cancelLabel}</button>` : '✓'}</div>
+            <div id="actions-${act.id}">${act.status === 'waiting' ? `<button id="btn-cancel-${act.id}" class="btn-cancel" onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
         </div>
     `;
     activeNumbers.insertAdjacentHTML('afterbegin', h);
 
     if (act.status === 'waiting') {
-        // Desbloqueia o botão cancelar após o período de lock
-        if (msUntilUnlock > 0) {
-            setTimeout(() => {
-                const btn = document.getElementById(`btn-cancel-${act.id}`);
-                if (btn) { btn.disabled = false; btn.removeAttribute('style'); btn.innerText = 'CANCELAR'; }
-            }, msUntilUnlock);
-        }
-
         // TRAVA 3: Auto-cancelamento após 10 minutos
         const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
         const msSinceCreated = Date.now() - createdAt;
@@ -1285,9 +1477,16 @@ function renderActivationCard(act) {
 }
 
 async function cancelActivation(id) {
-    const { data } = await db.rpc('rpc_cancelar_ativacao', { p_user_id: currentUser.id, p_activation_id: id });
-    if (data?.ok) { document.getElementById(id).remove(); updateUIForUser(); }
+    const card = document.getElementById(id);
+    if (!card || !currentUser) return;
+    card.remove();
+    const { data, error } = await db.rpc('rpc_cancelar_ativacao', { p_user_id: currentUser.id, p_activation_id: id });
+    if (error || !data?.ok) {
+        activeNumbers.insertAdjacentHTML('afterbegin', '<div class="empty-state">Falha ao cancelar. Atualize e tente novamente.</div>');
+    }
+    updateUIForUser();
 }
+window.cancelActivation = cancelActivation;
 
 async function loadActiveSessions() {
     if (!db || !currentUser || currentUserIsPartner) return;

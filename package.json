@@ -7,7 +7,13 @@
     "start": "node server.js",
     "build": "node obfuscate.js",
     "dev": "nodemon server.js",
-    "build:secure": "node obfuscate.js"
+    "build:secure": "node obfuscate.js",
+    "verify:migration-011": "node scripts/verify-migration-011.js",
+    "apply:migration-011": "node scripts/apply-migration-011-pg.js",
+    "optimize:assets": "node scripts/optimize-assets.js",
+    "railway:up": "railway up",
+    "deploy:web": "node obfuscate.js",
+    "build-exe": "npm run build-exe --prefix polo-worker-draft"
   },
   "engines": {
     "node": "20.x"
@@ -27,6 +33,7 @@
     "playwright": "^1.59.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "sharp": "^0.34.5"
   }
 }

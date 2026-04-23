@@ -1,14 +1,15 @@
 {
   "name": "fluxsms-polo-worker",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
-  "description": "FluxSMS Polo Worker — Electron + Partner API + COM",
+  "description": "FluxSMS Desktop — parceiros (Polo Worker + API + COM)",
   "author": "FluxSMS",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w serialport",
-    "dist": "electron-builder --win portable --publish never"
+    "dist": "electron-builder --win nsis --publish never",
+    "build-exe": "npm run rebuild && npm run dist"
   },
   "dependencies": {
     "axios": "^1.6.8",
@@ -23,19 +24,29 @@
   },
   "build": {
     "appId": "com.fluxsms.poloworker",
-    "productName": "FluxSMS Polo Worker",
+    "productName": "FluxSMS Desktop",
+    "artifactName": "FluxSMS_Setup.${ext}",
     "directories": {
-      "output": "dist-exe"
+      "output": "../public/download"
     },
     "files": [
       "src/**/*",
       "index.html",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "core-v7.1",
+        "to": "core-v7.1"
+      }
+    ],
     "win": {
+      "icon": "../marketing/assets/fluxsms-chip-dourado.png",
+      "executableName": "FluxSMS Desktop",
+      "requestedExecutionLevel": "asInvoker",
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
@@ -44,7 +55,16 @@
       "sign": null
     },
     "nsis": {
-      "oneClick": false
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "FluxSMS Desktop",
+      "uninstallDisplayName": "FluxSMS Desktop",
+      "runAfterFinish": true
     }
   }
 }

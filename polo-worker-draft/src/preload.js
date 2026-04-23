@@ -1,11 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('poloWorker', {
-  configGet: () => ipcRenderer.invoke('config:get'),
-  configSet: (payload) => ipcRenderer.invoke('config:set', payload),
+  appMeta: () => ipcRenderer.invoke('app:meta'),
+  authGetSaved: () => ipcRenderer.invoke('auth:getSaved'),
+  authLogin: (payload) => ipcRenderer.invoke('auth:login', payload),
+  appStatus: () => ipcRenderer.invoke('app:status'),
+  appLogout: () => ipcRenderer.invoke('app:logout'),
   serialList: () => ipcRenderer.invoke('serial:list'),
-  registerChip: (body) => ipcRenderer.invoke('partner:registerChip', body),
-  heartbeat: () => ipcRenderer.invoke('partner:heartbeat'),
-  pendingActivations: () => ipcRenderer.invoke('partner:pendingActivations'),
-  deliverSms: (body) => ipcRenderer.invoke('hardware:deliverSms', body)
+  modemRows: () => ipcRenderer.invoke('partner:modems'),
+  chipHistory: (porta) => ipcRenderer.invoke('partner:chipHistory', { porta }),
+  ccidImportTxt: (rawText) => ipcRenderer.invoke('ccid:importTxt', { rawText }),
+  updatesCheck: () => ipcRenderer.invoke('updates:check'),
+  updatesOpenDownload: (url) => ipcRenderer.invoke('updates:openDownload', url)
 });

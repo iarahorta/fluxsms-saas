@@ -3,87 +3,233 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FluxSMS Polo Worker (rascunho)</title>
+  <title>FluxSMS Desktop</title>
   <style>
-    :root { font-family: system-ui, sans-serif; background: #111; color: #eee; }
-    body { margin: 0; padding: 16px; max-width: 880px; }
-    h1 { font-size: 1.1rem; color: #a78bfa; }
-    fieldset { border: 1px solid #333; border-radius: 8px; margin-bottom: 14px; padding: 12px; }
-    legend { padding: 0 8px; color: #94a3b8; }
-    label { display: block; font-size: 0.75rem; color: #94a3b8; margin-top: 8px; }
-    input, select, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #444; background: #1a1a1a; color: #fff; }
-    button { cursor: pointer; background: #4c1d95; border-color: #6d28d9; font-weight: 600; margin-top: 10px; }
-    button.secondary { background: #1e293b; }
-    #log { font-family: ui-monospace, monospace; font-size: 11px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 10px; height: 200px; overflow: auto; white-space: pre-wrap; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+    :root {
+      --bg: #0a0a0a;
+      --card: #141414;
+      --gold: #d4af37;
+      --gold-dim: rgba(212, 175, 55, 0.25);
+      --border: rgba(212, 175, 55, 0.25);
+      --text: #efefef;
+      --muted: rgba(255, 255, 255, 0.58);
+      font-family: 'Montserrat', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 60% 45% at 0% 0%, rgba(212, 175, 55, 0.12), transparent),
+        linear-gradient(180deg, #0f0f0f 0%, var(--bg) 45%);
+    }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 22px; }
+    .brand { margin-bottom: 14px; }
+    .brand-line1 { font-size: 18px; font-weight: 800; letter-spacing: .06em; color: var(--gold); }
+    .brand-version { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin-top: 4px; }
+    .pane {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+      padding: 16px;
+    }
+    .login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .full { grid-column: 1 / -1; }
+    label { display: block; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+    input[type=text], input[type=password], input[type=email] {
+      width: 100%; border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(0,0,0,0.35); color: #fff; border-radius: 10px; padding: 10px 12px;
+    }
+    .row-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: 1px solid rgba(212, 175, 55, 0.34);
+      background: linear-gradient(135deg, #edcb5f, #d4af37);
+      color: #1a1a1a; font-weight: 800; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+    }
+    button.secondary { background: transparent; color: var(--gold); }
+    .btn-txt-hero {
+      background: linear-gradient(135deg, #f0d78c, #c9a227);
+      color: #111; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 7px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.28); color: #ddd; font-size: 12px; padding: 6px 12px; user-select: none;
+    }
+    .status-chip.ok { border-color: rgba(79, 224, 130, .6); color: #7af0a2; }
+    .app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ccid-line { font-size: 12px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+    .ccid-line.ok { color: #7af0a2; }
+    .ccid-line.err { color: #f0a0a0; }
+    .hint { font-size: 12px; color: var(--muted); margin: 0; }
+    .update-strip { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    h2.modem-h2 { margin: 10px 0 4px; color: var(--gold); font-size: 14px; }
+    .modem-hint { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+    .modem-table-wrap { overflow-x: auto; }
+    .modem-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .modem-table th, .modem-table td { border-bottom: 1px solid rgba(255,255,255,0.08); padding: 10px 8px; font-size: 12px; text-align: left; }
+    .modem-table th { color: var(--gold); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .modem-table tbody tr { cursor: pointer; transition: background 0.15s, box-shadow 0.15s; }
+    .modem-table tbody tr.modem-row--on { background: linear-gradient(90deg, rgba(212,175,55,0.18) 0%, rgba(20,20,20,0.3) 100%); box-shadow: inset 0 0 0 1px var(--gold-dim); }
+    .modem-table tbody tr.modem-row--off { background: rgba(0,0,0,0.45); opacity: 0.7; }
+    .modem-table tbody tr.modem-row--on:hover { background: linear-gradient(90deg, rgba(212,175,55,0.25) 0%, rgba(30,28,18,0.4) 100%); }
+    .modem-table tbody tr.modem-row--off:hover { opacity: 0.9; }
+    .pill-on, .pill-off {
+      display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    }
+    .pill-on { background: rgba(66, 189, 103, 0.2); color: #89f3ad; }
+    .pill-off { background: rgba(80, 80, 80, 0.35); color: #b0b0b0; }
+    #ccid-file-input, #ccid-file-input-login { display: none; }
+    #login-msg { margin-top: 8px; font-size: 12px; color: #ff9696; min-height: 1.2em; }
+    @media (max-width: 900px) { .login-grid { grid-template-columns: 1fr; } }
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+    .modal-backdrop.open { display: flex; }
+    .num-modal { background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; max-width: 920px; width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.65); }
+    .num-modal-hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .num-modal-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .led { width: 12px; height: 12px; border-radius: 50%; background: #2d2; flex-shrink: 0; }
+    .led-off { background: #555; }
+    .num-label { font-weight: 800; font-size: 14px; }
+    .num-sub { font-size: 12px; color: var(--muted); }
+    .num-modal-body { display: flex; flex-wrap: wrap; gap: 0; min-height: 0; }
+    .num-modal-left { flex: 1 1 420px; min-width: 0; overflow: auto; max-height: 64vh; padding: 0 0 8px; }
+    .num-modal-right { width: 180px; flex: 0 0 auto; border-left: 1px solid rgba(255,255,255,0.08); padding: 14px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+    .num-modal-right strong { color: #ddd; }
+    .act-sub { font-size: 12px; color: var(--muted); padding: 6px 16px 0; }
+    .act-table { width: 100%; border-collapse: collapse; }
+    .act-table th, .act-table td { font-size: 12px; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .act-table th { text-align: left; color: #bbb; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+    .act-ok { background: rgba(130, 90, 200, 0.18) !important; }
+    .act-bad { background: rgba(200, 100, 60, 0.2) !important; }
+    .act-pending { background: rgba(60, 60, 60, 0.25) !important; }
+    .btn-close { background: transparent; color: #aaa; border: none; font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
   </style>
 </head>
 <body>
-  <h1>FluxSMS · Polo Worker (rascunho)</h1>
+  <div class="shell">
+    <div class="brand" aria-label="FluxSMS Desktop">
+      <div class="brand-line1">FLUXSMS DESKTOP <span id="app-version-label" class="brand-version" style="display:inline;font-size:12px;margin-left:6px;">v—</span></div>
+      <span class="brand-version">Gestão de modems e serviços</span>
+    </div>
 
-  <fieldset>
-    <legend>1 · Partner API &amp; Polo</legend>
-    <label>URL do backend</label>
-    <input id="backendUrl" placeholder="https://..." />
-    <label>Partner API Key (Bearer)</label>
-    <input id="partnerApiKey" type="password" autocomplete="off" placeholder="sk_live_..." />
-    <label>Chave do polo (<code>polos.chave_acesso</code>)</label>
-    <input id="poloChave" autocomplete="off" />
-    <label>HARDWARE_API_KEY (para POST /sms/deliver — ver README)</label>
-    <input id="hardwareApiKey" type="password" autocomplete="off" />
-    <button id="btnSaveConfig">Guardar configuração</button>
-  </fieldset>
-
-  <fieldset>
-    <legend>2 · Portas COM</legend>
-    <button id="btnListSerial" class="secondary">Listar portas seriais</button>
-    <select id="selPort" size="4"></select>
-  </fieldset>
-
-  <fieldset>
-    <legend>3 · Registar chip no banco</legend>
-    <div class="row">
-      <div>
-        <label>Porta (ex.: COM3 ou id da lista)</label>
-        <input id="chipPorta" placeholder="COM3" />
+    <section id="login-pane" class="pane">
+      <h2 style="margin:0 0 12px; color:var(--gold); font-size:14px;">Acesso</h2>
+      <div class="login-grid">
+        <div>
+          <label>E-mail</label>
+          <input id="login-email" type="email" autocomplete="username" />
+        </div>
+        <div>
+          <label>Senha</label>
+          <input id="login-password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="full">
+          <label>Chave de integração (API)</label>
+          <input id="login-api-key" type="password" autocomplete="off" />
+        </div>
+        <div>
+          <label>CHAVE DO PARCEIRO</label>
+          <input id="login-polo-key" type="text" autocomplete="off" />
+        </div>
+        <div>
+          <label>Backend</label>
+          <input id="login-backend" type="text" autocomplete="off" value="https://fluxsms.com.br" />
+        </div>
       </div>
-      <div>
-        <label>Número do chip (MSISDN)</label>
-        <input id="chipNumero" placeholder="+5511999990000" />
+      <div class="row-actions" style="margin-top:12px;">
+        <label style="display:flex; align-items:center; gap:8px; margin:0; text-transform:none; letter-spacing:0; font-size:12px; color:var(--muted);">
+          <input id="login-remember" type="checkbox" style="width:auto; margin:0;" />
+          Lembrar de mim
+        </label>
+        <button id="btn-login">Entrar e iniciar bridge</button>
+      </div>
+      <div id="login-msg"></div>
+      <div class="ccid-hero" style="margin-top:16px;padding:14px;border-radius:12px;border:1px solid var(--border);">
+        <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--gold);">CCID + número (TXT)</p>
+        <p class="hint" style="margin:0 0 10px;">Ficheiro .TXT — um par por linha. <strong>Importe para deixar de ver —</strong> na tabela de modems.</p>
+        <div class="row-actions" style="justify-content:flex-start;">
+          <button type="button" class="btn-txt-hero" id="btn-ccid-import-login">Importar lista TXT (CCID + Número)</button>
+          <input type="file" id="ccid-file-input-login" accept=".txt,text/plain" />
+          <span id="ccid-import-status-login" class="ccid-line">Nenhuma lista importada.</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="app-pane" class="pane" style="display:none;">
+      <div class="app-toolbar">
+        <span id="status-chip" class="status-chip" title="Estado do core">CORE OFFLINE</span>
+        <button type="button" class="btn-txt-hero" id="btn-ccid-import">Importar lista TXT (CCID + Número)</button>
+        <input type="file" id="ccid-file-input" accept=".txt,text/plain" />
+        <button id="btn-refresh" class="secondary" type="button">Atualizar monitoramento</button>
+        <button id="btn-update-check" class="secondary" type="button">Verificar atualização</button>
+        <button id="btn-logout" class="secondary" type="button">Sair</button>
+        <span id="ccid-import-status" class="ccid-line" style="min-width:160px;flex:1 1 240px">—</span>
+      </div>
+      <div class="update-strip">
+        <span id="update-banner" class="hint" style="margin:0;flex:1 1 220px;min-width:0;"></span>
+        <button type="button" id="btn-update-download" class="secondary" style="display:none;">Baixar instalador</button>
+      </div>
+      <h2 class="modem-h2">Monitoramento de modems</h2>
+      <p class="modem-hint">Toque numa linha para ver o histórico de serviços (ID, recompensa, status, data).</p>
+      <div class="modem-table-wrap">
+        <table class="modem-table" id="modem-table">
+          <thead>
+            <tr>
+              <th>Porta</th>
+              <th>Número</th>
+              <th>Operadora</th>
+              <th>Status</th>
+              <th>Lucro</th>
+              <th>Última ativação</th>
+            </tr>
+          </thead>
+          <tbody id="modem-table-body"></tbody>
+        </table>
+      </div>
+      <p id="last-sync" class="hint" style="margin-top:10px;">Última atualização: --:--:--</p>
+    </section>
+  </div>
+
+  <div id="num-modal-backdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="num-modal-headline">
+    <div class="num-modal" onclick="event.stopPropagation();">
+      <div class="num-modal-hd">
+        <div class="num-modal-title">
+          <span class="led" id="num-modal-led" aria-hidden="true"></span>
+          <div>
+            <div id="num-modal-headline" class="num-label">Brasil</div>
+            <div class="num-sub" id="num-modal-sub">Porta</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" id="num-modal-close" aria-label="Fechar">×</button>
+      </div>
+      <div class="num-modal-body">
+        <div class="num-modal-left">
+          <p class="act-sub" id="act-count">Ativações (0)</p>
+          <div style="overflow-x:auto">
+            <table class="act-table" id="act-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Serviço</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="act-tbody"></tbody>
+            </table>
+          </div>
+          <p class="act-sub" id="act-err" style="color:#f0a0a0;display:none;"></p>
+        </div>
+        <div class="num-modal-right" id="num-side-meta">
+          <div><strong>Operadora</strong> —</div>
+          <div><strong>Porta</strong> —</div>
+          <div><strong>Lucro (sessão)</strong> R$ 0,00</div>
+        </div>
       </div>
     </div>
-    <label>Operadora (opcional)</label>
-    <input id="chipOperadora" placeholder="TIM" />
-    <button id="btnRegisterChip">Enviar para API (POST /partner-api/chips)</button>
-  </fieldset>
-
-  <fieldset>
-    <legend>4 · Escutar pedidos de SMS (polling)</legend>
-    <p style="font-size:0.8rem;color:#888;margin:0;">Heartbeat + lista de ativações <code>waiting</code> a cada intervalo.</p>
-    <label>Intervalo (ms)</label>
-    <input id="pollMs" type="number" value="5000" min="2000" step="1000" />
-    <button id="btnTogglePoll" class="secondary">Iniciar / Parar escuta</button>
-    <p style="font-size:0.75rem;color:#666;">Quando o modem ler o código, use “Entregar SMS” com o <code>activation_id</code> da fila.</p>
-    <div class="row">
-      <div>
-        <label>activation_id</label>
-        <input id="actId" />
-      </div>
-      <div>
-        <label>sms_code</label>
-        <input id="smsCode" />
-      </div>
-    </div>
-    <label>chip_porta (igual ao registo)</label>
-    <input id="deliverPorta" placeholder="COM3" />
-    <button id="btnDeliver">Entregar SMS (POST /sms/deliver)</button>
-  </fieldset>
-
-  <fieldset>
-    <legend>Log</legend>
-    <div id="log"></div>
-  </fieldset>
+  </div>
 
   <script src="src/renderer.js"></script>
 </body>

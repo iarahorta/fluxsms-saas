@@ -21,6 +21,43 @@ const { validateInput } = require('./middleware/validate');
 const app = express();
 app.set('trust proxy', 1);
 
+// Redirecionamentos explícitos (legado) — antes de tudo, para o Railway/Cloud não devolver 404.
+app.get([
+    '/downloads/FluxSMS-Polo-Worker-Portable.exe',
+    '/download/FluxSMS-Polo-Worker-Portable.exe',
+    '/downloads/FluxSMS-Polo-Worker-Portable.EXE',
+    '/download/FluxSMS-Polo-Worker-Portable.EXE'
+], (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return res.redirect(301, '/download/FluxSMS_Setup.exe');
+});
+
+// Instalador legado — DEVE ficar antes de qualquer outro middleware / router
+// (evita 404 "Cannot GET" se outro handler ou deploy antigo interceptar /downloads).
+app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const raw = String(req.originalUrl || req.url || '').split('?')[0].split('#')[0];
+    let p;
+    try {
+        p = decodeURIComponent(raw);
+    } catch {
+        p = raw;
+    }
+    if (
+        /^\/downloads\/FluxSMS-Polo-Worker-Portable\.exe\/?$/i.test(p) ||
+        /^\/download\/FluxSMS-Polo-Worker-Portable\.exe\/?$/i.test(p)
+    ) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.redirect(301, '/download/FluxSMS_Setup.exe');
+    }
+    // Qualquer /downloads/*.exe (exceto redirect específico acima) ainda comum em links viejos
+    if (/^\/downloads\/[^/]+\.exe\/?$/i.test(p) && !/^\/downloads\/FluxSMS_Setup\.exe\/?$/i.test(p)) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.redirect(301, '/download/FluxSMS_Setup.exe');
+    }
+    next();
+});
+
 // ─── Supabase (service_role para operações protegidas) ────────
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -85,8 +122,42 @@ app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resum
 app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autónomo: ativar perfil parceiro (JWT)
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
 
-// Deploy touch 2026-04-22 10:04:45 -03:00 (forçar rebuild Railway)
-const VERSION = '2.1.13';
+// ─── Heartbeat Cleaner Automático (60s / timeout 180s) ─────────
+const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+const HEARTBEAT_TIMEOUT_MS = 180 * 1000;
+async function runHeartbeatCleaner() {
+    try {
+        const thresholdIso = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS).toISOString();
+
+        // Polos sem comunicação recente => OFFLINE
+        await supabase
+            .from('polos')
+            .update({ status: 'OFFLINE' })
+            .lt('ultima_comunicacao', thresholdIso)
+            .neq('status', 'OFFLINE');
+
+        // Chips fantasmas (sem ping > 180s) => OFFLINE
+        await supabase
+            .from('chips')
+            .update({ status: 'offline' })
+            .lt('last_ping', thresholdIso)
+            .neq('status', 'offline');
+        // Fallback para chips legados que ainda não receberam last_ping
+        await supabase
+            .from('chips')
+            .update({ status: 'offline' })
+            .is('last_ping', null)
+            .lt('updated_at', thresholdIso)
+            .neq('status', 'offline');
+    } catch (_err) {
+        // silencioso por requisito operacional
+    }
+}
+setInterval(runHeartbeatCleaner, HEARTBEAT_INTERVAL_MS);
+setTimeout(runHeartbeatCleaner, 10000);
+
+// Deploy touch 2026-04-22 — performance LCP + imagens WebP/JPEG + scripts ao fim do body
+const VERSION = '2.1.27';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
@@ -116,14 +187,23 @@ function sendIndexHtml(req, res) {
             html = html.replace('<head>', '<head>\n    <script>window.__FLUX_PARTNER_PORTAL=true</script>');
         }
         if (!html.includes('window.__FLUX_CHAT_CONFIG=')) {
+            const tawkPropertyId = String(process.env.TAWK_PROPERTY_ID || '69e8ef5ae501111c351289e9').trim();
+            const tawkWidgetId = String(process.env.TAWK_WIDGET_ID || '1jmqudufi').trim();
             const chatConfig = {
                 provider: String(process.env.CHAT_WIDGET_PROVIDER || 'tawk').toLowerCase(),
                 crispWebsiteId: process.env.CRISP_WEBSITE_ID || '',
-                tawkPropertyId: process.env.TAWK_PROPERTY_ID || '69e8ef5ae501111c351289e9',
-                tawkWidgetId: process.env.TAWK_WIDGET_ID || '1jmqudufi'
+                tawkPropertyId,
+                tawkWidgetId
             };
             const safeConfigJson = JSON.stringify(chatConfig).replace(/</g, '\\u003c');
             html = html.replace('<head>', `<head>\n    <script>window.__FLUX_CHAT_CONFIG=${safeConfigJson}</script>`);
+        }
+        if (!html.includes('window.__FLUX_APP_CONFIG=')) {
+            const appConfig = {
+                supportEmail: String(process.env.SUPPORT_EMAIL || 'suporte@fluxsms.com.br').trim().toLowerCase()
+            };
+            const safeAppConfigJson = JSON.stringify(appConfig).replace(/</g, '\\u003c');
+            html = html.replace('<head>', `<head>\n    <script>window.__FLUX_APP_CONFIG=${safeAppConfigJson}</script>`);
         }
         res.type('html').send(html);
     } catch (err) {
@@ -195,8 +275,47 @@ publicFolders.forEach(folder => {
     app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
 });
 
-// Executável Polo Worker (coloque FluxSMS-Polo-Worker-Portable.exe na pasta /downloads ou defina POLO_WORKER_DOWNLOAD_URL)
-app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));
+// Metadados de versão do instalador desktop (sem cache — o app compara com a versão instalada)
+app.get('/download/desktop-update.json', (_req, res) => {
+    const fp = path.join(__dirname, 'public', 'download', 'desktop-update.json');
+    if (!fs.existsSync(fp)) return res.status(404).type('application/json').send('{}');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.type('application/json; charset=utf-8');
+    res.sendFile(fp);
+});
+
+// Instalador Windows (parceiros) — URL canónica: /download/FluxSMS_Setup.exe
+app.use(
+    '/download',
+    express.static(path.join(__dirname, 'public', 'download'), {
+        maxAge: 7 * 86400000,
+        setHeaders(res) {
+            res.set('Cache-Control', 'public, max-age=604800');
+        }
+    })
+);
+// Legado: redireciona nomes / caminhos antigos do instalador parceiro
+app.get('/downloads/FluxSMS_Setup.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
+app.get('/downloads/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
+app.get('/download/FluxSMS-Polo-Worker-Portable.exe', (_req, res) => res.redirect(301, '/download/FluxSMS_Setup.exe'));
+// Pasta /downloads mantida para README ou ficheiros opcionais locais (não enviada no deploy se .railwayignore excluir downloads/)
+if (fs.existsSync(path.join(__dirname, 'downloads'))) {
+    app.use('/downloads', express.static(path.join(__dirname, 'downloads'), { maxAge: 7 * 86400000 }));
+}
+
+// SEO — sitemap e robots (ficheiros em /public)
+app.get('/sitemap.xml', (_req, res) => {
+    const fp = path.join(__dirname, 'public', 'sitemap.xml');
+    if (!fs.existsSync(fp)) return res.status(404).type('text/plain').send('Not found');
+    res.type('application/xml');
+    res.sendFile(fp);
+});
+app.get('/robots.txt', (_req, res) => {
+    const fp = path.join(__dirname, 'public', 'robots.txt');
+    if (!fs.existsSync(fp)) return res.status(404).type('text/plain').send('Not found');
+    res.type('text/plain; charset=utf-8');
+    res.sendFile(fp);
+});
 
 // Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
 app.get('/', sendIndexHtml);

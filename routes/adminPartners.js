@@ -191,6 +191,50 @@ router.post('/:partnerProfileId/api-keys', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/partners/:partnerProfileId/chips/force-offline
+ * Botão admin: força OFFLINE para todos os chips da API Key do parceiro.
+ */
+router.post('/:partnerProfileId/chips/force-offline', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    try {
+        const { data: polos, error: pErr } = await supabase
+            .from('polos')
+            .select('id')
+            .eq('partner_profile_id', partnerProfileId);
+        if (pErr) {
+            return res.status(500).json({ ok: false, error: 'polos_failed', detail: pErr.message });
+        }
+        const poloIds = (polos || []).map((p) => p.id).filter(Boolean);
+        if (!poloIds.length) {
+            return res.json({ ok: true, polos: 0, chips_offline: 0 });
+        }
+
+        const { data: chips, error: cErr } = await supabase
+            .from('chips')
+            .update({ status: 'offline' })
+            .in('polo_id', poloIds)
+            .select('id');
+        if (cErr) {
+            return res.status(500).json({ ok: false, error: 'chips_update_failed', detail: cErr.message });
+        }
+
+        await supabase
+            .from('polos')
+            .update({ status: 'OFFLINE' })
+            .in('id', poloIds);
+
+        return res.json({
+            ok: true,
+            polos: poloIds.length,
+            chips_offline: (chips || []).length
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'force_offline_failed', detail: err.message });
+    }
+});
+
+/**
  * GET /api/admin/partners
  * Lista partner_profiles com dados básicos do perfil (somente admin).
  */

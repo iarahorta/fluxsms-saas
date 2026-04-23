@@ -166,7 +166,7 @@
     <div class="hero-partner">
         <div class="hero-badge">Parceiro · Infraestrutura</div>
         <h1>Cadastro <span>autónomo</span> de parceiro FluxSMS</h1>
-        <p class="hero-lead">Crie a sua conta, ative o perfil parceiro e aceda ao painel: API Key, Polo Worker (.exe) e
+        <p class="hero-lead">Crie a sua conta, ative o perfil parceiro e aceda ao painel: chave de integração, FluxSMS Desktop e
             repasses — sem depender de e-mail manual da equipa.</p>
 
         <div class="card-register">
@@ -176,6 +176,9 @@
 
                 <label for="pr-email">E-mail</label>
                 <input id="pr-email" type="email" required autocomplete="email" placeholder="seu@email.com">
+
+                <label for="pr-whatsapp">WhatsApp (com DDD)</label>
+                <input id="pr-whatsapp" type="text" required autocomplete="tel" placeholder="(11) 99999-9999">
 
                 <label for="pr-pass">Senha</label>
                 <input id="pr-pass" type="password" required minlength="6" autocomplete="new-password"
@@ -189,6 +192,7 @@
         <div class="footer-links">
             <a id="pr-login-portal" href="/portal/login">Já tenho conta — entrar</a>
             <a href="/termos/">Termos</a>
+            <div style="margin-top:10px; font-size:11px; opacity:0.75;">Suporte: <a href="mailto:suporte@fluxsms.com.br">suporte@fluxsms.com.br</a></div>
         </div>
     </div>
 
@@ -225,6 +229,13 @@
             msgEl.className = 'msg' + (ok ? ' ok' : '');
         }
 
+        function normalizeWhatsapp(value) {
+            const digits = String(value || '').replace(/\D/g, '');
+            if (digits.length < 10 || digits.length > 13) return '';
+            if (digits.startsWith('55')) return '+' + digits;
+            return '+55' + digits;
+        }
+
         async function activatePartner(accessToken) {
             const res = await fetch(BACKEND_URL + '/api/partner/onboarding/activate', {
                 method: 'POST',
@@ -244,9 +255,10 @@
         btn.addEventListener('click', async function () {
             const name = document.getElementById('pr-name').value.trim();
             const email = document.getElementById('pr-email').value.trim();
+            const whatsapp = normalizeWhatsapp(document.getElementById('pr-whatsapp').value);
             const password = document.getElementById('pr-pass').value;
-            if (!name || !email || !password) {
-                setMsg('Preencha todos os campos.');
+            if (!name || !email || !password || !whatsapp) {
+                setMsg('Preencha todos os campos, incluindo WhatsApp com DDD.');
                 return;
             }
             btn.disabled = true;
@@ -255,7 +267,7 @@
                 const { data, error } = await db.auth.signUp({
                     email: email,
                     password: password,
-                    options: { data: { full_name: name } }
+                    options: { data: { full_name: name, whatsapp: whatsapp } }
                 });
                 if (error) throw error;
 
@@ -270,10 +282,12 @@
                     throw new Error('Sem sessão após registo. Confirme o e-mail se solicitado e volte a entrar.');
                 }
 
+                await db.from('profiles').update({ whatsapp: whatsapp }).eq('id', session.user.id);
+
                 setMsg('A ativar perfil parceiro…', true);
                 const act = await activatePartner(session.access_token);
                 if (act.api_key) {
-                    window.prompt('COPIE AGORA a sua Partner API Key (única, fixa, vincula ao 1.º PC do Worker). Guarde em local seguro:', act.api_key);
+                    window.prompt('COPIE AGORA a sua chave de integração (única; guarde em local seguro). Use no FluxSMS Desktop com a chave do parceiro do painel:', act.api_key);
                 }
                 setMsg('Conta pronta. A redirecionar para o painel…', true);
                 window.location.href = fluxPartnerPortalBase() + '/';

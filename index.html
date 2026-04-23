@@ -4,15 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FluxSMS | Números Virtuais de Elite</title>
+    <title>FluxSMS | Números Virtuais e Ativações SMS Instantâneas</title>
     <meta name="description"
-        content="FluxSMS - Ativações via chips físicos reais brasileiros. Segurança e rapidez para WhatsApp, Telegram e muito mais.">
-    <link rel="icon" type="image/png" href="/favicon.png?v=2.1.12">
-    <link rel="stylesheet" href="/style.css?v=2.1.12">
+        content="FluxSMS — Números virtuais e ativações SMS instantâneas com chips físicos brasileiros genuínos. Segurança, rapidez e estorno automático para WhatsApp, Telegram, Google e centenas de serviços. Crie sua conta e comece em minutos.">
+    <link rel="canonical" href="https://fluxsms.com.br/">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="image" href="/assets/hero_luxury.webp?v=2.1.27" type="image/webp">
+    <meta property="og:title" content="FluxSMS | Números Virtuais e Ativações SMS Instantâneas">
+    <meta property="og:description" content="FluxSMS — Números virtuais e ativações SMS instantâneas com chips físicos brasileiros genuínos. Segurança, rapidez e estorno automático para WhatsApp, Telegram, Google e centenas de serviços.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://fluxsms.com.br/">
+    <link rel="icon" type="image/png" href="/favicon.png?v=2.1.27">
+    <link rel="stylesheet" href="/style.css?v=2.1.27">
     <link
         href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 
 <body>
@@ -48,7 +56,7 @@
             <div class="container hero-grid">
                 <div class="hero-text">
                     <div class="tag-premium">◆ INFRAESTRUTURA DE ELITE</div>
-                    <h1>O Padrão Ouro para Ativações via <span class="text-gold">Chips Reais</span></h1>
+                    <h1><span class="text-gold">Números Virtuais</span> e <span class="text-gold">Ativações SMS</span> instantâneas com o padrão ouro em chips reais brasileiros</h1>
                     <p>Utilizamos apenas chips físicos brasileiros genuínos. Garanta a maior taxa de aprovação para
                         WhatsApp, Telegram, Google e centenas de outros serviços.</p>
                     <div class="hero-actions">
@@ -59,7 +67,13 @@
                     </div>
                 </div>
                 <div class="hero-image">
-                    <img src="/assets/hero_luxury.png?v=2.1.12" alt="FluxSMS Luxury SIM" id="hero-img-main">
+                    <picture>
+                        <source type="image/webp" srcset="/assets/hero_luxury.webp?v=2.1.27">
+                        <source type="image/jpeg" srcset="/assets/hero_luxury.jpg?v=2.1.27">
+                        <img src="/assets/hero_luxury.jpg?v=2.1.27" width="1024" height="1024"
+                            alt="FluxSMS — Números virtuais e ativações SMS com chips reais" id="hero-img-main"
+                            fetchpriority="high" decoding="async" loading="eager">
+                    </picture>
                 </div>
             </div>
         </section>
@@ -68,7 +82,7 @@
             <div class="container">
                 <div class="lp-section-header">
                     <div class="tag-premium">◆ POR QUE A FLUXSMS É DIFERENTE?</div>
-                    <h2>Infraestrutura que você não encontra em outro lugar</h2>
+                    <h2>Números Virtuais e fluxo de Ativações SMS com infraestrutura que você não encontra em outro lugar</h2>
                 </div>
                 <div class="lp-features-grid">
                     <div class="lp-feature-card">
@@ -144,6 +158,7 @@
                 </div>
                 <div class="footer-copy">
                     © 2026 FluxSMS. Todos os direitos reservados.
+                    <span style="display:block; margin-top:6px; opacity:0.7;">Suporte oficial: <a href="mailto:suporte@fluxsms.com.br" style="color:var(--flux-gold);">suporte@fluxsms.com.br</a></span>
                 </div>
             </div>
         </footer>
@@ -156,8 +171,12 @@
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-top">
                     <div class="logo-area">
-                        <img src="/assets/logo.png?v=2.1.12" alt="FluxSMS" class="logo-img"
-                            onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                        <picture>
+                            <source type="image/webp" srcset="/assets/logo.webp?v=2.1.27">
+                            <img src="/assets/logo.png?v=2.1.27" width="400" height="400" alt="FluxSMS" class="logo-img"
+                                loading="lazy" decoding="async"
+                                onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'">
+                        </picture>
                         <span id="logo-fallback" style="display:none;"><span class="logo-flux">FLUX</span><span
                                 class="logo-sms">SMS</span></span>
                     </div>
@@ -228,34 +247,60 @@
                     </div>
                 </header>
 
-                <div id="partner-autonomy-strip" class="partner-autonomy-strip" style="display: none;" aria-label="Identidade e infraestrutura parceiro">
-                    <div class="partner-autonomy-inner">
-                        <div class="partner-autonomy-card partner-identity-card">
-                            <div class="partner-autonomy-label">Partner API Key · identidade fixa</div>
-                            <div class="partner-key-row">
-                                <input type="text" id="partner-api-key-field" class="partner-api-key-field" readonly autocomplete="off" placeholder="A carregar…" spellcheck="false">
-                                <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="copyPartnerApiKey()">Copiar</button>
-                            </div>
-                            <p id="partner-key-hint" class="partner-autonomy-hint" style="margin-top:8px;">A mesma chave liga o Polo Worker a esta conta. Guarde em cofre interno.</p>
-                        </div>
-                        <div class="partner-autonomy-card">
-                            <div class="partner-autonomy-label">Polo Worker · Windows</div>
-                            <a id="partner-strip-download" class="btn-pix partner-autonomy-download" href="#" rel="noopener">Baixar .exe</a>
-                            <p class="partner-autonomy-hint">Instale no PC do polo; use a URL deste site e a chave acima.</p>
-                        </div>
-                        <div class="partner-autonomy-card">
-                            <div class="partner-autonomy-label">Repasse (resumo)</div>
-                            <div id="partner-strip-finance-line" class="partner-autonomy-value">—</div>
-                            <button type="button" class="btn-partner-lux partner-autonomy-btn" onclick="showView('partners')">Financeiro &amp; saque</button>
+                <div id="partner-autonomy-strip" class="partner-lux-stack" style="display: none;" aria-label="Área do parceiro">
+                    <div class="partner-lux-hero">
+                        <a id="partner-strip-download" class="btn-partner-download-gold" href="/download/FluxSMS_Setup.exe" download="FluxSMS_Setup.exe" rel="noopener">📥 BAIXAR FLUXSMS DESKTOP</a>
+                        <p class="partner-lux-hero-note">Nota: No Windows, clique em "Sim" para permitir a gestão dos chips.</p>
+                    </div>
+                    <div class="partner-lux-finance" id="partner-finance-ribbon" aria-label="Resumo financeiro">
+                        <div class="partner-lux-finance-inner">
+                            <div id="partner-strip-finance-line" class="partner-lux-finance-line">—</div>
+                            <button type="button" class="btn-partner-lux" onclick="showView('partners')">Financeiro e saque</button>
                         </div>
                     </div>
+                    <div class="partner-lux-keybox" aria-label="Sua chave de acesso">
+                        <h2 class="partner-lux-keybox-title">Sua Chave de Acesso</h2>
+                        <p class="partner-lux-keybox-lead">E-mail, senha, a <strong>chave de integração (API)</strong> e a <strong>CHAVE DO PARCEIRO</strong> abaixo — tudo o que o app pede no primeiro acesso.</p>
+                        <div class="partner-lux-profile-mini">
+                            <div><span class="pk-label">E-mail</span> <span id="partner-profile-email" class="pk-value">—</span></div>
+                            <div><span class="pk-label">Nome</span> <span id="partner-profile-name" class="pk-value">—</span></div>
+                            <div><span class="pk-label">Código</span> <code id="partner-profile-code" class="pk-code">—</code></div>
+                        </div>
+                        <div class="partner-lux-keyrow">
+                            <div class="partner-lux-keylabel">Chave de integração (API) — use no app</div>
+                            <div class="partner-key-row">
+                                <input type="text" id="partner-api-key-field" class="partner-api-key-field" readonly autocomplete="off" placeholder="A carregar…" spellcheck="false" aria-label="Chave de integração">
+                                <button type="button" class="btn-partner-lux" onclick="copyPartnerApiKey()">COPIAR CHAVE</button>
+                            </div>
+                            <p id="partner-key-hint" class="partner-lux-hint">—</p>
+                        </div>
+                        <div class="partner-lux-stations" id="partner-stations-chaves">
+                            <div class="partner-lux-keylabel">CHAVE DO PARCEIRO (por estação)</div>
+                            <div id="partner-polos-keys-list" class="partner-polos-keys-list"></div>
+                        </div>
+                    </div>
+                    <ol class="partner-lux-howto" aria-label="Passo a passo">
+                        <li>Baixe e instale o app.</li>
+                        <li>Abra o app e cole a <strong>CHAVE DO PARCEIRO</strong> (e complete e-mail, senha e chave de integração).</li>
+                        <li>Os chips aparecem abaixo automaticamente quando tudo estiver conectado.</li>
+                    </ol>
                 </div>
 
                 <!-- VIEW: DASHBOARD — cliente (compra) vs parceiro (infra) -->
                 <section id="view-dashboard" class="content-grid app-view">
                     <div id="client-purchase-dashboard" class="client-purchase-dashboard hide-for-partner">
-                        <div id="launch-timer-banner" class="launch-timer-banner" style="display:none;">
-                            Tarifa de Lançamento: WhatsApp por R$ 6,10 encerra em <strong id="launch-timer-days">15 dias</strong>
+                        <div class="operator-selector-card">
+                            <div class="operator-selector-head">
+                                <h2 class="section-title">OPERADORA PREFERIDA</h2>
+                                <span class="count-badge">Aplicado nas próximas ativações</span>
+                            </div>
+                            <select id="operator-preference" class="custom-value" onchange="saveOperatorPreference(this.value)">
+                                <option value="any">Automática (melhor disponibilidade)</option>
+                                <option value="vivo">Vivo</option>
+                                <option value="claro">Claro</option>
+                                <option value="tim">TIM</option>
+                                <option value="oi">Oi</option>
+                            </select>
                         </div>
                         <div class="services-container">
                             <div class="section-header">
@@ -269,9 +314,17 @@
                             </div>
                             <div class="services-list" id="services-grid"></div>
                         </div>
-                        <div class="active-sessions">
-                            <h2 class="section-title">NÚMEROS ATIVOS</h2>
-                            <div id="level-progress-card" class="level-progress-card" style="display:none;">
+                    </div>
+                    <aside id="dashboard-right-sidebar" class="dashboard-right-sidebar hide-for-partner">
+                        <div id="launch-timer-card" class="dashboard-side-card" style="display:none;">
+                            <h2 class="section-title">TIMER DE ATIVAÇÃO</h2>
+                            <div id="launch-timer-banner" class="launch-timer-banner" style="display:none;">
+                                Tarifa de Lançamento: WhatsApp por R$ 6,10 encerra em <strong id="launch-timer-days">15 dias</strong>
+                            </div>
+                        </div>
+                        <div id="level-progress-card" class="level-progress-card dashboard-side-card" style="display:none;">
+                            <h2 class="section-title">PROGRESSO DE NÍVEL</h2>
+                            <div class="level-progress-wrap">
                                 <div class="level-progress-head">
                                     <span id="level-current-badge" class="fidelity-badge badge-bronze">PADRÃO</span>
                                     <span id="level-current-price">R$ 7,50</span>
@@ -281,27 +334,30 @@
                                 </div>
                                 <p id="level-progress-text" class="level-progress-text">Gaste mais R$ 200,00 para atingir o Nível Bronze e pagar R$ 7,00.</p>
                             </div>
+                        </div>
+                        <div class="active-sessions dashboard-side-card">
+                            <h2 class="section-title">NÚMEROS ATIVOS</h2>
                             <div class="sessions-list" id="active-numbers">
                                 <div class="empty-state">Nenhum número solicitado no momento.</div>
                             </div>
                         </div>
-                    </div>
+                    </aside>
                     <div id="partner-infra-monitor" class="partner-infra-monitor" style="display:none;">
                         <div class="section-header" style="margin-bottom: 16px;">
                             <h2 class="section-title">MONITORAMENTO DE CHIPS</h2>
                             <span class="count-badge">Infraestrutura do parceiro</span>
                         </div>
-                        <p style="color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-bottom: 14px;">Estado dos modems e chips nos polos vinculados à sua conta (Partner API).</p>
+                        <p class="partner-infra-lead" style="color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-bottom: 14px;">Estado dos modems e chips vinculados à sua conta.</p>
                         <button type="button" class="btn-partner-refresh" onclick="loadPartnerChipsMonitor()" style="margin-bottom:14px;">Atualizar</button>
                         <div style="overflow-x: auto;">
                             <table class="partner-table" id="table-partner-chips-monitor">
                                 <thead>
                                     <tr>
-                                        <th>Polo</th>
+                                        <th class="partner-col-station">Estação</th>
                                         <th>Porta</th>
                                         <th>Número</th>
                                         <th>Status chip</th>
-                                        <th>Polo / link</th>
+                                        <th>Comunicação</th>
                                         <th>WA disponível</th>
                                     </tr>
                                 </thead>
@@ -495,6 +551,11 @@
                             autocomplete="off">
                     </div>
                     <div class="input-group">
+                        <label>WhatsApp (com DDD)</label>
+                        <input type="text" id="reg-whatsapp" class="custom-value" placeholder="(11) 99999-9999"
+                            autocomplete="tel">
+                    </div>
+                    <div class="input-group">
                         <label>Senha</label>
                         <input type="password" id="reg-password" class="custom-value" placeholder="Mínimo 6 dígitos">
                     </div>
@@ -507,9 +568,31 @@
         </div>
     </div>
 
+    <!-- PROFILE COMPLETION MODAL -->
+    <div id="profileCompletionModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width: 420px;">
+            <div class="modal-header">
+                <span>COMPLETAR PERFIL</span>
+                <button type="button" onclick="closeProfileCompletionModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:12px; color: rgba(255,255,255,0.72); margin-bottom: 12px;">
+                    Complete seu perfil com seu WhatsApp para receber notificações importantes da conta.
+                </p>
+                <div class="input-group">
+                    <label>WhatsApp (com DDD)</label>
+                    <input type="text" id="profile-whatsapp" class="custom-value" placeholder="(11) 99999-9999" autocomplete="tel">
+                </div>
+                <button type="button" class="btn-pix" onclick="submitProfileCompletion()">Salvar WhatsApp</button>
+                <p id="profile-completion-msg" style="font-size: 11px; margin-top: 10px; color: rgba(255,255,255,0.65);"></p>
+            </div>
+        </div>
+    </div>
 
-    <!-- SCRIPTS -->
-    <script src="/dist/app.shield.js?v=2.1.12"></script>
+
+    <!-- SCRIPTS (fim do body: não bloqueia LCP; Supabase antes do app) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="/dist/app.shield.js?v=2.1.27"></script>
     <script>
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
         function toggleLandingMenu() {
@@ -570,7 +653,7 @@
                 if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth('login'); });
             });
             // Enter no cadastro
-            ['reg-name', 'reg-email', 'reg-password'].forEach(id => {
+            ['reg-name', 'reg-email', 'reg-whatsapp', 'reg-password'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth('signup'); });
             });

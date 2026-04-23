@@ -15,6 +15,7 @@ router.get('/docs', (_req, res) => {
       { method: 'GET', path: '/partner-api/me', auth: true, description: 'Dados do parceiro autenticado' },
       { method: 'POST', path: '/partner-api/chips', auth: true, description: 'Registrar chip no polo vinculado ao parceiro (bloqueio Em quarentena WhatsApp 30d)' },
       { method: 'GET', path: '/partner-api/worker/activations?polo_chave=', auth: true, description: 'Fila SMS waiting para chips deste polo (worker Electron)' },
+      { method: 'GET', path: '/partner-api/worker/chip-activations?polo_chave=&porta=', auth: true, description: 'Histórico de ativações do chip (porta COM) para o painel do worker' },
       { method: 'POST', path: '/partner-api/worker/heartbeat', auth: true, description: 'Mantém polo ONLINE (ultima_comunicacao)' }
     ]
   });
@@ -148,6 +149,74 @@ router.get('/worker/activations', async (req, res) => {
 });
 
 /**
+ * GET /partner-api/worker/chip-activations?polo_chave=...&porta=COM3
+ * Histórico de ativações ligadas a um chip (porta) do polo.
+ */
+router.get('/worker/chip-activations', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const polo_chave = req.query.polo_chave;
+    const porta = req.query.porta;
+    if (!polo_chave || porta == null || String(porta).trim() === '') {
+        return res.status(400).json({ ok: false, error: 'polo_chave_e_porta_obrigatorias' });
+    }
+    const portaNorm = String(porta).trim();
+    const portaUpper = portaNorm.toUpperCase();
+    try {
+        const { data: polo, error: polErr } = await supabase
+            .from('polos')
+            .select('id, partner_profile_id, nome, status, ultima_comunicacao')
+            .eq('chave_acesso', String(polo_chave))
+            .maybeSingle();
+
+        if (polErr || !polo) {
+            return res.status(404).json({ ok: false, error: 'polo_nao_encontrado' });
+        }
+        if (polo.partner_profile_id !== req.partner.id) {
+            return res.status(403).json({ ok: false, error: 'polo_nao_vinculado_a_este_parceiro' });
+        }
+
+        const { data: chipRows, error: cErr } = await supabase
+            .from('chips')
+            .select('id, porta, numero, operadora')
+            .eq('polo_id', polo.id);
+        if (cErr) {
+            return res.status(500).json({ ok: false, error: 'chip_lookup_failed', detail: cErr.message });
+        }
+        const chip = (chipRows || []).find(
+            (c) => String(c.porta || '').toUpperCase() === portaUpper
+        ) || null;
+        if (!chip) {
+            return res.json({
+                ok: true,
+                activations: [],
+                chip: null,
+                polo: { nome: polo.nome, status: polo.status, ultima: polo.ultima_comunicacao }
+            });
+        }
+
+        const { data: activations, error: actErr } = await supabase
+            .from('activations')
+            .select('id, service, service_name, price, status, created_at')
+            .eq('chip_id', chip.id)
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        if (actErr) {
+            return res.status(500).json({ ok: false, error: 'activations_failed', detail: actErr.message });
+        }
+
+        return res.json({
+            ok: true,
+            activations: activations || [],
+            chip,
+            polo: { nome: polo.nome, status: polo.status, ultima: polo.ultima_comunicacao }
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'chip_activations_failed', detail: err.message });
+    }
+});
+
+/**
  * POST /partner-api/worker/heartbeat { polo_chave }
  * Atualiza ultima_comunicacao para o painel considerar o polo ONLINE.
  */
@@ -181,9 +250,59 @@ router.post('/worker/heartbeat', async (req, res) => {
             return res.status(500).json({ ok: false, error: 'heartbeat_failed', detail: upErr.message });
         }
 
+        // Marca parceiro e chips vinculados como vivos (last_ping).
+        await supabase
+            .from('partner_profiles')
+            .update({ last_ping: now })
+            .eq('id', polo.partner_profile_id);
+        await supabase
+            .from('chips')
+            .update({ last_ping: now })
+            .eq('polo_id', polo.id);
+
         return res.json({ ok: true, ts: now });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'worker_heartbeat_failed', detail: err.message });
+    }
+});
+
+/**
+ * POST /partner-api/worker/shutdown { polo_chave }
+ * Graceful shutdown do app desktop: polo/chips OFFLINE imediatos.
+ */
+router.post('/worker/shutdown', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { polo_chave } = req.body || {};
+    if (!polo_chave) {
+        return res.status(400).json({ ok: false, error: 'polo_chave_obrigatoria' });
+    }
+    try {
+        const { data: polo, error: polErr } = await supabase
+            .from('polos')
+            .select('id, partner_profile_id')
+            .eq('chave_acesso', String(polo_chave))
+            .maybeSingle();
+
+        if (polErr || !polo) {
+            return res.status(404).json({ ok: false, error: 'polo_nao_encontrado' });
+        }
+        if (polo.partner_profile_id !== req.partner.id) {
+            return res.status(403).json({ ok: false, error: 'polo_nao_vinculado_a_este_parceiro' });
+        }
+
+        const now = new Date().toISOString();
+        await supabase
+            .from('polos')
+            .update({ status: 'OFFLINE', ultima_comunicacao: now })
+            .eq('id', polo.id);
+        await supabase
+            .from('chips')
+            .update({ status: 'offline' })
+            .eq('polo_id', polo.id);
+
+        return res.json({ ok: true, ts: now, forced_offline: true });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'worker_shutdown_failed', detail: err.message });
     }
 });
 

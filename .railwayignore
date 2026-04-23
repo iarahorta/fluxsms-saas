@@ -1,0 +1,33 @@
+# Reduz drasticamente o payload do `railway up` (Railpack / upload de contexto).
+# O build na Railway reinstala dependências via `npm ci` — não envie node_modules local.
+
+**/node_modules/
+
+# Core Python do Electron (só necessário na máquina de build do .exe, não no servidor web).
+polo-worker-draft/core-v7.1/
+
+# Artefatos pesados do electron-builder (mantenha apenas public/download/FluxSMS_Setup.exe).
+# EXCLUIR: pasta descompactada do NSIS (centenas de MB) — o servidor só precisa do .exe.
+public/download/win-unpacked/
+public/download/.icon-ico/
+public/download/builder-debug.yml
+public/download/*.blockmap
+downloads/
+polo-worker-draft/dist-exe/
+
+# Ferramentas / IDE
+.cursor/
+.vscode/
+
+# Mídia e anexos locais (não pertencem ao runtime do backend)
+**/*.mp4
+**/*.mov
+**/*.webm
+**/*.mkv
+
+# Artefatos temporários de teste
+**/test_failure.png
+**/playwright-report/
+
+# Supabase CLI local (migrations continuam versionadas em supabase/ — não ignore supabase/migrations)
+.supabase/

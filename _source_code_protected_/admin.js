@@ -293,7 +293,7 @@ function setupRealtime() {
         .subscribe();
 }
 
-// === GERENCIAMENTO DE POLOS (WORKERS) ===
+// === GERENCIAMENTO DE PARCEIROS (WORKERS) ===
 async function loadPolos() {
     const { data: polos, error } = await db.from('polos').select('*').order('criado_em', { ascending: false });
     if (error) {
@@ -309,9 +309,9 @@ async function loadPolos() {
     tbody.innerHTML = '';
 
     polos.forEach(p => {
-        // Regra de 90 segundos para o Badge de Status entrar em OFFLINE automaticamente na tela
+        // Regra de 180 segundos para o Badge de Status entrar em OFFLINE automaticamente na tela
         const lastSeenDate = p.ultima_comunicacao ? new Date(p.ultima_comunicacao) : null;
-        const isOnline = lastSeenDate && (new Date() - lastSeenDate < 90000); 
+        const isOnline = lastSeenDate && (new Date() - lastSeenDate < 180000); 
         
         const lastSeenStr = lastSeenDate ? lastSeenDate.toLocaleString('pt-BR') : 'Sem Conexão';
         const activeChips = chips ? chips.filter(c => c.polo_id === p.id && c.status === 'idle').length : 0;
@@ -366,14 +366,14 @@ window.gerarPolo = async function() {
     if (error) {
         alert("Erro ao criar polo no banco: " + error.message);
     } else {
-        alert("Polo criado com sucesso! Copie a chave exibida e envie para o operador local.");
+        alert("Parceiro criado com sucesso! Copie a chave exibida e envie para o operador local.");
         document.getElementById('polo-nome-input').value = '';
         loadPolos(); // Força load caso realtime sinta atraso
     }
 }
 
 window.deletarPolo = async function(id) {
-    if(!confirm("⚠️ AVISO CRÍTICO: Excluir este Polo vai DESCONECTAR a máquina física associada a ele. O Worker irá parar de enviar dados.\n\nTem certeza que deseja excluir o Polo?")) return;
+    if(!confirm("⚠️ AVISO CRÍTICO: Excluir este Parceiro vai DESCONECTAR a máquina física associada a ele. O Worker irá parar de enviar dados.\n\nTem certeza que deseja excluir este parceiro?")) return;
     
     const { error } = await db.from('polos').delete().eq('id', id);
     if(error) alert("Erro ao excluir polo: " + error.message);
@@ -381,7 +381,7 @@ window.deletarPolo = async function(id) {
 }
 
 window.editarPolo = async function(id, nomeAtual) {
-    const novoNome = prompt("Digite o novo nome para este Polo:", nomeAtual);
+    const novoNome = prompt("Digite o novo nome para este Parceiro:", nomeAtual);
     if (!novoNome || novoNome === nomeAtual) return;
 
     const { error } = await db.from('polos').update({ nome: novoNome }).eq('id', id);
@@ -502,6 +502,7 @@ async function loadPartnerApiAdmin() {
                 <td style="font-size:11px;color:rgba(255,255,255,0.5);">${p.id}</td>
                 <td>
                     <button type="button" class="btn-action" onclick="generateAdminPartnerKey('${p.id}')">Gerar API Key</button>
+                    <button type="button" class="btn-action" style="margin-left:6px;border-color:#ff7a7a;color:#ff7a7a;" onclick="forcePartnerOfflineNow('${p.id}')">Limpar Chips</button>
                 </td>
             </tr>`;
         }
@@ -539,7 +540,7 @@ window.toggleAdminSaquePrioritario = async function (partnerProfileId, checked) 
 };
 
 window.generateAdminPartnerKey = async function (partnerProfileId) {
-    const label = window.prompt('Rótulo desta chave (ex.: Notebook Polo SP):', 'Polo Worker');
+    const label = window.prompt('Rótulo desta chave (ex.: PC estação SP):', 'FluxSMS Desktop');
     if (label === null) return;
 
     const { data: { session } } = await db.auth.getSession();
@@ -562,8 +563,33 @@ window.generateAdminPartnerKey = async function (partnerProfileId) {
             alert('Erro: ' + (j.detail || j.error || res.statusText));
             return;
         }
-        window.prompt('COPIE AGORA a Partner API Key (não será guardada no servidor de novo):', j.api_key);
+        window.prompt('COPIE AGORA a chave de integração (API). Não volta a ser mostrada:', j.api_key);
         loadPartnerApiAdmin();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
+window.forcePartnerOfflineNow = async function (partnerProfileId) {
+    if (!confirm('Forçar OFFLINE de todos os chips deste parceiro agora?')) return;
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}/chips/force-offline`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        alert(`Limpeza concluída: ${j.chips_offline || 0} chips OFFLINE.`);
+        loadPolos();
+        loadChips();
     } catch (e) {
         alert('Falha: ' + (e.message || e));
     }
