@@ -8,6 +8,9 @@ const Store = require('electron-store');
 const axios = require('axios');
 const { SerialPort } = require('serialport');
 
+/** Sempre a fonte canónica de `desktop-update.json` no app instalado (evita parceiro com outro `backendUrl` a ver versão errada). */
+const FLUXSMS_UPDATE_MANIFEST_BASE = 'https://fluxsms.com.br';
+
 let mainWindow = null;
 let tray = null;
 let workerProcess = null;
@@ -20,6 +23,12 @@ let runtimeRows = {};
 const runtimeLogs = [];
 /** Último CCID visto por porta COM (logs do core) — cruza com lista importada .TXT */
 const lastCcidByPort = {};
+/** Acumula chunks incompletos do stdout/stderr do core Python */
+let workerStdoutCarry = '';
+let workerStderrCarry = '';
+let runtimeRowsNotifyTimer = null;
+/** Evita spam à API: chave "PORT|numero" → timestamp */
+const lastWorkerSyncSent = new Map();
 
 /** Ícone da app: chip dourado (marketing); fallback logo legado. */
 function getAppIconPath() {
@@ -83,8 +92,29 @@ const store = new Store({
 
 const CCID_NUMEROS_FILENAME = 'ccid_numeros.json';
 
+function coreDataDir() {
+  const dir = path.join(app.getPath('userData'), 'core-v7.1-data');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function ensureSeedFileInDataDir(filename) {
+  const dst = path.join(coreDataDir(), filename);
+  if (fs.existsSync(dst)) return dst;
+  const src = path.join(safeCorePath(), filename);
+  if (fs.existsSync(src)) {
+    try {
+      fs.copyFileSync(src, dst);
+      return dst;
+    } catch {
+      return dst;
+    }
+  }
+  return dst;
+}
+
 function ccidNumerosPath() {
-  return path.join(safeCorePath(), CCID_NUMEROS_FILENAME);
+  return ensureSeedFileInDataDir(CCID_NUMEROS_FILENAME);
 }
 
 function readJsonCcidBase() {
@@ -102,8 +132,7 @@ function readJsonCcidBase() {
 function syncCcidNumerosFileFromStore() {
   const user = store.get('ccidUserPairs') || {};
   const nUser = user && typeof user === 'object' && !Array.isArray(user) ? Object.keys(user).length : 0;
-  const coreDir = safeCorePath();
-  if (!fs.existsSync(coreDir)) return { written: false, totalKeys: 0 };
+  coreDataDir();
   const p = ccidNumerosPath();
   if (nUser === 0) {
     if (fs.existsSync(p)) {
@@ -232,16 +261,29 @@ function safeCorePath() {
   return path.join(__dirname, '..', 'core-v7.1');
 }
 
+function buildWorkerEnv() {
+  const backendUrl = String(store.get('backendUrl') || '').trim();
+  const poloKey = String(store.get('poloChave') || '').trim();
+  return {
+    ...process.env,
+    PYTHONUNBUFFERED: '1',
+    BACKEND_URL: backendUrl || process.env.BACKEND_URL || '',
+    POLO_KEY: poloKey || process.env.POLO_KEY || '',
+    FLUXSMS_DATA_DIR: coreDataDir()
+  };
+}
+
 function partnerRequestHeaders() {
   const key = String(store.get('partnerApiKey') || '').trim();
   const hwid = getFluxHwid();
   const h = {
-    'Content-Type': 'application/json',
-    'X-Flux-Hwid': hwid
+    'Content-Type': 'application/json'
   };
   if (key) {
     h.Authorization = `Bearer ${key}`;
-    h['X-API-Key'] = key;
+  }
+  if (hwid && hwid.length >= 16) {
+    h['X-Flux-Hwid'] = hwid;
   }
   return h;
 }
@@ -270,6 +312,20 @@ function extractPort(line) {
   return m ? m[0].toUpperCase() : null;
 }
 
+function scheduleRuntimeRowsNotify() {
+  if (runtimeRowsNotifyTimer) return;
+  runtimeRowsNotifyTimer = setTimeout(() => {
+    runtimeRowsNotifyTimer = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.webContents.send('partner:runtime-rows-updated');
+      } catch {
+        /* janela a fechar */
+      }
+    }
+  }, 120);
+}
+
 function markRuntimePort(port, patch) {
   if (!port) return;
   runtimeRows[port] = {
@@ -281,6 +337,91 @@ function markRuntimePort(port, patch) {
     lastActivationAt: runtimeRows[port]?.lastActivationAt || null,
     ...patch
   };
+  scheduleRuntimeRowsNotify();
+}
+
+/** Linha JSON do Python (prefixo FLUXSMS_JSON:) — não passar por sanitizeWorkerLine. */
+function tryConsumeFluxSmsJsonLine(trimmed) {
+  if (!trimmed.startsWith('FLUXSMS_JSON:')) return false;
+  const jsonPart = trimmed.slice('FLUXSMS_JSON:'.length).trim();
+  let obj;
+  try {
+    obj = JSON.parse(jsonPart);
+  } catch {
+    console.warn('[DEBUG] JSON inválido do Python:', jsonPart.slice(0, 200));
+    return true;
+  }
+  const port = String(obj.port || obj.porta || '').trim().toUpperCase();
+  const numRaw = obj.number != null ? String(obj.number) : String(obj.numero || '');
+  const digits = numRaw.replace(/\D/g, '');
+  const operadora = obj.operadora != null ? String(obj.operadora) : String(obj.operator || '');
+  console.log('[DEBUG] Recebi do Python:', JSON.stringify({ port, number: digits, operadora }));
+  if (port) {
+    markRuntimePort(port, {
+      numero: digits.length >= 8 ? digits : runtimeRows[port]?.numero || '—',
+      operadora: operadora || runtimeRows[port]?.operadora || '—',
+      status: 'ON'
+    });
+  }
+  forwardWorkerChipSyncToApi({ port, number: digits, operadora }).catch(() => {});
+  return true;
+}
+
+async function forwardWorkerChipSyncToApi({ port, number, operadora }) {
+  const key = String(store.get('partnerApiKey') || '').trim();
+  if (!key || !port) return;
+  const dedupeKey = `${port}|${number || ''}`;
+  const now = Date.now();
+  const prev = lastWorkerSyncSent.get(dedupeKey) || 0;
+  if (now - prev < 2500) return;
+  lastWorkerSyncSent.set(dedupeKey, now);
+
+  const body = {
+    porta: port,
+    numero: number && number.length >= 8 ? number : null,
+    operadora: operadora || null
+  };
+  console.log('[DEBUG] Enviando para API:', JSON.stringify({ path: '/partner-api/worker/sync', ...body }));
+  try {
+    await apiClient().post('/partner-api/worker/sync', body);
+  } catch (err) {
+    const st = err.response?.status;
+    const detail = err.response?.data || err.message;
+    console.warn('[DEBUG] worker/sync falhou:', st, typeof detail === 'object' ? JSON.stringify(detail) : detail);
+    pushLog(`[WARN] worker/sync ${st || ''}: ${err.message || err}`);
+  }
+}
+
+function processWorkerStreamChunk(chunk, isStderr) {
+  if (isStderr) {
+    workerStderrCarry += String(chunk);
+    const parts = workerStderrCarry.split(/\r?\n/);
+    workerStderrCarry = parts.pop() || '';
+    for (const rawLine of parts) {
+      const trimmed = String(rawLine || '').trim();
+      if (!trimmed) continue;
+      if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
+      const sanitized = sanitizeWorkerLine(trimmed);
+      if (!sanitized) continue;
+      updatePortStatusFromLog(sanitized);
+      enrichNumeroFromCoreLogLine(sanitized);
+      pushLog(`[CORE-ERR] ${sanitized}`);
+    }
+    return;
+  }
+  workerStdoutCarry += String(chunk);
+  const parts = workerStdoutCarry.split(/\r?\n/);
+  workerStdoutCarry = parts.pop() || '';
+  for (const rawLine of parts) {
+    const trimmed = String(rawLine || '').trim();
+    if (!trimmed) continue;
+    if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
+    const sanitized = sanitizeWorkerLine(trimmed);
+    if (!sanitized) continue;
+    updatePortStatusFromLog(sanitized);
+    enrichNumeroFromCoreLogLine(sanitized);
+    pushLog(`[CORE] ${sanitized}`);
+  }
 }
 
 function updatePortStatusFromLog(line) {
@@ -293,29 +434,6 @@ function updatePortStatusFromLog(line) {
   if (/ERRO CR[IÍ]TICO|FALHA AO ABRIR PORTA|ENCERRADO/i.test(line)) {
     markRuntimePort(port, { status: 'OFF' });
   }
-}
-
-function ensureCoreEnv() {
-  const coreDir = safeCorePath();
-  const envPath = path.join(coreDir, '.env');
-  let envRaw = '';
-  if (fs.existsSync(envPath)) {
-    envRaw = fs.readFileSync(envPath, 'utf8');
-  }
-  const backendUrl = String(store.get('backendUrl') || '').trim();
-  const poloKey = String(store.get('poloChave') || '').trim();
-  const setVar = (name, value) => {
-    if (!value) return;
-    const rgx = new RegExp(`^${name}=.*$`, 'm');
-    if (rgx.test(envRaw)) {
-      envRaw = envRaw.replace(rgx, `${name}=${value}`);
-    } else {
-      envRaw += `${envRaw.endsWith('\n') || !envRaw ? '' : '\n'}${name}=${value}\n`;
-    }
-  };
-  setVar('BACKEND_URL', backendUrl);
-  setVar('POLO_KEY', poloKey);
-  fs.writeFileSync(envPath, envRaw || '\n', 'utf8');
 }
 
 function clearMonitorPoll() {
@@ -334,9 +452,7 @@ function clearHeartbeat() {
 
 async function sendHeartbeat() {
   try {
-    const polo_chave = String(store.get('poloChave') || '').trim();
-    if (!polo_chave) return;
-    await apiClient().post('/partner-api/worker/heartbeat', { polo_chave });
+    await apiClient().post('/partner-api/worker/heartbeat', {});
   } catch (err) {
     pushLog(`[WARN] heartbeat falhou: ${err.message || err}`);
   }
@@ -344,9 +460,7 @@ async function sendHeartbeat() {
 
 async function sendGracefulShutdown() {
   try {
-    const polo_chave = String(store.get('poloChave') || '').trim();
-    if (!polo_chave) return;
-    await apiClient().post('/partner-api/worker/shutdown', { polo_chave });
+    await apiClient().post('/partner-api/worker/shutdown', {});
     pushLog('[SYSTEM] Graceful shutdown enviado (chips OFFLINE).');
   } catch (err) {
     pushLog(`[WARN] graceful shutdown falhou: ${err.message || err}`);
@@ -355,12 +469,8 @@ async function sendGracefulShutdown() {
 
 async function pollPendingActivations() {
   try {
-    const polo_chave = String(store.get('poloChave') || '').trim();
-    if (!polo_chave) return;
     const client = apiClient();
-    const { data } = await client.get('/partner-api/worker/activations', {
-      params: { polo_chave }
-    });
+    const { data } = await client.get('/partner-api/worker/activations');
     const rows = data.activations || [];
     rows.forEach((r) => {
       const port = String(r.chip_porta || '').toUpperCase();
@@ -403,6 +513,8 @@ function stopWorker() {
   }
   workerProcess = null;
   workerRunning = false;
+  workerStdoutCarry = '';
+  workerStderrCarry = '';
   for (const k of Object.keys(lastCcidByPort)) delete lastCcidByPort[k];
   sendGracefulShutdown().catch(() => { });
   pushLog('[SYSTEM] Core V7.1 parado.');
@@ -412,6 +524,7 @@ function spawnWorkerWith(cmd, args, cwd) {
   // Um único processo filho (Core V7.1) reutilizado — sem reelevar UAC a cada leitura COM
   return spawn(cmd, args, {
     cwd,
+    env: buildWorkerEnv(),
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
@@ -421,24 +534,28 @@ function spawnWorkerWith(cmd, args, cwd) {
 function startWorker() {
   if (workerRunning) return { ok: true, alreadyRunning: true };
   const coreDir = safeCorePath();
-  if (!fs.existsSync(path.join(coreDir, 'main.py'))) {
-    return { ok: false, error: 'Core V7.1 não encontrado (main.py ausente).' };
+  const mainPyc = path.join(coreDir, 'main.pyc');
+  const mainPy = path.join(coreDir, 'main.py');
+  if (!fs.existsSync(mainPyc) && !fs.existsSync(mainPy)) {
+    return { ok: false, error: 'Core V7.1 não encontrado (main.pyc/main.py ausente).' };
   }
-  ensureCoreEnv();
   try {
     syncCcidNumerosFileFromStore();
   } catch (err) {
     pushLog(`[WARN] ccid_numeros sync: ${err.message || err}`);
   }
   workerShouldRestart = true;
+  workerStdoutCarry = '';
+  workerStderrCarry = '';
 
   let child = null;
+  const workerEntry = fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py';
   try {
-    child = spawnWorkerWith('py', ['-3', 'main.py'], coreDir);
+    child = spawnWorkerWith('py', ['-3', '-u', workerEntry], coreDir);
   } catch (_) { }
   if (!child || child.exitCode != null) {
     try {
-      child = spawnWorkerWith('python', ['main.py'], coreDir);
+      child = spawnWorkerWith('python', ['-u', workerEntry], coreDir);
     } catch (err) {
       return { ok: false, error: `Falha ao iniciar Python: ${err.message || err}` };
     }
@@ -450,24 +567,8 @@ function startWorker() {
   startMonitorPoll();
   startHeartbeat();
 
-  child.stdout.on('data', (buff) => {
-    String(buff).split(/\r?\n/).forEach((line) => {
-      const sanitized = sanitizeWorkerLine(line);
-      if (!sanitized) return;
-      updatePortStatusFromLog(sanitized);
-      enrichNumeroFromCoreLogLine(sanitized);
-      pushLog(`[CORE] ${sanitized}`);
-    });
-  });
-  child.stderr.on('data', (buff) => {
-    String(buff).split(/\r?\n/).forEach((line) => {
-      const sanitized = sanitizeWorkerLine(line);
-      if (!sanitized) return;
-      updatePortStatusFromLog(sanitized);
-      enrichNumeroFromCoreLogLine(sanitized);
-      pushLog(`[CORE-ERR] ${sanitized}`);
-    });
-  });
+  child.stdout.on('data', (buff) => processWorkerStreamChunk(buff, false));
+  child.stderr.on('data', (buff) => processWorkerStreamChunk(buff, true));
 
   child.on('close', (code) => {
     workerRunning = false;
@@ -502,35 +603,70 @@ function semverCompare(a, b) {
 }
 
 async function fetchUpdateInfo() {
-  const base = String(store.get('backendUrl') || 'https://fluxsms.com.br').replace(/\/$/, '');
-  let res;
-  try {
-    res = await axios.get(`${base}/download/desktop-update.json`, { timeout: 15000, validateStatus: () => true });
-  } catch (e) {
-    return { ok: false, error: e.message || String(e) };
+  const customBase = String(store.get('backendUrl') || '').replace(/\/$/, '');
+  const primaryBase = app.isPackaged ? FLUXSMS_UPDATE_MANIFEST_BASE : (customBase || FLUXSMS_UPDATE_MANIFEST_BASE);
+  const fallbacks = app.isPackaged
+    ? [primaryBase, customBase && customBase !== primaryBase ? customBase : ''].filter(Boolean)
+    : [customBase || FLUXSMS_UPDATE_MANIFEST_BASE, FLUXSMS_UPDATE_MANIFEST_BASE]
+        .filter((b, i, a) => b && a.indexOf(b) === i);
+
+  const pathJson = '/download/desktop-update.json';
+  let lastStatus = 0;
+  let lastErr = null;
+
+  for (const b of fallbacks) {
+    const manifestUrl = `${b.replace(/\/$/, '')}${pathJson}?cb=${Date.now()}`;
+    try {
+      console.log('[update] A ler manifest:', manifestUrl);
+      const res = await axios.get(manifestUrl, {
+        timeout: 18000,
+        validateStatus: () => true,
+        headers: {
+          'Cache-Control': 'no-cache, no-store',
+          Pragma: 'no-cache'
+        }
+      });
+      lastStatus = res.status;
+      if (res.status !== 200) {
+        lastErr = new Error(`HTTP ${res.status}`);
+        continue;
+      }
+      const data = res.data;
+      if (!data || typeof data !== 'object' || data === null) {
+        lastErr = new Error('Resposta inválida');
+        continue;
+      }
+      const remote = String(data.version || '').trim();
+      let downloadUrl = String(data.url || '').trim();
+      if (downloadUrl && !/^https?:\/\//i.test(downloadUrl)) {
+        const origin = b.replace(/\/$/, '');
+        downloadUrl = downloadUrl.startsWith('/') ? `${origin}${downloadUrl}` : `${origin}/${downloadUrl}`;
+      }
+      if (!downloadUrl) {
+        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.1'}.exe`;
+      }
+      const notes = String(data.notes || '').trim();
+      if (!remote) {
+        return { ok: false, error: 'Ficheiro desktop-update.json sem campo «version».' };
+      }
+      const local = app.getVersion();
+      const cmp = semverCompare(remote, local);
+      return {
+        ok: true,
+        localVersion: local,
+        remoteVersion: remote,
+        updateAvailable: cmp === 1,
+        downloadUrl,
+        notes,
+        manifestBase: b
+      };
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  if (res.status !== 200) {
-    return { ok: false, error: `Não foi possível ler a versão no site (${res.status}).` };
-  }
-  const data = res.data;
-  if (!data || typeof data !== 'object') {
-    return { ok: false, error: 'Resposta inválida do servidor.' };
-  }
-  const remote = String(data.version || '').trim();
-  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.6.exe`;
-  const notes = String(data.notes || '').trim();
-  if (!remote) {
-    return { ok: false, error: 'Ficheiro desktop-update.json sem campo «version».' };
-  }
-  const local = app.getVersion();
-  const cmp = semverCompare(remote, local);
   return {
-    ok: true,
-    localVersion: local,
-    remoteVersion: remote,
-    updateAvailable: cmp === 1,
-    downloadUrl: url,
-    notes
+    ok: false,
+    error: `Não foi possível ler a versão (último HTTP: ${lastStatus || '—'}). ${lastErr && lastErr.message ? lastErr.message : 'Verifique a ligação; o parceiro deve aceder a fluxsms.com.br para atualizar.'}`
   };
 }
 
@@ -557,7 +693,7 @@ async function runUpdateCheckFromTray() {
       await dialog.showMessageBox(win, {
         type: 'info',
         title: 'FluxSMS',
-        message: `Está na última versão (${r.localVersion}).`
+        message: `Tudo em dia. Instalação: v${r.localVersion} · site: v${r.remoteVersion}.`
       });
     }
   } catch (e) {
@@ -670,15 +806,15 @@ ipcMain.handle('auth:login', async (_e, payload) => {
   const password = String(payload.password || '').trim();
   const apiKey = String(payload.apiKey || '').trim();
   const rememberMe = !!payload.rememberMe;
-  const poloChave = String(payload.poloChave || '').trim();
+  const poloChaveInput = String(payload.poloChave || '').trim();
   const backendUrl = String(payload.backendUrl || '').trim() || String(store.get('backendUrl') || '');
-  if (!email || !password || !apiKey || !poloChave) {
-    return { ok: false, error: 'Preencha e-mail, senha, chave de integração e CHAVE DO PARCEIRO.' };
+  if (!email || !password || !apiKey) {
+    return { ok: false, error: 'Preencha e-mail, senha e chave de integração.' };
   }
 
   store.set('backendUrl', backendUrl.replace(/\/$/, ''));
   store.set('partnerApiKey', apiKey);
-  store.set('poloChave', poloChave);
+  if (poloChaveInput) store.set('poloChave', poloChaveInput);
   store.set('rememberMe', rememberMe);
   if (rememberMe) {
     store.set('loginEmail', email);
@@ -690,6 +826,14 @@ ipcMain.handle('auth:login', async (_e, payload) => {
 
   try {
     await apiClient().get('/partner-api/health');
+    if (!poloChaveInput) {
+      const bootstrap = await apiClient().get('/partner-api/worker/bootstrap').catch(() => null);
+      const fallbackKey = String(bootstrap?.data?.polo?.chave_acesso || '').trim();
+      if (fallbackKey) {
+        // Compatibilidade do core legado sem exigir entrada manual de chave da estação.
+        store.set('poloChave', fallbackKey);
+      }
+    }
     const workerResult = startWorker();
     if (!workerResult.ok) return workerResult;
     return { ok: true };
@@ -789,9 +933,8 @@ ipcMain.handle('partner:modems', async () => {
   });
   const map = Object.fromEntries(base.map((r) => [String(r.porta || '').toUpperCase(), r]));
   try {
-    const polo_chave = String(store.get('poloChave') || '').trim();
     const client = apiClient();
-    const { data } = await client.get('/partner-api/worker/activations', { params: { polo_chave } });
+    const { data } = await client.get('/partner-api/worker/activations');
     (data.activations || []).forEach((a) => {
       const port = String(a.chip_porta || '').toUpperCase();
       if (!port) return;
@@ -814,8 +957,7 @@ ipcMain.handle('partner:modems', async () => {
     pushLog(`[WARN] Monitor API indisponível: ${err.message || err}`);
   }
   try {
-    const polo_chave2 = String(store.get('poloChave') || '').trim();
-    const { data: chipPayload } = await apiClient().get('/partner-api/worker/chips', { params: { polo_chave: polo_chave2 } });
+    const { data: chipPayload } = await apiClient().get('/partner-api/worker/chips');
     if (chipPayload && chipPayload.ok) {
       (chipPayload.chips || []).forEach((c) => {
         const port = String(c.porta || '').toUpperCase();
@@ -862,7 +1004,6 @@ ipcMain.handle('partner:rescan', async () => {
 });
 
 ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
-  const poloChave = String(store.get('poloChave') || '').trim();
   const port = String(porta || '').trim();
   if (!port) {
     return { ok: false, error: 'Porta inválida.' };
@@ -870,7 +1011,7 @@ ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
   const client = apiClient();
   try {
     const { data, status } = await client.get('/partner-api/worker/chip-activations', {
-      params: { polo_chave: poloChave, porta: port }
+      params: { porta: port }
     });
     if (data && data.ok) return { ok: true, ...data };
     return { ok: false, error: data?.error || 'resposta inválida', status };
@@ -883,7 +1024,7 @@ ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
         ok: false,
         error: body?.detail
           || body?.error
-          || (body?.ip ? `IP não autorizado (${body.ip})` : 'Acesso negado (403). Verifique a chave de integração, CHAVE DO PARCEIRO e rede (VPN/IP).'),
+          || (body?.ip ? `IP não autorizado (${body.ip})` : 'Acesso negado (403). Verifique a chave de integração e a rede (VPN/IP).'),
         status: st
       };
     }

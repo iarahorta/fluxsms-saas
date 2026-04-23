@@ -309,8 +309,8 @@ app.use(
     express.static(path.join(__dirname, 'public', 'download'), {
         maxAge: 0,
         setHeaders(res, filePath) {
-            if (String(filePath).toLowerCase().endsWith('.exe')) {
-                // Instalador nunca deve ficar em cache para evitar download de versão antiga.
+            const low = String(filePath).toLowerCase();
+            if (low.endsWith('.exe') || low.endsWith('desktop-update.json')) {
                 res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
                 return;
             }

@@ -249,7 +249,7 @@
 
                 <div id="partner-autonomy-strip" class="partner-lux-stack" style="display: none;" aria-label="Área do parceiro">
                     <div class="partner-lux-hero">
-                        <a id="partner-strip-download" class="btn-partner-download-gold" href="/download/FluxSMS.0.4.6.exe" download="FluxSMS.0.4.6.exe" rel="noopener">📥 BAIXAR FLUXSMS DESKTOP</a>
+                        <a id="partner-strip-download" class="btn-partner-download-gold" href="/download/FluxSMS.0.5.1.exe" download="FluxSMS.0.5.1.exe" rel="noopener">📥 BAIXAR FLUXSMS DESKTOP</a>
                         <p class="partner-lux-hero-note">Nota: No Windows, clique em "Sim" para permitir a gestão dos chips.</p>
                     </div>
                     <div class="partner-lux-finance" id="partner-finance-ribbon" aria-label="Resumo financeiro">
@@ -261,7 +261,7 @@
                     </div>
                     <div class="partner-lux-keybox" id="partner-lux-keybox" style="display:none;" aria-label="Sua chave de acesso">
                         <h2 class="partner-lux-keybox-title">Sua Chave de Acesso</h2>
-                        <p class="partner-lux-keybox-lead">E-mail, senha, a <strong>chave de integração (API)</strong> e a <strong>CHAVE DO PARCEIRO</strong> abaixo — tudo o que o app pede no primeiro acesso.</p>
+                        <p class="partner-lux-keybox-lead">E-mail, senha e a <strong>chave de integração (API)</strong> — isso já basta para conectar o app. A chave de estação fica apenas para contingência.</p>
                         <div class="partner-lux-profile-mini">
                             <div><span class="pk-label">E-mail</span> <span id="partner-profile-email" class="pk-value">—</span></div>
                             <div><span class="pk-label">Nome</span> <span id="partner-profile-name" class="pk-value">—</span></div>
@@ -442,6 +442,13 @@
                     <div id="partner-finance-panel" class="partner-finance-panel" style="display:none;">
                         <h2 class="section-title partner-view-title">FINANCEIRO — REPASSES</h2>
                         <p class="partner-view-sub">Regras oficiais de saque e valores liberados com base nos SMS recebidos nos seus chips (margem do contrato).</p>
+                        <div id="partner-services-panel" class="partner-finance-rules" style="margin-bottom:14px;">
+                            <h3 style="margin:0 0 8px; color:var(--flux-gold); font-size:0.95rem;">Serviços da sua chave</h3>
+                            <p style="margin:0 0 10px; font-size:0.8rem; opacity:0.72;">Ligue/desligue os serviços vendidos por todos os apps conectados nesta chave.</p>
+                            <div id="partner-services-toggles" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px;"></div>
+                            <button type="button" class="btn-partner-refresh" style="margin-top:10px;" onclick="savePartnerServiceToggles()">Salvar serviços</button>
+                            <p id="partner-services-msg" style="font-size:11px; margin-top:8px; color:rgba(255,255,255,0.55);"></p>
+                        </div>
                         <div id="partner-finance-rules" class="partner-finance-rules"></div>
                         <div id="partner-finance-stats" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; margin: 16px 0;"></div>
                         <div style="max-width: 440px; padding: 16px; background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid rgba(212,175,55,0.28);">

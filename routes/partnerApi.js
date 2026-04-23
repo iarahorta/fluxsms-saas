@@ -3,107 +3,6 @@ const { buildPartnerAuth } = require('../middleware/partnerAuth');
 
 const router = express.Router();
 
-/**
- * Resolve o polo da estação para rotas do worker.
- * Aceita: chave_acesso real do polo OU (quando há só 1 estação) o partner_code / valor incorreto tolerado.
- * Nunca devolve polo de outro parceiro.
- */
-async function resolvePoloForPartnerWorker(supabase, partnerId, poloChaveRaw) {
-  const raw = String(poloChaveRaw || '').trim();
-
-  const { data: myPolos, error: mpErr } = await supabase
-    .from('polos')
-    .select('id, partner_profile_id, chave_acesso, nome, status, ultima_comunicacao')
-    .eq('partner_profile_id', partnerId);
-
-  if (mpErr) {
-    return { ok: false, status: 500, body: { ok: false, error: 'polos_list_failed', detail: mpErr.message } };
-  }
-
-  const list = myPolos || [];
-
-  const pickSingleOrError = () => {
-    if (list.length === 1) return { ok: true, polo: list[0] };
-    if (list.length === 0) {
-      return {
-        ok: false,
-        status: 404,
-        body: {
-          ok: false,
-          error: 'polo_nao_encontrado',
-          detail: 'Nenhuma estação (polo) ligada a este parceiro. Peça à FluxSMS para criar/vincular a estação.'
-        }
-      };
-    }
-    return {
-      ok: false,
-      status: 400,
-      body: {
-        ok: false,
-        error: 'polo_chave_obrigatoria',
-        detail: 'Tem várias estações: use a CHAVE DO PARCEIRO (chave_acesso) da estação correta, copiada do painel.'
-      }
-    };
-  };
-
-  if (!raw) {
-    return pickSingleOrError();
-  }
-
-  const ownByChave = list.find((p) => String(p.chave_acesso || '') === raw);
-  if (ownByChave) return { ok: true, polo: ownByChave };
-
-  const { data: prof } = await supabase
-    .from('partner_profiles')
-    .select('partner_code')
-    .eq('id', partnerId)
-    .maybeSingle();
-  if (prof && String(prof.partner_code || '').trim() === raw) {
-    if (list.length === 1) return { ok: true, polo: list[0] };
-    if (list.length === 0) {
-      return {
-        ok: false,
-        status: 404,
-        body: {
-          ok: false,
-          error: 'polo_nao_encontrado',
-          detail: 'Este valor é o código do parceiro, mas ainda não existe estação (polo) criada para a sua conta.'
-        }
-      };
-    }
-    return {
-      ok: false,
-      status: 400,
-      body: {
-        ok: false,
-        error: 'polo_chave_ambigua',
-        detail: 'Tem várias estações: copie a chave da estação (não só o código curto do parceiro).'
-      }
-    };
-  }
-
-  const { data: otherPolo } = await supabase
-    .from('polos')
-    .select('id, partner_profile_id')
-    .eq('chave_acesso', raw)
-    .maybeSingle();
-  if (otherPolo) {
-    return {
-      ok: false,
-      status: 403,
-      body: { ok: false, error: 'polo_nao_vinculado_a_este_parceiro', detail: 'Esta chave pertence a outra estação/parceiro.' }
-    };
-  }
-
-  if (list.length === 1) return { ok: true, polo: list[0] };
-
-  return {
-    ok: false,
-    status: 404,
-    body: { ok: false, error: 'polo_nao_encontrado', detail: 'Chave da estação não reconhecida para este parceiro.' }
-  };
-}
-
 async function listPolosFromPartner(supabase, partnerId) {
   const { data, error } = await supabase
     .from('polos')
@@ -112,19 +11,143 @@ async function listPolosFromPartner(supabase, partnerId) {
   if (error) {
     return { ok: false, status: 500, body: { ok: false, error: 'polos_list_failed', detail: error.message } };
   }
-  const polos = data || [];
-  if (!polos.length) {
-    return {
-      ok: false,
-      status: 404,
-      body: {
-        ok: false,
-        error: 'polo_nao_encontrado',
-        detail: 'Nenhuma estação (polo) ligada a este parceiro. Peça à FluxSMS para criar/vincular a estação.'
-      }
-    };
+  return { ok: true, polos: data || [] };
+}
+
+function pickPreferredPolo(polos) {
+  const list = Array.isArray(polos) ? [...polos] : [];
+  if (!list.length) return null;
+  list.sort((a, b) => {
+    const aOnline = String(a.status || '').toUpperCase() === 'ONLINE' ? 1 : 0;
+    const bOnline = String(b.status || '').toUpperCase() === 'ONLINE' ? 1 : 0;
+    if (aOnline !== bOnline) return bOnline - aOnline;
+    const at = new Date(a.ultima_comunicacao || 0).getTime();
+    const bt = new Date(b.ultima_comunicacao || 0).getTime();
+    return bt - at;
+  });
+  return list[0];
+}
+
+/**
+ * Upsert chip no polo do parceiro autenticado (sem polo_chave no body — resolve só por partner_id).
+ * Aceita aliases: port/number/operator.
+ */
+async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn) {
+  const body = bodyIn || {};
+  const portaRaw = body.porta != null ? body.porta : body.port;
+  const numero = body.numero != null ? body.numero : body.number;
+  const operadora = body.operadora != null ? body.operadora : body.operator;
+
+  if (!portaRaw || String(portaRaw).trim() === '') {
+    return { status: 400, json: { ok: false, error: 'porta_obrigatoria' } };
   }
-  return { ok: true, polos };
+
+  try {
+    const polosScope = await listPolosFromPartner(supabase, partnerId);
+    if (!polosScope.ok) return { status: polosScope.status, json: polosScope.body };
+    let polo = pickPreferredPolo(polosScope.polos);
+    if (!polo) {
+      const { data: partnerProfile } = await supabase
+        .from('partner_profiles')
+        .select('partner_code')
+        .eq('id', partnerId)
+        .maybeSingle();
+      const newPolo = await supabase
+        .from('polos')
+        .insert({
+          partner_profile_id: partnerId,
+          nome: 'Estação principal',
+          status: 'ONLINE',
+          chave_acesso: String(partnerProfile?.partner_code || `partner-${String(partnerId).slice(0, 8)}`)
+        })
+        .select('id, partner_profile_id, chave_acesso, nome, status, ultima_comunicacao')
+        .maybeSingle();
+      if (newPolo.error) {
+        return { status: 500, json: { ok: false, error: 'polo_autocreate_failed', detail: newPolo.error.message } };
+      }
+      polo = newPolo.data;
+      polosScope.polos = polo ? [polo] : [];
+    }
+    if (!polo) {
+      return { status: 404, json: { ok: false, error: 'polo_nao_encontrado' } };
+    }
+
+    const portaNorm = String(portaRaw).trim();
+    const { data: existing } = await supabase
+      .from('chips')
+      .select('id, polo_id, porta')
+      .in('polo_id', polosScope.polos.map((p) => p.id))
+      .ilike('porta', portaNorm)
+      .limit(1)
+      .maybeSingle();
+
+    const row = {
+      polo_id: existing?.polo_id || polo.id,
+      porta: portaNorm,
+      numero: numero != null ? String(numero) : null,
+      operadora: operadora != null ? String(operadora) : null,
+      status: 'idle',
+      disponivel_em: null,
+      last_ping: new Date().toISOString()
+    };
+    let chip = null;
+    let insErr = null;
+    if (existing?.id) {
+      const upd = await supabase
+        .from('chips')
+        .update(row)
+        .eq('id', existing.id)
+        .select('id, porta, numero, status, disponivel_em')
+        .maybeSingle();
+      chip = upd.data;
+      insErr = upd.error;
+    } else {
+      const ins = await supabase
+        .from('chips')
+        .insert(row)
+        .select('id, porta, numero, status, disponivel_em')
+        .maybeSingle();
+      chip = ins.data;
+      insErr = ins.error;
+    }
+
+    if (insErr) {
+      const msg = insErr.message || '';
+      if (msg.includes('Em Quarentena')) {
+        return { status: 423, json: { ok: false, error: 'em_quarentena', detail: msg } };
+      }
+      return { status: 400, json: { ok: false, error: 'insert_failed', detail: msg } };
+    }
+
+    return { status: 201, json: { ok: true, chip } };
+  } catch (err) {
+    return { status: 500, json: { ok: false, error: 'partner_chip_failed', detail: err.message } };
+  }
+}
+
+async function getPartnerServiceRules(supabase, partnerId) {
+  let { data, error } = await supabase
+    .from('partner_service_costs')
+    .select('service, enabled')
+    .eq('partner_id', partnerId);
+  if (error && String(error.message || '').toLowerCase().includes('enabled')) {
+    const legacy = await supabase
+      .from('partner_service_costs')
+      .select('service')
+      .eq('partner_id', partnerId);
+    data = legacy.data || [];
+    error = legacy.error;
+  }
+  if (error) return { ok: false, error };
+  const rows = data || [];
+  const hasEnabledFlag = rows.some((r) => Object.prototype.hasOwnProperty.call(r, 'enabled'));
+  const disabled = new Set(
+    rows
+      .filter((r) => hasEnabledFlag && r.enabled === false)
+      .map((r) => String(r.service || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  return { ok: true, disabledServices: disabled };
 }
 
 router.get('/docs', (_req, res) => {
@@ -132,15 +155,16 @@ router.get('/docs', (_req, res) => {
     ok: true,
     module: 'partner-api',
     version: 'v1',
-    auth: 'x-api-key or Authorization: Bearer <API_KEY> + header obrigatório X-Flux-Hwid (identificador estável do PC)',
+    auth: 'x-api-key or Authorization: Bearer <API_KEY>; X-Flux-Hwid opcional (primeira vinculação); obrigatório se a chave já tiver bound_hwid',
     endpoints: [
       { method: 'GET', path: '/partner-api/docs', auth: false, description: 'Documentação base da API Partner' },
       { method: 'GET', path: '/partner-api/health', auth: true, description: 'Health check autenticado + allow list IP' },
       { method: 'GET', path: '/partner-api/me', auth: true, description: 'Dados do parceiro autenticado' },
       { method: 'POST', path: '/partner-api/chips', auth: true, description: 'Registrar chip no polo vinculado ao parceiro (bloqueio Em quarentena WhatsApp 30d)' },
-      { method: 'GET', path: '/partner-api/worker/activations?polo_chave=', auth: true, description: 'Fila SMS waiting para chips deste polo (worker Electron)' },
-      { method: 'GET', path: '/partner-api/worker/chips?polo_chave=', auth: true, description: 'Lista chips da estação (porta/número) para o desktop enriquecer a grelha' },
-      { method: 'GET', path: '/partner-api/worker/chip-activations?polo_chave=&porta=', auth: true, description: 'Histórico de ativações do chip (porta COM) para o painel do worker' },
+      { method: 'POST', path: '/partner-api/worker/sync', auth: true, description: 'Sync imediato porta/número (desktop); mesmo upsert que /chips' },
+      { method: 'GET', path: '/partner-api/worker/activations', auth: true, description: 'Fila SMS waiting para chips vinculados ao partner da API key' },
+      { method: 'GET', path: '/partner-api/worker/chips', auth: true, description: 'Lista chips vinculados ao partner da API key (porta/número)' },
+      { method: 'GET', path: '/partner-api/worker/chip-activations?porta=', auth: true, description: 'Histórico de ativações do chip (porta COM) do partner autenticado' },
       { method: 'POST', path: '/partner-api/worker/heartbeat', auth: true, description: 'Mantém polo ONLINE (ultima_comunicacao)' }
     ]
   });
@@ -162,45 +186,71 @@ router.get('/health', (req, res) => {
 });
 
 /**
+ * GET /partner-api/worker/bootstrap
+ * Resolve automaticamente a estação para uso no core local (POLO_KEY),
+ * sem exigir que o parceiro informe chave manualmente no app.
+ */
+router.get('/worker/bootstrap', async (req, res) => {
+  const supabase = req.app.get('supabase');
+  try {
+    let polosScope = await listPolosFromPartner(supabase, req.partner.id);
+    if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+    let polo = pickPreferredPolo(polosScope.polos);
+    if (!polo) {
+      const { data: partnerProfile, error: pErr } = await supabase
+        .from('partner_profiles')
+        .select('partner_code')
+        .eq('id', req.partner.id)
+        .maybeSingle();
+      if (pErr) return res.status(500).json({ ok: false, error: 'partner_profile_failed', detail: pErr.message });
+      const newPolo = await supabase
+        .from('polos')
+        .insert({
+          partner_profile_id: req.partner.id,
+          nome: 'Estacao principal',
+          status: 'ONLINE',
+          chave_acesso: String(partnerProfile?.partner_code || `partner-${String(req.partner.id).slice(0, 8)}`)
+        })
+        .select('id, chave_acesso, nome, status, ultima_comunicacao')
+        .maybeSingle();
+      if (newPolo.error || !newPolo.data) {
+        return res.status(500).json({ ok: false, error: 'polo_autocreate_failed', detail: newPolo.error?.message || 'erro' });
+      }
+      polo = newPolo.data;
+    }
+    return res.json({
+      ok: true,
+      partner_id: req.partner.id,
+      polo: {
+        id: polo.id,
+        chave_acesso: polo.chave_acesso || null,
+        nome: polo.nome || null,
+        status: polo.status || null
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'worker_bootstrap_failed', detail: err.message });
+  }
+});
+
+/**
  * POST /partner-api/chips
  * Registra chip no polo cuja chave_acesso pertence ao parceiro (polos.partner_profile_id).
  */
 router.post('/chips', async (req, res) => {
-    const supabase = req.app.get('supabase');
-    const { polo_chave, porta, numero, operadora } = req.body || {};
+  const supabase = req.app.get('supabase');
+  const r = await upsertPartnerWorkerChip(supabase, req.partner.id, req.body);
+  return res.status(r.status).json(r.json);
+});
 
-    if (!porta) {
-        return res.status(400).json({ ok: false, error: 'polo_chave_e_porta_obrigatorios' });
-    }
-
-    try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
-
-        const row = {
-            polo_id: polo.id,
-            porta: String(porta),
-            numero: numero != null ? String(numero) : null,
-            operadora: operadora != null ? String(operadora) : null,
-            status: 'idle',
-            disponivel_em: null
-        };
-
-        const { data: chip, error: insErr } = await supabase.from('chips').insert(row).select('id, porta, numero, status, disponivel_em').maybeSingle();
-
-        if (insErr) {
-            const msg = insErr.message || '';
-            if (msg.includes('Em Quarentena')) {
-                return res.status(423).json({ ok: false, error: 'em_quarentena', detail: msg });
-            }
-            return res.status(400).json({ ok: false, error: 'insert_failed', detail: msg });
-        }
-
-        return res.status(201).json({ ok: true, chip });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: 'partner_chip_failed', detail: err.message });
-    }
+/**
+ * POST /partner-api/worker/sync
+ * Canal usado pelo desktop após ler JSON do core Python (IPC).
+ */
+router.post('/worker/sync', async (req, res) => {
+  const supabase = req.app.get('supabase');
+  const r = await upsertPartnerWorkerChip(supabase, req.partner.id, req.body);
+  return res.status(r.status).json(r.json);
 });
 
 /**
@@ -213,6 +263,7 @@ router.get('/worker/activations', async (req, res) => {
         const polosScope = await listPolosFromPartner(supabase, req.partner.id);
         if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
         const poloIds = polosScope.polos.map((p) => p.id);
+        if (!poloIds.length) return res.json({ ok: true, activations: [], chips: [] });
 
         const { data: chips, error: chipErr } = await supabase
             .from('chips')
@@ -238,8 +289,12 @@ router.get('/worker/activations', async (req, res) => {
             return res.status(500).json({ ok: false, error: 'activations_failed', detail: actErr.message });
         }
 
+        const svcRules = await getPartnerServiceRules(supabase, req.partner.id);
+        const disabledServices = svcRules.ok ? svcRules.disabledServices : new Set();
         const chipById = Object.fromEntries((chips || []).map((c) => [c.id, c]));
-        const enriched = (activations || []).map((a) => ({
+        const enriched = (activations || [])
+          .filter((a) => !disabledServices.has(String(a.service || '').trim().toLowerCase()))
+          .map((a) => ({
             ...a,
             chip_porta: chipById[a.chip_id]?.porta || null,
             chip_numero: chipById[a.chip_id]?.numero || null
@@ -261,6 +316,7 @@ router.get('/worker/chips', async (req, res) => {
         const polosScope = await listPolosFromPartner(supabase, req.partner.id);
         if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
         const poloIds = polosScope.polos.map((p) => p.id);
+        if (!poloIds.length) return res.json({ ok: true, chips: [], polos: [] });
 
         const { data: chips, error: chipErr } = await supabase
             .from('chips')
@@ -284,7 +340,7 @@ router.get('/worker/chip-activations', async (req, res) => {
     const supabase = req.app.get('supabase');
     const porta = req.query.porta;
     if (porta == null || String(porta).trim() === '') {
-        return res.status(400).json({ ok: false, error: 'polo_chave_e_porta_obrigatorias' });
+        return res.status(400).json({ ok: false, error: 'porta_obrigatoria' });
     }
     const portaNorm = String(porta).trim();
     const portaUpper = portaNorm.toUpperCase();
@@ -292,6 +348,14 @@ router.get('/worker/chip-activations', async (req, res) => {
         const polosScope = await listPolosFromPartner(supabase, req.partner.id);
         if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
         const poloIds = polosScope.polos.map((p) => p.id);
+        if (!poloIds.length) {
+          return res.json({
+            ok: true,
+            activations: [],
+            chip: null,
+            polo: null
+          });
+        }
 
         const { data: chipRows, error: cErr } = await supabase
             .from('chips')
@@ -341,17 +405,17 @@ router.get('/worker/chip-activations', async (req, res) => {
  */
 router.post('/worker/heartbeat', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const { polo_chave } = req.body || {};
     try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
+        const polosScope = await listPolosFromPartner(supabase, req.partner.id);
+        if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+        const poloIds = polosScope.polos.map((p) => p.id);
+        if (!poloIds.length) return res.json({ ok: true, ts: new Date().toISOString(), noop: true });
 
         const now = new Date().toISOString();
         const { error: upErr } = await supabase
             .from('polos')
             .update({ ultima_comunicacao: now, status: 'ONLINE' })
-            .eq('id', polo.id);
+            .in('id', poloIds);
 
         if (upErr) {
             return res.status(500).json({ ok: false, error: 'heartbeat_failed', detail: upErr.message });
@@ -361,11 +425,11 @@ router.post('/worker/heartbeat', async (req, res) => {
         await supabase
             .from('partner_profiles')
             .update({ last_ping: now })
-            .eq('id', polo.partner_profile_id);
+            .eq('id', req.partner.id);
         await supabase
             .from('chips')
             .update({ last_ping: now })
-            .eq('polo_id', polo.id);
+            .in('polo_id', poloIds);
 
         return res.json({ ok: true, ts: now });
     } catch (err) {
@@ -379,21 +443,21 @@ router.post('/worker/heartbeat', async (req, res) => {
  */
 router.post('/worker/shutdown', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const { polo_chave } = req.body || {};
     try {
-        const resolved = await resolvePoloForPartnerWorker(supabase, req.partner.id, polo_chave);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const polo = resolved.polo;
+        const polosScope = await listPolosFromPartner(supabase, req.partner.id);
+        if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
+        const poloIds = polosScope.polos.map((p) => p.id);
+        if (!poloIds.length) return res.json({ ok: true, ts: new Date().toISOString(), forced_offline: true, noop: true });
 
         const now = new Date().toISOString();
         await supabase
             .from('polos')
             .update({ status: 'OFFLINE', ultima_comunicacao: now })
-            .eq('id', polo.id);
+            .in('id', poloIds);
         await supabase
             .from('chips')
             .update({ status: 'offline' })
-            .eq('polo_id', polo.id);
+            .in('polo_id', poloIds);
 
         return res.json({ ok: true, ts: now, forced_offline: true });
     } catch (err) {

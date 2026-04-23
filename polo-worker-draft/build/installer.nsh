@@ -14,3 +14,9 @@
   ExecWait '"$SYSDIR\cmd.exe" /c taskkill /F /IM "FluxSMS Desktop.exe" /T' $R0
   Sleep 800
 !macroend
+
+; Garante atalho no Ambiente de trabalho do parceiro (além do que o NSIS cria, por OneDrive/perfis a verem atalho duplicado é inócuo)
+!macro customInstall
+  SetShellVarContext current
+  CreateShortCut "$DESKTOP\FluxSMS Desktop.lnk" "$INSTDIR\FluxSMS Desktop.exe" "" "$INSTDIR\FluxSMS Desktop.exe" 0
+!macroend

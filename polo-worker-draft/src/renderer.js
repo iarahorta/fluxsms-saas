@@ -358,7 +358,7 @@ function applyUpdateCheckResult(r, { quiet } = {}) {
     return;
   }
   if (r.updateAvailable) {
-    updateBanner.textContent = `Nova versão ${r.remoteVersion} disponível (esta: ${r.localVersion}).`;
+    updateBanner.textContent = `Nova versão v${r.remoteVersion} — esta instalação: v${r.localVersion} (toque em «Obter inst.» abaixo).`;
     updateBanner.style.color = '#f0d878';
     btnUpdateDownload.style.display = 'inline-block';
     btnUpdateDownload.dataset.url = r.downloadUrl || '';
@@ -368,7 +368,7 @@ function applyUpdateCheckResult(r, { quiet } = {}) {
   btnUpdateDownload.style.display = 'none';
   delete btnUpdateDownload.dataset.url;
   if (!quiet) {
-    updateBanner.textContent = `Está na última versão (${r.localVersion}).`;
+    updateBanner.textContent = `Instalação v${r.localVersion} · site v${r.remoteVersion} (em dia).`;
   } else {
     updateBanner.textContent = '';
   }
@@ -504,6 +504,12 @@ async function boot() {
   document.getElementById('login-remember').checked = !!saved.rememberMe;
   showLogin(true);
   setStatus('CORE OFFLINE', false);
+}
+
+if (typeof poloWorker.onRuntimeRowsUpdated === 'function') {
+  poloWorker.onRuntimeRowsUpdated(() => {
+    refreshModems().catch(() => {});
+  });
 }
 
 boot().catch((err) => {

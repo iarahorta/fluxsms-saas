@@ -11,7 +11,7 @@ function workerDownloadUrl(req) {
         .split(',')[0]
         .trim();
     const host = req.get('host') || 'fluxsms.com.br';
-    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.4.6.exe`;
+    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.5.1.exe`;
 
     const envUrl = (process.env.POLO_WORKER_DOWNLOAD_URL || '').trim();
     if (!envUrl) return sameOrigin;
@@ -139,6 +139,90 @@ router.get('/chips', async (req, res) => {
         return res.json({ ok: true, chips: enriched, polos: polos || [] });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'chips_route_failed', detail: err.message });
+    }
+});
+
+const DEFAULT_PARTNER_SERVICES = [
+    { service: 'whatsapp', enabled: true },
+    { service: 'telegram', enabled: true },
+    { service: 'google', enabled: true },
+    { service: 'instagram', enabled: true }
+];
+
+router.get('/service-toggles', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const pid = req.partnerProfile.id;
+    try {
+        let { data, error } = await supabase
+            .from('partner_service_costs')
+            .select('service, enabled')
+            .eq('partner_id', pid);
+        if (error && String(error.message || '').toLowerCase().includes('enabled')) {
+            const legacy = await supabase
+                .from('partner_service_costs')
+                .select('service')
+                .eq('partner_id', pid);
+            data = legacy.data || [];
+            error = legacy.error;
+        }
+        if (error) {
+            return res.status(500).json({ ok: false, error: 'service_toggles_failed', detail: error.message });
+        }
+        const rows = data || [];
+        const merged = DEFAULT_PARTNER_SERVICES.map((svc) => {
+            const hit = rows.find((r) => String(r.service || '').toLowerCase() === svc.service);
+            if (!hit) return svc;
+            return {
+                service: svc.service,
+                enabled: hit.enabled !== false
+            };
+        });
+        return res.json({ ok: true, services: merged });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'service_toggles_route_failed', detail: err.message });
+    }
+});
+
+router.put('/service-toggles', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const pid = req.partnerProfile.id;
+    const input = Array.isArray(req.body?.services) ? req.body.services : [];
+    const normalized = input
+        .map((r) => ({
+            service: String(r?.service || '').trim().toLowerCase(),
+            enabled: r?.enabled !== false
+        }))
+        .filter((r) => !!r.service);
+    if (!normalized.length) {
+        return res.status(400).json({ ok: false, error: 'services_required' });
+    }
+    try {
+        const payload = normalized.map((r) => ({
+            partner_id: pid,
+            service: r.service,
+            cost_price: 0,
+            enabled: r.enabled
+        }));
+        let { error } = await supabase
+            .from('partner_service_costs')
+            .upsert(payload, { onConflict: 'partner_id,service' });
+        if (error && String(error.message || '').toLowerCase().includes('enabled')) {
+            const legacyPayload = normalized.map((r) => ({
+                partner_id: pid,
+                service: r.service,
+                cost_price: 0
+            }));
+            const legacy = await supabase
+                .from('partner_service_costs')
+                .upsert(legacyPayload, { onConflict: 'partner_id,service' });
+            error = legacy.error;
+        }
+        if (error) {
+            return res.status(500).json({ ok: false, error: 'service_toggles_update_failed', detail: error.message });
+        }
+        return res.json({ ok: true, updated: payload.length });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'service_toggles_update_route_failed', detail: err.message });
     }
 });
 

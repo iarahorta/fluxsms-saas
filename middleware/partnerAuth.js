@@ -51,18 +51,19 @@ function buildPartnerAuth({ supabase }) {
         req.headers['x-hardware-id'] ||
         ''
       ).trim();
-      if (!hwid || hwid.length < 16) {
-        return res.status(400).json({
-          ok: false,
-          error: 'hwid_required',
-          hint: 'Envie o header X-Flux-Hwid (identificador estável do PC). Atualize o Polo Worker.'
-        });
-      }
+      // Chave sem HWID vinculado: basta API key. Chave já vinculada: exige X-Flux-Hwid correto.
       if (keyRow.bound_hwid) {
+        if (!hwid || hwid.length < 16) {
+          return res.status(400).json({
+            ok: false,
+            error: 'hwid_required',
+            hint: 'Esta chave está vinculada a um PC. Envie o header X-Flux-Hwid do instalador desktop.'
+          });
+        }
         if (keyRow.bound_hwid !== hwid) {
           return res.status(403).json({ ok: false, error: 'hwid_mismatch', detail: 'Esta chave já está vinculada a outro computador.' });
         }
-      } else {
+      } else if (hwid.length >= 16) {
         const { data: boundRows, error: bindErr } = await supabase
           .from('partner_api_keys')
           .update({ bound_hwid: hwid })

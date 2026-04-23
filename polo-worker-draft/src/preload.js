@@ -12,5 +12,15 @@ contextBridge.exposeInMainWorld('poloWorker', {
   chipHistory: (porta) => ipcRenderer.invoke('partner:chipHistory', { porta }),
   ccidImportTxt: (rawText) => ipcRenderer.invoke('ccid:importTxt', { rawText }),
   updatesCheck: () => ipcRenderer.invoke('updates:check'),
-  updatesOpenDownload: (url) => ipcRenderer.invoke('updates:openDownload', url)
+  updatesOpenDownload: (url) => ipcRenderer.invoke('updates:openDownload', url),
+  onRuntimeRowsUpdated: (cb) => {
+    if (typeof cb !== 'function') return;
+    ipcRenderer.on('partner:runtime-rows-updated', () => {
+      try {
+        cb();
+      } catch {
+        /* */
+      }
+    });
+  }
 });

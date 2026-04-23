@@ -671,14 +671,14 @@ async function loadPartnerAutonomyStrip() {
         if (dl) {
             const raw = (j.worker_download_url || '').trim();
             const broken = /Polo-Worker-Portable|\/downloads\//i.test(raw);
-            const href = broken || !raw ? '/download/FluxSMS.0.4.6.exe' : raw;
+            const href = broken || !raw ? '/download/FluxSMS.0.5.1.exe' : raw;
             dl.href = href;
-            dl.setAttribute('download', 'FluxSMS.0.4.6.exe');
+            dl.setAttribute('download', 'FluxSMS.0.5.1.exe');
             dl.onclick = function (ev) {
                 ev.preventDefault();
                 const a = document.createElement('a');
                 a.href = href;
-                a.download = 'FluxSMS.0.4.6.exe';
+                a.download = 'FluxSMS.0.5.1.exe';
                 a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
@@ -745,7 +745,7 @@ function renderPartnerPolosKeysList(polos) {
     if (!wrap) return;
     const list = polos || [];
     if (!list.length) {
-        wrap.innerHTML = '<p class="partner-lux-hint" style="margin:0; color: rgba(255,255,255,0.55);">Ainda não há estação vinculada. A equipa FluxSMS liga a sua estação — depois a <strong>chave do parceiro</strong> aparece aqui.</p>';
+        wrap.innerHTML = '<p class="partner-lux-hint" style="margin:0; color: rgba(255,255,255,0.55);">Ainda não há estação vinculada. A equipa FluxSMS liga a sua estação e os chips passam a aparecer aqui automaticamente.</p>';
         return;
     }
     wrap.innerHTML = list.map((p) => {
@@ -761,7 +761,7 @@ window.copyPartnerPoloKey = async function (key) {
     if (!k) return;
     try {
         await navigator.clipboard.writeText(k);
-        alert('Chave do parceiro copiada. Cole no FluxSMS Desktop no campo indicado no login.');
+        alert('Chave copiada com sucesso.');
     } catch {
         window.prompt('Copie manualmente:', k);
     }
@@ -841,6 +841,74 @@ async function loadPartnerChipsMonitor() {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#e085a0;">${escapeHtml(e.message || String(e))}</td></tr>`;
     }
 }
+
+async function loadPartnerServiceToggles() {
+    const wrap = document.getElementById('partner-services-toggles');
+    const msg = document.getElementById('partner-services-msg');
+    if (!wrap || !currentUserIsPartner || !db) return;
+    wrap.innerHTML = '<div style="opacity:0.6;">Carregando serviços…</div>';
+    if (msg) msg.textContent = '';
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/service-toggles`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            wrap.innerHTML = `<div style="color:#e085a0;">${escapeHtml(j.detail || j.error || res.statusText)}</div>`;
+            return;
+        }
+        const rows = j.services || [];
+        if (!rows.length) {
+            wrap.innerHTML = '<div style="opacity:0.65;">Nenhum serviço configurado.</div>';
+            return;
+        }
+        wrap.innerHTML = rows.map((r) => {
+            const service = String(r.service || '').toLowerCase();
+            const checked = r.enabled !== false ? 'checked' : '';
+            return `<label style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px;">
+                <input type="checkbox" data-service-toggle="${escapeHtml(service)}" ${checked}>
+                <span style="text-transform:capitalize;">${escapeHtml(service)}</span>
+            </label>`;
+        }).join('');
+    } catch (e) {
+        wrap.innerHTML = `<div style="color:#e085a0;">${escapeHtml(e.message || String(e))}</div>`;
+    }
+}
+
+window.savePartnerServiceToggles = async function () {
+    const checks = Array.from(document.querySelectorAll('[data-service-toggle]'));
+    const msg = document.getElementById('partner-services-msg');
+    if (!checks.length || !db) return;
+    const services = checks.map((el) => ({
+        service: String(el.getAttribute('data-service-toggle') || '').toLowerCase(),
+        enabled: !!el.checked
+    }));
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) {
+            if (msg) msg.textContent = 'Sessão expirada. Faça login novamente.';
+            return;
+        }
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/service-toggles`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ services })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            if (msg) msg.textContent = `Falha ao salvar: ${j.detail || j.error || res.statusText}`;
+            return;
+        }
+        if (msg) msg.textContent = 'Serviços atualizados com sucesso.';
+    } catch (e) {
+        if (msg) msg.textContent = `Erro: ${e.message || e}`;
+    }
+};
 let pixCheckInterval = null;
 
 async function gerarPix() {
@@ -1302,6 +1370,7 @@ async function loadPartnerProfiles() {
     if (currentUserIsPartner) {
         await loadPartnerFinanceSummary();
         loadPartnerAutonomyStrip();
+        loadPartnerServiceToggles();
     }
 
     const tbody = document.querySelector('#table-partners tbody');
