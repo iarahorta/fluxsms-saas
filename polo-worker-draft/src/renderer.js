@@ -1,5 +1,18 @@
 /* global poloWorker */
 
+/** URL canónica do instalador (fallback se o JSON não trouxer o campo `url` completo). */
+const FLUXSMS_DOWNLOAD_DIR = 'https://fluxsms.com.br/download';
+
+function buildInstallerUrlFromUpdateResult(r) {
+  const raw = String(r && r.downloadUrl != null ? r.downloadUrl : '').trim();
+  const ver = String(r && r.remoteVersion != null ? r.remoteVersion : '').trim();
+  const byVersion = ver ? `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.${ver}.exe` : `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.2.exe`;
+  if (!raw) return byVersion;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('/')) return `https://fluxsms.com.br${raw}`;
+  return byVersion;
+}
+
 const loginPane = document.getElementById('login-pane');
 const appPane = document.getElementById('app-pane');
 const statusChip = document.getElementById('status-chip');
@@ -358,10 +371,12 @@ function applyUpdateCheckResult(r, { quiet } = {}) {
     return;
   }
   if (r.updateAvailable) {
-    updateBanner.textContent = `Nova versão v${r.remoteVersion} — esta instalação: v${r.localVersion} (toque em «Obter inst.» abaixo).`;
+    const dl = buildInstallerUrlFromUpdateResult(r);
+    updateBanner.textContent = `Nova versão v${r.remoteVersion} — instalação atual: v${r.localVersion}. Toque em «Baixar instalador» (abre o browser no .exe).`;
     updateBanner.style.color = '#f0d878';
     btnUpdateDownload.style.display = 'inline-block';
-    btnUpdateDownload.dataset.url = r.downloadUrl || '';
+    btnUpdateDownload.dataset.url = dl;
+    btnUpdateDownload.setAttribute('title', dl);
     return;
   }
   updateBanner.style.color = '';
@@ -449,8 +464,16 @@ if (btnUpdateCheck) {
 }
 if (btnUpdateDownload) {
   btnUpdateDownload.addEventListener('click', async () => {
-    const url = btnUpdateDownload.dataset.url;
-    if (!url) return;
+    let url = String(btnUpdateDownload.dataset.url || '').trim();
+    if (!url) {
+      try {
+        const r = await poloWorker.updatesCheck();
+        if (r && r.ok && r.updateAvailable) url = buildInstallerUrlFromUpdateResult(r);
+      } catch {
+        /* */
+      }
+    }
+    if (!url) url = `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.2.exe`;
     await poloWorker.updatesOpenDownload(url);
   });
 }

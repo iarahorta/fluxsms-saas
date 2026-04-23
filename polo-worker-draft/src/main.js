@@ -643,7 +643,7 @@ async function fetchUpdateInfo() {
         downloadUrl = downloadUrl.startsWith('/') ? `${origin}${downloadUrl}` : `${origin}/${downloadUrl}`;
       }
       if (!downloadUrl) {
-        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.1'}.exe`;
+        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.2'}.exe`;
       }
       const notes = String(data.notes || '').trim();
       if (!remote) {
@@ -855,11 +855,13 @@ ipcMain.handle('app:status', () => {
 ipcMain.handle('updates:check', async () => fetchUpdateInfo());
 
 ipcMain.handle('updates:openDownload', async (_e, url) => {
-  const u = String(url || '').trim();
+  let u = String(url || '').trim();
   if (!u) return { ok: false, error: 'URL em falta.' };
+  if (u.startsWith('/')) u = `https://fluxsms.com.br${u}`;
+  if (!/^https?:\/\//i.test(u)) u = `https://fluxsms.com.br/download/${u.replace(/^\//, '')}`;
   try {
     await shell.openExternal(u);
-    return { ok: true };
+    return { ok: true, opened: u };
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }
