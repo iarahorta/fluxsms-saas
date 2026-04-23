@@ -517,7 +517,7 @@ async function fetchUpdateInfo() {
     return { ok: false, error: 'Resposta inválida do servidor.' };
   }
   const remote = String(data.version || '').trim();
-  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.5.exe`;
+  const url = String(data.url || '').trim() || `${base}/download/FluxSMS.0.4.6.exe`;
   const notes = String(data.notes || '').trim();
   if (!remote) {
     return { ok: false, error: 'Ficheiro desktop-update.json sem campo «version».' };
