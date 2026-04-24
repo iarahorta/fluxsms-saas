@@ -994,6 +994,38 @@ window.copyPartnerApiKeyAt = async function (key) {
     }
 };
 
+window.createPartnerApiKeyForNewPc = async function () {
+    if (!currentUserIsPartner || !db) return;
+    const label = window.prompt('Nome desta chave (ex.: PC 2, Notebook, Estação B):', 'Novo PC');
+    if (label === null) return;
+    try {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) {
+            alert('Sessão expirada. Faça login novamente.');
+            return;
+        }
+        const res = await fetch(`${BACKEND_URL}/api/partner/self/api-keys`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ label: String(label || 'Novo PC').trim().slice(0, 120) })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert(j.detail || j.error || res.statusText);
+            return;
+        }
+        if (j.api_key) {
+            window.prompt('Nova chave criada. Copie e guarde agora:', j.api_key);
+        }
+        await loadPartnerAutonomyStrip();
+    } catch (e) {
+        alert('Falha ao criar chave: ' + (e.message || e));
+    }
+};
+
 window.togglePartnerAccessBox = function (ev) {
     if (ev) ev.preventDefault();
     const box = document.getElementById('partner-lux-keybox');

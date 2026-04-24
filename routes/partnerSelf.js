@@ -2,6 +2,8 @@ const express = require('express');
 const { requirePartnerUser } = require('../middleware/partnerSession');
 const { buildFinanceSummary } = require('./partnerFinance');
 const { decryptPartnerApiKeySecret } = require('../lib/partnerKeyVault');
+const { generatePlainPartnerKey } = require('../lib/partnerApiKeyIssue');
+const { encryptPartnerApiKeyPlain } = require('../lib/partnerKeyVault');
 
 const router = express.Router();
 
@@ -34,6 +36,8 @@ function workerDownloadUrl(req) {
 }
 
 router.use(requirePartnerUser);
+
+const PARTNER_MAX_ACTIVE_KEYS = 3;
 
 /**
  * GET /api/partner/self/bootstrap
@@ -192,6 +196,70 @@ router.get('/service-toggles', async (req, res) => {
         return res.json({ ok: true, services: merged });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'service_toggles_route_failed', detail: err.message });
+    }
+});
+
+/**
+ * POST /api/partner/self/api-keys
+ * Cria nova API key para novo PC sem desativar as anteriores.
+ * Limite operacional: 3 chaves ativas por parceiro.
+ */
+router.post('/api-keys', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const pid = req.partnerProfile.id;
+    const label = (req.body && req.body.label) ? String(req.body.label).slice(0, 120) : 'Novo PC';
+    try {
+        const { data: activeRows, error: countErr } = await supabase
+            .from('partner_api_keys')
+            .select('id')
+            .eq('partner_id', pid)
+            .eq('is_active', true);
+        if (countErr) {
+            return res.status(500).json({ ok: false, error: 'keys_count_failed', detail: countErr.message });
+        }
+        const activeCount = Array.isArray(activeRows) ? activeRows.length : 0;
+        if (activeCount >= PARTNER_MAX_ACTIVE_KEYS) {
+            return res.status(400).json({
+                ok: false,
+                error: 'active_keys_limit_reached',
+                detail: 'Limite de 3 chaves ativas. Para mais, contacte o suporte FluxSMS.'
+            });
+        }
+
+        const plain = generatePlainPartnerKey();
+        const keyHash = require('crypto').createHash('sha256').update(plain).digest('hex');
+        const keyPrefix = plain.slice(0, 14);
+        const vault = encryptPartnerApiKeyPlain(plain);
+        const payload = {
+            partner_id: pid,
+            key_hash: keyHash,
+            key_prefix: keyPrefix,
+            label: label || `PC ${activeCount + 1}`,
+            is_active: true,
+            bound_hwid: null
+        };
+        if (vault) {
+            payload.secret_ciphertext = vault.ciphertext;
+            payload.secret_iv = vault.iv;
+            payload.secret_tag = vault.tag;
+        }
+        const { data: row, error: insErr } = await supabase
+            .from('partner_api_keys')
+            .insert(payload)
+            .select('id, key_prefix, label, is_active, created_at')
+            .maybeSingle();
+        if (insErr) {
+            return res.status(500).json({ ok: false, error: 'key_create_failed', detail: insErr.message });
+        }
+        return res.status(201).json({
+            ok: true,
+            api_key: plain,
+            key: row,
+            active_keys_count: activeCount + 1,
+            active_keys_limit: PARTNER_MAX_ACTIVE_KEYS
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'key_create_route_failed', detail: err.message });
     }
 });
 
