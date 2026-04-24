@@ -98,12 +98,13 @@ function bootChatWidget() {
         window.Tawk_API.onLoad = function () {
             try {
                 window.Tawk_API.setAttributes({
-                    name: 'Cliente FluxSMS'
+                    name: 'Cliente FluxSMS',
+                    support_menu: 'fluxsms_v1'
                 }, function (_error) { });
                 window.Tawk_API.localize = {
                     en: {
                         chat_window: {
-                            live_chat: 'Suporte FluxSMS',
+                            live_chat: 'Olá fluxer rs, Precisa de ajuda?',
                             away_message: 'No momento não estamos online, deixe sua mensagem.',
                             send_message: 'Enviar Mensagem',
                             input_placeholder: 'Digite sua dúvida aqui...'
@@ -114,6 +115,40 @@ function bootChatWidget() {
                 if (typeof window.Tawk_API.minimize === 'function') {
                     window.Tawk_API.minimize();
                 }
+                window.Tawk_API.onChatStarted = function () {
+                    try {
+                        window.Tawk_API.setAttributes({
+                            support_flow: 'quick_menu_partner'
+                        }, function (_err) { });
+                        window.Tawk_API.addEvent('fluxsms_quick_menu', {
+                            menu: 'Olá fluxer rs, Precisa de ajuda?',
+                            op1: 'Quero ser Parceiro',
+                            op2: 'Como recarregar?',
+                            op3: 'Falar com Atendente'
+                        }, function (_err) { });
+                    } catch (_e) { }
+                };
+                // Auto-respostas por gatilho de texto no início do chat.
+                // Mantém atendimento humano quando o usuário escolher "Falar com Atendente".
+                window.Tawk_API.onChatMessageVisitor = function (message) {
+                    try {
+                        const m = String(message || '').trim().toLowerCase();
+                        if (!m) return;
+                        if (m.includes('quero ser parceiro')) {
+                            window.Tawk_API.addEvent('fluxsms_auto_reply', {
+                                text: 'Ótimo! Acesse https://fluxsms.com.br/partner para começar a lucrar com seus chips.'
+                            }, function (_err) { });
+                        } else if (m.includes('como recarregar')) {
+                            window.Tawk_API.addEvent('fluxsms_auto_reply', {
+                                text: 'O depósito mínimo é R$ 20 via PIX. Basta clicar em Recarregar em seu painel.'
+                            }, function (_err) { });
+                        } else if (m.includes('falar com atendente')) {
+                            window.Tawk_API.addEvent('fluxsms_auto_reply', {
+                                text: 'Digite abaixo sua dúvida.'
+                            }, function (_err) { });
+                        }
+                    } catch (_e) { }
+                };
             } catch (_e) { }
         };
         const s1 = document.createElement('script');
@@ -771,9 +806,20 @@ window.submitAdminPasswordChange = async function () {
 };
 
 // === PIX ===
-const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
-    ? '__BACKEND_URL__'
-    : (window.location.hostname.includes('railway.app') ? window.location.origin : 'https://fluxsms-staging-production.up.railway.app');
+// Mesmo host do site (ex.: https://fluxsms.com.br) — evita apontar para URL Railway antiga/inactiva.
+const BACKEND_URL = (() => {
+    const ph = '__BACKEND_URL__';
+    if (typeof ph === 'string' && ph.startsWith('http') && !ph.includes('localhost')) {
+        return ph.replace(/\/$/, '');
+    }
+    try {
+        return (window.location && window.location.origin)
+            ? window.location.origin.replace(/\/$/, '')
+            : 'https://fluxsms.com.br';
+    } catch {
+        return 'https://fluxsms.com.br';
+    }
+})();
 let initialBalance = 0;
 
 let _partnerApiKeyPlainCache = '';
@@ -873,14 +919,14 @@ async function loadPartnerAutonomyStrip() {
         if (dl) {
             const raw = (j.worker_download_url || '').trim();
             const broken = /Polo-Worker-Portable|\/downloads\//i.test(raw);
-            const href = broken || !raw ? '/download/FluxSMS.0.5.3.exe' : raw;
+            const href = broken || !raw ? '/download/FluxSMS.0.5.9.exe' : raw;
             dl.href = href;
-            dl.setAttribute('download', 'FluxSMS.0.5.3.exe');
+                dl.setAttribute('download', 'FluxSMS.0.5.9.exe');
             dl.onclick = function (ev) {
                 ev.preventDefault();
                 const a = document.createElement('a');
                 a.href = href;
-                a.download = 'FluxSMS.0.5.3.exe';
+                a.download = 'FluxSMS.0.5.9.exe';
                 a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
@@ -924,6 +970,13 @@ function updatePartnerProfileApiPreview() {
         return;
     }
     el.textContent = k.length > 18 ? `${k.slice(0, 10)}…${k.slice(-6)}` : k;
+}
+
+function setPartnerKeyActionMessage(message, isError = false) {
+    const el = document.getElementById('partner-key-action-msg');
+    if (!el) return;
+    el.textContent = message || '';
+    el.style.color = isError ? '#e085a0' : 'rgba(212,175,55,0.95)';
 }
 
 function ensurePartnerProfileKeysVisible() {
@@ -998,9 +1051,11 @@ window.createPartnerApiKeyForNewPc = async function () {
     if (!currentUserIsPartner || !db) return;
     const label = window.prompt('Nome desta chave (ex.: PC 2, Notebook, Estação B):', 'Novo PC');
     if (label === null) return;
+    setPartnerKeyActionMessage('Criando nova chave...');
     try {
         const { data: { session } } = await db.auth.getSession();
         if (!session) {
+            setPartnerKeyActionMessage('Sessão expirada. Faça login novamente.', true);
             alert('Sessão expirada. Faça login novamente.');
             return;
         }
@@ -1014,15 +1069,22 @@ window.createPartnerApiKeyForNewPc = async function () {
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
-            alert(j.detail || j.error || res.statusText);
+            const reason = j.detail || j.error || 'Falha ao criar chave. Tente novamente.';
+            setPartnerKeyActionMessage(reason, true);
+            alert(reason);
             return;
         }
         if (j.api_key) {
+            setPartnerKeyActionMessage(`Nova chave criada com sucesso. Total ativo: ${Number(j.active_keys_count || 0)}/${Number(j.active_keys_limit || 3)}.`);
             window.prompt('Nova chave criada. Copie e guarde agora:', j.api_key);
+        } else {
+            setPartnerKeyActionMessage('Chave criada, mas sem retorno do valor. Atualize e tente copiar na lista.', true);
         }
         await loadPartnerAutonomyStrip();
     } catch (e) {
-        alert('Falha ao criar chave: ' + (e.message || e));
+        const reason = 'Falha ao criar chave: ' + (e.message || e);
+        setPartnerKeyActionMessage(reason, true);
+        alert(reason);
     }
 };
 
@@ -1159,23 +1221,37 @@ let pixCheckInterval = null;
 async function gerarPix() {
     const amount = parseFloat(document.getElementById('valorRecarga').value);
     try {
-        const res = await fetch(`${BACKEND_URL}/webhook/criar-pix`, {
+        const sessionTok = (await db.auth.getSession()).data.session.access_token;
+        const res = await fetch(`${BACKEND_URL}/webhook/criar-pix-nexus`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${(await db.auth.getSession()).data.session.access_token}`,
+                Authorization: `Bearer ${sessionTok}`,
                 'X-Idempotency-Key': Math.random().toString(36).substring(7)
             },
             body: JSON.stringify({ amount })
         });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || data.detail || res.statusText);
+
+        if (!data.qr_code && !data.qr_code_b64) {
+            const hint = data.detail ? ` (${data.detail})` : '';
+            throw new Error(
+                `NexusPag não devolveu QR/copia-e-cola${hint}. Confira NEXUSPAG_API_KEY e credenciais no Railway.`
+            );
+        }
+
+        const qr = String(data.qr_code || '').replace(/'/g, "\\'");
+        const b64 = data.qr_code_b64 ? String(data.qr_code_b64) : '';
+        const imgHtml = b64
+            ? `<img src="data:image/png;base64,${b64}" style="width:200px;"><br>`
+            : '';
 
         document.getElementById('qrCodeContainer').innerHTML = `
             <div style="text-align:center">
-                <img src="data:image/png;base64,${data.qr_code_b64}" style="width:200px;"><br>
-                <div style="background:rgba(255,255,255,0.05); padding:10px; margin-top:10px; font-size:11px; word-break:break-all;">${data.qr_code}</div>
-                <button onclick="navigator.clipboard.writeText('${data.qr_code}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
+                ${imgHtml}
+                <div style="background:rgba(255,255,255,0.05); padding:10px; margin-top:10px; font-size:11px; word-break:break-all;">${qr}</div>
+                <button onclick="navigator.clipboard.writeText('${qr}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
             </div>
         `;
         document.getElementById('pixArea').style.display = 'block';
@@ -1729,6 +1805,14 @@ function renderServices(list) {
 }
 
 // === ACTIVATIONS ===
+/** Evita o texto literal "null" no cartão quando o RPC/devolve MSISDN ainda vazio. */
+function displayActivationPhone(v) {
+    if (v == null) return 'AGUARDANDO';
+    const s = String(v).trim();
+    if (!s || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return 'AGUARDANDO';
+    return s;
+}
+
 async function requestNumber(serviceId, serviceName, defaultPrice) {
     // TRAVA 1: Máximo 5 ativações simultâneas
     const { count } = await db.from('activations')
@@ -1764,7 +1848,7 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
 
     renderActivationCard({
         id: data.activation_id,
-        phone_number: data.numero,
+        phone_number: displayActivationPhone(data.numero),
         service_name: serviceName,
         status: 'waiting',
         sms_code: null,
@@ -1784,7 +1868,7 @@ function renderActivationCard(act) {
     const isPendingLike = ['waiting', 'pending'].includes(String(act.status || '').toLowerCase());
     const h = `
         <div class="session-card" id="${act.id}">
-            <span class="number">${act.phone_number}</span>
+            <span class="number">${escapeHtml(displayActivationPhone(act.phone_number))}</span>
             <div class="specialist-tip">
                 <b>💡 Dica de Especialista:</b>
                 Para melhor desempenho, use conexão 4G/5G e ative/desative o modo avião antes de cada nova ativação. Isso preserva a qualidade e aumenta a durabilidade do seu WhatsApp!
