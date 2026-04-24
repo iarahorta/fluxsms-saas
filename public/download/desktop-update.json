@@ -1,5 +1,5 @@
 {
-  "version": "0.5.5",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.5.exe",
-  "notes": "0.5.5: interface do desktop agora mostra apenas modems ON (linhas OFF ocultas), mantendo intacta a lógica de monitoramento e sincronização."
+  "version": "0.5.6",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.6.exe",
+  "notes": "0.5.6: exibição de lucro do parceiro no desktop ajustada para 60% do valor da venda, sem alterar pipeline de conexão/main. Mantida interface limpa com modems OFF ocultos."
 }

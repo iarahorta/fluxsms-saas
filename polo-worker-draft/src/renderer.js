@@ -2,6 +2,13 @@
 
 /** URL canónica do instalador (fallback se o JSON não trouxer o campo `url` completo). */
 const FLUXSMS_DOWNLOAD_DIR = 'https://fluxsms.com.br/download';
+const PARTNER_REPASSE_RATE = 0.6;
+
+function asPartnerProfit(value) {
+  const v = Number(value || 0);
+  const safe = Number.isFinite(v) ? v : 0;
+  return Math.round((safe * PARTNER_REPASSE_RATE) * 100) / 100;
+}
 
 function buildInstallerUrlFromUpdateResult(r) {
   const raw = String(r && r.downloadUrl != null ? r.downloadUrl : '').trim();
@@ -249,7 +256,7 @@ async function refreshModems() {
         <td>${r.numero || '—'}</td>
         <td>${r.operadora || '—'}</td>
         <td><span class="${on ? 'pill-on' : 'pill-off'}">${on ? 'ON' : 'OFF'}</span></td>
-        <td>R$ ${Number(r.profit || 0).toFixed(2)}</td>
+        <td>R$ ${asPartnerProfit(r.profit).toFixed(2)}</td>
         <td>${fmtDate(r.lastActivationAt)}</td>
       `;
       tr.addEventListener('click', () => openNumberModal(r));
@@ -287,7 +294,7 @@ async function openNumberModal(r) {
     numSideMeta.innerHTML = `
       <div><strong>Operadora</strong> ${(r.operadora && r.operadora !== '—') ? r.operadora : '—'}</div>
       <div><strong>Porta</strong> ${r.porta || '—'}</div>
-      <div><strong>Lucro (monitor)</strong> R$ ${Number(r.profit || 0).toFixed(2)}</div>
+      <div><strong>Lucro (monitor)</strong> R$ ${asPartnerProfit(r.profit).toFixed(2)}</div>
     `;
   }
   if (actTbody) actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.7">A carregar…</td></tr>';
@@ -326,7 +333,7 @@ async function openNumberModal(r) {
         .replace(/>/g, '&gt;');
       actTbody.innerHTML = list.map((a) => {
         const cls = rowClassForAct(a.status);
-        const val = a.price != null ? `R$ ${Number(a.price).toFixed(2)}` : '—';
+        const val = a.price != null ? `R$ ${asPartnerProfit(a.price).toFixed(2)}` : '—';
         const sn = esc(a.service_name || a.service || '—');
         return `<tr class="${cls}">
           <td><code style="font-size:11px">${esc(fmtShortId(a.id))}</code></td>
