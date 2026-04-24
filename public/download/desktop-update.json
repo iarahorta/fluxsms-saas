@@ -1,5 +1,5 @@
 {
-  "version": "0.5.4",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.4.exe",
-  "notes": "0.5.4: correção crítica do lucro do fornecedor no desktop (ativação em waiting não soma saldo/lucro e log REQUEST deixa de repetir em loop). 0.5.3: core Python no Electron headless + monitoramento ON."
+  "version": "0.5.5",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.5.exe",
+  "notes": "0.5.5: interface do desktop agora mostra apenas modems ON (linhas OFF ocultas), mantendo intacta a lógica de monitoramento e sincronização."
 }

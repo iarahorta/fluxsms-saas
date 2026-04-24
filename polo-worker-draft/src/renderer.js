@@ -237,8 +237,9 @@ async function setStatusAndCcid() {
 async function refreshModems() {
   try {
     const rows = await poloWorker.modemRows();
+    const rowsOn = (rows || []).filter((r) => String(r.status || 'OFF').toUpperCase() === 'ON');
     modemTableBody.innerHTML = '';
-    rows.forEach((r) => {
+    rowsOn.forEach((r) => {
       const tr = document.createElement('tr');
       const on = String(r.status || 'OFF').toUpperCase() === 'ON';
       tr.className = on ? 'modem-row--on' : 'modem-row--off';
@@ -254,9 +255,9 @@ async function refreshModems() {
       tr.addEventListener('click', () => openNumberModal(r));
       modemTableBody.appendChild(tr);
     });
-    if (!rows.length) {
+    if (!rowsOn.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem detectado ainda.</td>';
+      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem ON no momento.</td>';
       modemTableBody.appendChild(tr);
     }
     lastSyncEl.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
