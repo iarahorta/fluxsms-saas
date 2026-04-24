@@ -1219,9 +1219,19 @@ window.savePartnerServiceToggles = async function () {
 let pixCheckInterval = null;
 
 async function gerarPix() {
-    const amount = parseFloat(document.getElementById('valorRecarga').value);
+    const elVal = document.getElementById('valorRecarga');
+    const amount = parseFloat(elVal && elVal.value);
+    if (!elVal) return;
+    if (!db || !currentUser) {
+        alert('Entre com sua conta para gerar o PIX.');
+        return;
+    }
     try {
-        const sessionTok = (await db.auth.getSession()).data.session.access_token;
+        const sessionTok = (await db.auth.getSession()).data.session?.access_token;
+        if (!sessionTok) {
+            alert('Sessão expirada. Entre de novo para gerar o PIX.');
+            return;
+        }
         const res = await fetch(`${BACKEND_URL}/webhook/criar-pix-nexus`, {
             method: 'POST',
             headers: {
@@ -1234,14 +1244,14 @@ async function gerarPix() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
             const hint = [data.detail, data.error, data.code].filter(Boolean).join(' | ');
-            throw new Error(hint || res.statusText);
+            alert('Aviso: não foi possível gerar o PIX agora (' + (hint || res.statusText) + '). Com saldo em conta, você pode comprar números normalmente abaixo.');
+            return;
         }
 
         if (!data.qr_code && !data.qr_code_b64) {
-            const hint = data.detail ? ` (${data.detail})` : '';
-            throw new Error(
-                `NexusPag não devolveu QR/copia-e-cola${hint}. Confira NEXUSPAG_API_KEY e credenciais no Railway.`
-            );
+            const hint = data.detail ? ' ' + data.detail : '';
+            alert('Aviso: gateway não devolveu o código copia-e-cola.' + hint + ' Com saldo em conta, pode comprar números em Serviços.');
+            return;
         }
 
         const qr = String(data.qr_code || '').replace(/'/g, "\\'");
@@ -1257,15 +1267,17 @@ async function gerarPix() {
                 <button onclick="navigator.clipboard.writeText('${qr}').then(()=>alert('Código PIX copiado com sucesso!'))" style="margin-top:10px; background:var(--flux-gold); width:100%; padding:10px; border-radius:8px; font-weight:bold;">COPIAR PIX</button>
             </div>
         `;
-        document.getElementById('pixArea').style.display = 'block';
+        const pixArea = document.getElementById('pixArea');
+        if (pixArea) pixArea.style.display = 'block';
+
+        const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
+        initialBalance = profile?.balance || 0;
+        if (pixCheckInterval) clearInterval(pixCheckInterval);
+        pixCheckInterval = setInterval(checkBalanceAuto, 5000);
     } catch (err) {
-        console.error("Erro PIX:", err);
-        alert("Erro ao solicitar PIX: " + err.message);
+        console.error("Erro PIX (isolado, não trava o painel):", err);
+        alert('Aviso: não foi possível falar com o serviço de recarga. Se já tem saldo, use Solicitar abaixo normalmente. Detalhe: ' + (err && err.message ? err.message : err));
     }
-    const { data: profile } = await db.from('profiles').select('balance').eq('id', currentUser.id).single();
-    initialBalance = profile?.balance || 0;
-    if (pixCheckInterval) clearInterval(pixCheckInterval);
-    pixCheckInterval = setInterval(checkBalanceAuto, 5000);
 }
 
 async function checkBalanceAuto() {
@@ -1297,40 +1309,93 @@ async function fetchGlobalServices() {
     }
 }
 
+function mergeStockMaps(a, b) {
+    const out = { ...a };
+    for (const k of Object.keys(b || {})) {
+        out[k] = Math.max(Number(out[k] || 0), Number(b[k] || 0));
+    }
+    return out;
+}
+
+/** Plano C: se API e RPC falham, contagem mínima na tabela chips (anon). */
+async function loadChipsCountTableFallback() {
+    const SIXTY_MS = 60 * 60 * 1000;
+    const { data: rows, error } = await db
+        .from('chips')
+        .select('id, status, last_ping, polos(ultima_comunicacao)')
+        .not('numero', 'ilike', 'CCID%');
+    if (error || !rows) return null;
+    const alive = rows.filter((row) => {
+        const p = row.polos;
+        const t = p && (Array.isArray(p) ? p[0] : p).ultima_comunicacao;
+        const lp = row.last_ping;
+        const tP = t ? new Date(t).getTime() : 0;
+        const tL = lp ? new Date(lp).getTime() : 0;
+        if (tP && Date.now() - tP <= SIXTY_MS) return true;
+        if (tL && Date.now() - tL <= SIXTY_MS) return true;
+        if (!tP && !tL) return true;
+        return false;
+    });
+    const n = alive.length;
+    const per = {};
+    for (const s of SERVICES) per[s.id] = n;
+    return { chips: n, stocks: per };
+}
+
 async function loadChipsCount() {
     if (!db) return;
 
-    /* Janela 60 min no polo (ultima_comunicacao) em vez de 15 min: mais números visíveis. Sem polo embutido → conta. */
-    const POLO_ATIVO_MS = 60 * 60 * 1000;
-    const { data: chipRows, error: chipCountErr } = await db
-        .from('chips')
-        .select('id, polos(ultima_comunicacao)')
-        .in('status', ['idle', 'quarentena'])
-        .not('numero', 'ilike', 'CCID%');
+    const merged = {};
+    for (const s of SERVICES) merged[s.id] = 0;
 
-    if (chipCountErr) {
-        console.error('loadChipsCount', chipCountErr);
-        const { count: c2 } = await db
-            .from('chips')
-            .select('id', { count: 'exact', head: true })
-            .in('status', ['idle', 'quarentena'])
-            .not('numero', 'ilike', 'CCID%');
-        chipsDisponiveis = c2 || 0;
-    } else {
-        chipsDisponiveis = (chipRows || []).filter((row) => {
-            const p = row.polos;
-            const t = p && (Array.isArray(p) ? p[0] : p).ultima_comunicacao;
-            if (t == null) return true;
-            return (Date.now() - new Date(t).getTime()) <= POLO_ATIVO_MS;
-        }).length;
-    }
+    let fromApi = false;
     try {
-        const { data: stocks } = await db.rpc('rpc_get_service_stocks');
-        if (stocks) serviceStocks = stocks;
-        renderServices(SERVICES);
-    } catch (e) { console.error("Erro stocks:", e); }
+        const r = await fetch(`${BACKEND_URL}/api/public/estoque`, { method: 'GET' });
+        const j = r.ok ? await r.json() : null;
+        if (j && j.ok) {
+            fromApi = true;
+            chipsDisponiveis = Number(j.chips_vivos) || 0;
+            if (j.stocks && typeof j.stocks === 'object') {
+                for (const s of SERVICES) {
+                    merged[s.id] = Math.max(merged[s.id], Number(j.stocks[s.id] || 0));
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('loadChipsCount API público', e);
+    }
+
+    try {
+        const { data, error } = await db.rpc('rpc_get_service_stocks');
+        if (!error && data) {
+            for (const s of SERVICES) {
+                merged[s.id] = Math.max(merged[s.id], Number(data[s.id] || 0));
+            }
+        }
+    } catch (e) {
+        console.warn('loadChipsCount rpc_get_service_stocks', e);
+    }
+
+    if (Object.values(merged).every((n) => Number(n) <= 0)) {
+        const fb = await loadChipsCountTableFallback();
+        if (fb) {
+            chipsDisponiveis = Math.max(chipsDisponiveis, fb.chips);
+            for (const s of SERVICES) {
+                merged[s.id] = Math.max(merged[s.id] || 0, Number(fb.stocks[s.id] || 0));
+            }
+        }
+    }
+
+    serviceStocks = mergeStockMaps(merged, serviceStocks);
+
+    if (!chipsDisponiveis) {
+        const mx = Math.max(0, ...SERVICES.map((s) => Number(serviceStocks[s.id] || 0)));
+        if (mx > 0) chipsDisponiveis = mx;
+    }
+
+    renderServices(SERVICES);
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips (atividade 60 min)`;
 }
 
 let chipsDebounce = null;
@@ -1789,10 +1854,9 @@ function renderServices(list) {
     if (!servicesGrid) return;
     servicesGrid.innerHTML = list.map(s => {
         const rpcN = serviceStocks[s.id];
-        const hasGlobal = chipsDisponiveis > 0;
-        const stock = hasGlobal
-            ? Math.max(1, Number(rpcN) || 0)
-            : (rpcN == null || rpcN === undefined ? 0 : Number(rpcN) || 0);
+        const n = Math.max(0, Number(rpcN) || 0);
+        const hasGlobal = (chipsDisponiveis || 0) > 0;
+        const stock = n > 0 ? n : (hasGlobal ? 1 : 0);
         let finalPrice = userCustomPrices[s.id] || s.price;
         if (s.id === 'whatsapp') {
             finalPrice = getWhatsappBasePriceForCurrentUser();
@@ -1828,17 +1892,7 @@ function displayActivationPhone(v) {
 }
 
 async function requestNumber(serviceId, serviceName, defaultPrice) {
-    // TRAVA 1: Máximo 5 ativações simultâneas
-    const { count } = await db.from('activations')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', currentUser.id)
-        .eq('status', 'waiting');
-    if (count >= 5) {
-        alert('⚠️ Você atingiu o limite de 5 pedidos simultâneos.\nFinalize ou cancele um para pedir outro.');
-        return;
-    }
-
-    // Usa a V3 blindada com sistema fiel de Descontos e Acúmulos
+    // Compra: só saldo + chip no servidor (RPC v3)
     const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
         p_user_id: currentUser.id,
         p_service: serviceId,

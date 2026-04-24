@@ -11,11 +11,13 @@ const webhookRouter = require('./routes/webhook');
 const smsRouter = require('./routes/sms');
 const partnerApiRouter = require('./routes/partnerApi');
 const adminPartnersRouter = require('./routes/adminPartners');
+const adminFinancasFluxRouter = require('./routes/adminFinancasFlux');
 const adminSecurityRouter = require('./routes/adminSecurity');
 const partnerFinanceRouter = require('./routes/partnerFinance');
 const partnerOnboardingRouter = require('./routes/partnerOnboarding');
 const partnerSelfRouter = require('./routes/partnerSelf');
-const { rateLimiter } = require('./middleware/rateLimit');
+const publicEstoqueRouter = require('./routes/publicEstoque');
+const { rateLimiter, adminSensitiveLimiter } = require('./middleware/rateLimit');
 const { validateInput } = require('./middleware/validate');
 
 const app = express();
@@ -136,10 +138,12 @@ app.use('/sms', smsRouter);      // Modem → SMS delivery
 app.use('/webhook', webhookRouter); // Processador de PIX e Webhooks
 app.use('/partner-api', partnerApiRouter); // API universal para parceiros
 app.use('/api/admin/partners', adminPartnersRouter); // Dashboard admin: lista de parceiros (JWT + is_admin)
-app.use('/api/admin/security', adminSecurityRouter); // Admin raiz: gestão de senhas de usuários
+app.use('/api/admin/financas-flux', adminFinancasFluxRouter); // Finanças Flux: wallets + parceiro (JWT admin)
+app.use('/api/admin/security', adminSensitiveLimiter, adminSecurityRouter); // Admin raiz: gestão de senhas de usuários
 app.use('/api/partner/finance', partnerFinanceRouter); // Parceiro logado: resumo repasse + pedido de saque (JWT + is_partner)
 app.use('/api/partner/onboarding', partnerOnboardingRouter); // Cadastro autónomo: ativar perfil parceiro (JWT)
 app.use('/api/partner/self', partnerSelfRouter); // Painel parceiro: bootstrap + gerar API Key (JWT + is_partner)
+app.use('/api/public', publicEstoqueRouter); // Plano B: estoque (service_role) sem depender só de RPC/anon
 
 // ─── Heartbeat Cleaner Automático (60s / timeout 180s) ─────────
 const HEARTBEAT_INTERVAL_MS = 60 * 1000;
@@ -176,7 +180,7 @@ setInterval(runHeartbeatCleaner, HEARTBEAT_INTERVAL_MS);
 setTimeout(runHeartbeatCleaner, 10000);
 
 // Deploy touch 2026-04-22 — performance LCP + imagens WebP/JPEG + scripts ao fim do body
-const VERSION = '2.1.27';
+const VERSION = '2.1.28';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 
@@ -290,7 +294,7 @@ app.get('/debug/seed', async (req, res) => {
 });
 
 // Servir arquivos permitidos
-const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare'];
+const publicFolders = ['assets', 'dist', 'admindiretoria', 'termos', 'privacidade', 'cloudflare', 'marketing'];
 publicFolders.forEach(folder => {
     app.use(`/${folder}`, express.static(path.join(__dirname, folder)));
 });
@@ -340,6 +344,15 @@ app.get('/robots.txt', (_req, res) => {
     const fp = path.join(__dirname, 'public', 'robots.txt');
     if (!fs.existsSync(fp)) return res.status(404).type('text/plain').send('Not found');
     res.type('text/plain; charset=utf-8');
+    res.sendFile(fp);
+});
+
+// Documentação da API (HTML estático, estilo referência pública tipo hero-sms.com/api)
+app.get(['/api', '/api/'], (_req, res) => {
+    const fp = path.join(__dirname, 'public', 'api', 'index.html');
+    if (!fs.existsSync(fp)) return res.status(404).type('text/plain').send('Not found');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.type('text/html; charset=utf-8');
     res.sendFile(fp);
 });
 

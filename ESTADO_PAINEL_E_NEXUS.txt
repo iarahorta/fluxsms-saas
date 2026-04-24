@@ -1,0 +1,20 @@
+ESTADO DO PROJETO (Cursor) — 2026-04-24
+========================================
+
+Pausa intencional em NEXUS / webhooks de gateway
+-------------------------------------------------
+- Prioridade: painel de números, estoque, botão Solicitar, compra com saldo.
+- Não retomar Nexus (PIX, criar-pix-nexus, chaves NEXUSPAG) até o painel estar 100% validado em produção.
+- Quando o painel estiver ok, fazer backup (tag/commit) e só então perguntar se pode voltar à integração Nexus.
+
+O que foi entregue nesta fase (técnico)
+--------------------------------------
+- GET /api/public/estoque — plano B com service_role, sinal 60 min (last_ping / ultima_comunicacao), sem exigir polo "ONLINE" no front.
+- Front: loadChipsCount funde API pública + rpc_get_service_stocks + fallback tabela chips; PIX falho só avisa, não quebra o resto.
+- SQL Supabase: migrations/024_rpc_v3_chip_offline_com_sinal_60m.sql — venda/estoque com chip "offline" mas vivo nos últimos 60 min.
+- server.js v2.1.28
+
+Próximo passo humano
+--------------------
+- Colar 024 no SQL Editor do Supabase e NOTIFY/reload schema.
+- Validar no site: serviços com contagem e Solicitar com saldo.
