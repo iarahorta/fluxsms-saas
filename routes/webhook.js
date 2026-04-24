@@ -270,13 +270,42 @@ router.post('/criar-pix-nexus', pixCreateLimiter, async (req, res) => {
         });
 
         const chargeId = nexusPag.extractChargeIdFromCreateResponse(created.data) || null;
-        const qr = nexusPag.extractQrFromCreateResponse(created.data);
+        const resolved = await nexusPag.resolvePixQrFromCreate(created.data, {
+            externalRef: ord.external_ref
+        });
+        const qr = resolved.qr;
+
+        const rawCreateMerged = {
+            nexus_create: created.data,
+            nexus_get_attempts: resolved.getAttempts || [],
+            ...(resolved.remoteData ? { nexus_get: resolved.remoteData } : {})
+        };
+
+        if (!qr.qr_code && !qr.qr_code_b64) {
+            await supabase
+                .from('flux_nexus_pix_orders')
+                .update({
+                    gateway_charge_id: chargeId,
+                    status: 'failed',
+                    raw_create: rawCreateMerged
+                })
+                .eq('id', ord.id);
+            return res.status(502).json({
+                ok: false,
+                error: 'nexus_sem_qr',
+                detail:
+                    'NexusPag não devolveu QR/copia-e-cola. Confira NEXUSPAG_API_KEY e credenciais no Railway. Se a API exige outro endpoint ou campo, ative NEXUSPAG_DEBUG=1 e inspecione o JSON em raw_create.',
+                order_id: ord.id,
+                charge_id: chargeId,
+                raw: process.env.NEXUSPAG_DEBUG === '1' ? rawCreateMerged : undefined
+            });
+        }
 
         await supabase
             .from('flux_nexus_pix_orders')
             .update({
                 gateway_charge_id: chargeId,
-                raw_create: created.data || {}
+                raw_create: rawCreateMerged
             })
             .eq('id', ord.id);
 
@@ -288,12 +317,14 @@ router.post('/criar-pix-nexus', pixCreateLimiter, async (req, res) => {
             charge_id: chargeId,
             qr_code: qr.qr_code,
             qr_code_b64: qr.qr_code_b64,
-            raw: process.env.NEXUSPAG_DEBUG === '1' ? created.data : undefined
+            raw: process.env.NEXUSPAG_DEBUG === '1' ? rawCreateMerged : undefined
         });
     } catch (err) {
-        const detail = err.response?.data || err.message;
-        console.error('[CRIAR PIX NEXUS] Falha:', detail);
-        return res.status(500).json({ ok: false, error: 'nexus_pix_failed', detail: String(detail) });
+        const st = err.response?.status;
+        const body = err.response?.data;
+        const safe = body != null ? (typeof body === 'string' ? body : JSON.stringify(body)) : err.message;
+        console.error('[CRIAR PIX NEXUS] exceção:', st || '—', safe);
+        return res.status(500).json({ ok: false, error: 'nexus_pix_failed', detail: String(safe) });
     }
 });
 

@@ -1300,18 +1300,30 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
 
-    /* Contagem mínima: chip existe, disponível p/ venda (idle/quarentena), ignora placeholder CCID. Sem janela de tempo no polo. */
-    const { count, error: chipCountErr } = await db
+    /* Janela 60 min no polo (ultima_comunicacao) em vez de 15 min: mais números visíveis. Sem polo embutido → conta. */
+    const POLO_ATIVO_MS = 60 * 60 * 1000;
+    const { data: chipRows, error: chipCountErr } = await db
         .from('chips')
-        .select('id', { count: 'exact', head: true })
+        .select('id, polos(ultima_comunicacao)')
         .in('status', ['idle', 'quarentena'])
         .not('numero', 'ilike', 'CCID%');
 
     if (chipCountErr) {
         console.error('loadChipsCount', chipCountErr);
+        const { count: c2 } = await db
+            .from('chips')
+            .select('id', { count: 'exact', head: true })
+            .in('status', ['idle', 'quarentena'])
+            .not('numero', 'ilike', 'CCID%');
+        chipsDisponiveis = c2 || 0;
+    } else {
+        chipsDisponiveis = (chipRows || []).filter((row) => {
+            const p = row.polos;
+            const t = p && (Array.isArray(p) ? p[0] : p).ultima_comunicacao;
+            if (t == null) return true;
+            return (Date.now() - new Date(t).getTime()) <= POLO_ATIVO_MS;
+        }).length;
     }
-
-    chipsDisponiveis = count || 0;
     try {
         const { data: stocks } = await db.rpc('rpc_get_service_stocks');
         if (stocks) serviceStocks = stocks;
@@ -1831,7 +1843,8 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         p_user_id: currentUser.id,
         p_service: serviceId,
         p_service_name: serviceName,
-        p_default_price: defaultPrice
+        p_default_price: defaultPrice,
+        p_registered_by_api_key_id: null
     });
 
     if (error || !data || !data.ok) {

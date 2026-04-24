@@ -1,8 +1,9 @@
--- Cole no Supabase SQL Editor (023): RPC v3 com p_registered_by_api_key_id + rpc_get_service_stocks alinhado.
--- p_registered_by_api_key_id NULL (padrão web) = qualquer chip da plataforma (sem restringir por chave de parceiro).
--- Se precisar isolar, passe o UUID da partner_api_keys; chips sem registo (NULL) também entram nesse modo.
+-- 023: rpc_solicitar_sms_v3 com 5.º parâmetro (pool por API key) + estoque alinhado ao contador.
+-- p_registered_by_api_key_id = NULL (web) → considera qualquer chip (não restringe por chave).
+-- p_registered_by_api_key_id = UUID → restringe a chips (NULL nessa coluna) OU (reg = esse UUID).
+-- rpc_get_service_stocks: mesmas regras (chip_service_off, sem CCID placeholder) e sem janela de tempo no polo.
 
--- Remove assinatura antiga (4 args) se existir.
+-- Remove assinatura antiga (4 args) para a nova (5 args com default) ser a única.
 DROP FUNCTION IF EXISTS public.rpc_solicitar_sms_v3(UUID, TEXT, TEXT, NUMERIC);
 
 CREATE OR REPLACE FUNCTION public.rpc_solicitar_sms_v3(
@@ -114,7 +115,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms_v3(UUID, TEXT, TEXT, NUMERIC, UUID) TO authenticated;
 
--- Estoque por serviço (alinhado)
+-- Estoque por serviço: alinhado à RPC (chip_service_off, sem janela polo, sem prefixo CCID)
 CREATE OR REPLACE FUNCTION public.rpc_get_service_stocks()
 RETURNS JSONB
 LANGUAGE plpgsql
