@@ -48,17 +48,21 @@ body {
     border-right: 1px solid var(--flux-border);
     display: flex;
     flex-direction: column;
-    padding: 25px 15px;
+    padding: 10px 12px 8px;
     flex-shrink: 0;
     z-index: 100;
     transition: transform 0.3s ease;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .sidebar-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 30px;
+    margin-bottom: 12px;
 }
 
 .sidebar-close {
@@ -88,7 +92,7 @@ body {
 
 .logo-img {
     width: 100%;
-    max-width: 180px;
+    max-width: 155px;
     height: auto;
     display: block;
     margin: 0 auto;
@@ -134,21 +138,21 @@ body {
 .main-nav {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 4px;
     flex: 1;
 }
 
 .nav-item {
     text-decoration: none;
     color: var(--flux-dim);
-    padding: 14px 18px;
+    padding: 10px 14px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     transition: 0.2s;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     border-left: 3px solid transparent;
 }
 
@@ -170,7 +174,7 @@ body {
 }
 
 .sidebar-footer {
-    margin-top: auto;
+    display: none;
 }
 
 .badge-premium {
