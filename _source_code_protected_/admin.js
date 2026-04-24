@@ -557,7 +557,9 @@ async function loadPartnerApiAdmin() {
 
 window.updatePartnerCommission = async function (partnerProfileId) {
     const input = document.getElementById(`commission-${partnerProfileId}`);
+    const prioEl = document.querySelector(`input[onchange*="toggleAdminSaquePrioritario('${partnerProfileId}'"]`);
     const value = input ? Number(input.value) : NaN;
+    const prio = !!prioEl?.checked;
     if (!Number.isInteger(value) || value < 1 || value > 100) {
         alert('Comissão inválida. Use um inteiro entre 1 e 100.');
         return;
@@ -574,7 +576,7 @@ window.updatePartnerCommission = async function (partnerProfileId) {
                 Authorization: `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ custom_commission: value })
+            body: JSON.stringify({ custom_commission: value, saque_prioritario: prio })
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
