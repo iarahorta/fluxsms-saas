@@ -28,6 +28,47 @@ function pickPreferredPolo(polos) {
   return list[0];
 }
 
+async function ensurePartnerPolo(supabase, partnerId) {
+  const polosScope = await listPolosFromPartner(supabase, partnerId);
+  if (!polosScope.ok) return { ok: false, status: polosScope.status, body: polosScope.body };
+  let polo = pickPreferredPolo(polosScope.polos);
+  if (polo) return { ok: true, polo, polos: polosScope.polos };
+
+  const { data: partnerProfile, error: pErr } = await supabase
+    .from('partner_profiles')
+    .select('partner_code')
+    .eq('id', partnerId)
+    .maybeSingle();
+  if (pErr) return { ok: false, status: 500, body: { ok: false, error: 'partner_profile_failed', detail: pErr.message } };
+
+  const baseKey = String(partnerProfile?.partner_code || `partner-${String(partnerId).slice(0, 8)}`).trim() || `partner-${String(partnerId).slice(0, 8)}`;
+  const attempts = [baseKey, `${baseKey}-${String(partnerId).slice(0, 8)}`, `${baseKey}-${Date.now().toString().slice(-6)}`];
+  let lastErr = null;
+  for (const key of attempts) {
+    const created = await supabase
+      .from('polos')
+      .insert({
+        partner_profile_id: partnerId,
+        nome: 'Estacao principal',
+        status: 'ONLINE',
+        chave_acesso: key
+      })
+      .select('id, partner_profile_id, chave_acesso, nome, status, ultima_comunicacao')
+      .maybeSingle();
+    if (!created.error && created.data) {
+      return { ok: true, polo: created.data, polos: [created.data] };
+    }
+    lastErr = created.error;
+    const msg = String(created.error?.message || '').toLowerCase();
+    if (!msg.includes('duplicate key value') || !msg.includes('polos_chave_acesso_key')) break;
+  }
+  return {
+    ok: false,
+    status: 500,
+    body: { ok: false, error: 'polo_autocreate_failed', detail: lastErr?.message || 'erro' }
+  };
+}
+
 /**
  * Upsert chip no polo do parceiro autenticado (sem polo_chave no body — resolve só por partner_id).
  * Aceita aliases: port/number/operator.
@@ -43,31 +84,10 @@ async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn) {
   }
 
   try {
-    const polosScope = await listPolosFromPartner(supabase, partnerId);
-    if (!polosScope.ok) return { status: polosScope.status, json: polosScope.body };
-    let polo = pickPreferredPolo(polosScope.polos);
-    if (!polo) {
-      const { data: partnerProfile } = await supabase
-        .from('partner_profiles')
-        .select('partner_code')
-        .eq('id', partnerId)
-        .maybeSingle();
-      const newPolo = await supabase
-        .from('polos')
-        .insert({
-          partner_profile_id: partnerId,
-          nome: 'Estação principal',
-          status: 'ONLINE',
-          chave_acesso: String(partnerProfile?.partner_code || `partner-${String(partnerId).slice(0, 8)}`)
-        })
-        .select('id, partner_profile_id, chave_acesso, nome, status, ultima_comunicacao')
-        .maybeSingle();
-      if (newPolo.error) {
-        return { status: 500, json: { ok: false, error: 'polo_autocreate_failed', detail: newPolo.error.message } };
-      }
-      polo = newPolo.data;
-      polosScope.polos = polo ? [polo] : [];
-    }
+    const poloScope = await ensurePartnerPolo(supabase, partnerId);
+    if (!poloScope.ok) return { status: poloScope.status, json: poloScope.body };
+    const polo = poloScope.polo;
+    const polos = poloScope.polos || (polo ? [polo] : []);
     if (!polo) {
       return { status: 404, json: { ok: false, error: 'polo_nao_encontrado' } };
     }
@@ -76,7 +96,7 @@ async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn) {
     const { data: existing } = await supabase
       .from('chips')
       .select('id, polo_id, porta')
-      .in('polo_id', polosScope.polos.map((p) => p.id))
+      .in('polo_id', polos.map((p) => p.id))
       .ilike('porta', portaNorm)
       .limit(1)
       .maybeSingle();
@@ -193,31 +213,9 @@ router.get('/health', (req, res) => {
 router.get('/worker/bootstrap', async (req, res) => {
   const supabase = req.app.get('supabase');
   try {
-    let polosScope = await listPolosFromPartner(supabase, req.partner.id);
-    if (!polosScope.ok) return res.status(polosScope.status).json(polosScope.body);
-    let polo = pickPreferredPolo(polosScope.polos);
-    if (!polo) {
-      const { data: partnerProfile, error: pErr } = await supabase
-        .from('partner_profiles')
-        .select('partner_code')
-        .eq('id', req.partner.id)
-        .maybeSingle();
-      if (pErr) return res.status(500).json({ ok: false, error: 'partner_profile_failed', detail: pErr.message });
-      const newPolo = await supabase
-        .from('polos')
-        .insert({
-          partner_profile_id: req.partner.id,
-          nome: 'Estacao principal',
-          status: 'ONLINE',
-          chave_acesso: String(partnerProfile?.partner_code || `partner-${String(req.partner.id).slice(0, 8)}`)
-        })
-        .select('id, chave_acesso, nome, status, ultima_comunicacao')
-        .maybeSingle();
-      if (newPolo.error || !newPolo.data) {
-        return res.status(500).json({ ok: false, error: 'polo_autocreate_failed', detail: newPolo.error?.message || 'erro' });
-      }
-      polo = newPolo.data;
-    }
+    const poloScope = await ensurePartnerPolo(supabase, req.partner.id);
+    if (!poloScope.ok) return res.status(poloScope.status).json(poloScope.body);
+    const polo = poloScope.polo;
     return res.json({
       ok: true,
       partner_id: req.partner.id,
