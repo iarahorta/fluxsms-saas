@@ -1232,7 +1232,10 @@ async function gerarPix() {
             body: JSON.stringify({ amount })
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.error || data.detail || res.statusText);
+        if (!res.ok || !data.ok) {
+            const hint = [data.detail, data.error, data.code].filter(Boolean).join(' | ');
+            throw new Error(hint || res.statusText);
+        }
 
         if (!data.qr_code && !data.qr_code_b64) {
             const hint = data.detail ? ` (${data.detail})` : '';

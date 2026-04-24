@@ -253,7 +253,13 @@ router.post('/criar-pix-nexus', pixCreateLimiter, async (req, res) => {
             .maybeSingle();
 
         if (insErr || !ord) {
-            return res.status(500).json({ ok: false, error: 'order_create_failed', detail: insErr?.message });
+            console.error('[CRIAR PIX NEXUS] insert flux_nexus_pix_orders:', insErr);
+            return res.status(500).json({
+                ok: false,
+                error: 'order_create_failed',
+                detail: insErr?.message || 'insert_failed',
+                code: insErr?.code || null
+            });
         }
 
         const created = await nexusPag.createPixCharge({

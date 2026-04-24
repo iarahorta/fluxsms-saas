@@ -1,7 +1,3 @@
--- ATUALIZADO: use este script (022) no SQL Editor se tiver "sem_chips" com estoque no site.
--- Pré-requisito: public.rpc_refresh_fidelity_level (mig. 019).
--- Isto remove o filtro de polo "vivo" (15 min), alinhado ao loadChipsCount.
-
 -- 022: Remove filtro de "polo vivo" (ultima 15 min / lab) na venda.
 -- A contagem de estoque no site (loadChipsCount) já não usa esse filtro; sem isto
 -- a RPC ainda devolvia sem_chips quando o polo estava "frio" no banco.
