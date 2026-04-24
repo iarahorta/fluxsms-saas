@@ -465,8 +465,9 @@ async function loadPartnerApiAdmin() {
             const hasOnlineChip = Array.isArray(p.chips) && p.chips.some((c) => String(c.status || '').toLowerCase() !== 'offline');
             const statusLabel = hasOnlineChip ? 'ONLINE' : 'OFFLINE';
             const statusClass = hasOnlineChip ? 'status-online' : 'status-offline';
+            const code = escapeHtml(p.partner_code || '—');
             rows += `<tr>
-                <td><code style="font-size:11px;">${p.partner_code || '—'}</code></td>
+                <td><button type="button" class="btn-action" style="padding:4px 8px;font-size:10px;" onclick="showAdminPartnerKeys('${p.id}','${code}')">${code}</button></td>
                 <td>${email}</td>
                 <td style="text-align:center;">${keys}</td>
                 <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
@@ -522,6 +523,37 @@ window.updatePartnerCommission = async function (partnerProfileId) {
         }
         alert('Comissão atualizada com sucesso.');
         loadPartnerApiAdmin();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
+window.showAdminPartnerKeys = async function (partnerProfileId, partnerCode) {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}/api-keys`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro ao carregar chaves: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        const keys = Array.isArray(j.keys) ? j.keys.filter((k) => k.is_active !== false) : [];
+        if (!keys.length) {
+            alert(`Parceiro ${partnerCode}: nenhuma chave ativa.`);
+            return;
+        }
+        const lines = keys.map((k, idx) => {
+            const label = k.label || `Chave ${idx + 1}`;
+            const value = k.api_key_plain || k.key_prefix || 'indisponível';
+            return `${idx + 1}) ${label}\n${value}`;
+        }).join('\n\n');
+        window.prompt(`Chaves ativas do parceiro ${partnerCode} (copie abaixo):`, lines);
     } catch (e) {
         alert('Falha: ' + (e.message || e));
     }

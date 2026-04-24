@@ -42,20 +42,30 @@ router.get('/bootstrap', async (req, res) => {
     const supabase = req.app.get('supabase');
     const pid = req.partnerProfile.id;
     try {
-        const { data: keyRow, error: kErr } = await supabase
+        const { data: keyRows, error: kErr } = await supabase
             .from('partner_api_keys')
             .select('id, key_prefix, label, is_active, created_at, secret_ciphertext, secret_iv, secret_tag')
             .eq('partner_id', pid)
             .eq('is_active', true)
             .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .limit(20);
 
         if (kErr) {
             return res.status(500).json({ ok: false, error: 'keys_failed', detail: kErr.message });
         }
 
-        const apiKeyPlain = keyRow ? decryptPartnerApiKeySecret(keyRow) : null;
+        const rows = Array.isArray(keyRows) ? keyRows : [];
+        const keyList = rows
+            .map((row) => ({
+                id: row.id,
+                key_prefix: row.key_prefix,
+                label: row.label,
+                is_active: row.is_active,
+                created_at: row.created_at,
+                api_key_plain: decryptPartnerApiKeySecret(row) || null
+            }))
+            .filter((k) => !!k.api_key_plain);
+        const apiKeyPlain = keyList.length ? keyList[0].api_key_plain : null;
 
         let userEmail = null;
         let userName = null;
@@ -85,9 +95,11 @@ router.get('/bootstrap', async (req, res) => {
                 partner_code: req.partnerProfile.partner_code,
                 repasse_percent: repassePct
             },
-            api_key_prefix: keyRow?.key_prefix || null,
+            api_key_prefix: rows[0]?.key_prefix || null,
             api_key_plain: apiKeyPlain,
-            api_key_status: apiKeyPlain ? 'ok' : (keyRow ? 'decrypt_failed' : 'no_active_key'),
+            api_key_status: apiKeyPlain ? 'ok' : (rows.length ? 'decrypt_failed' : 'no_active_key'),
+            api_keys_active_count: keyList.length,
+            api_keys_active: keyList,
             finance,
             worker_download_url: workerDownloadUrl(req)
         });

@@ -1,5 +1,6 @@
 const express = require('express');
 const { rotatePartnerApiKey } = require('../lib/partnerApiKeyIssue');
+const { decryptPartnerApiKeySecret } = require('../lib/partnerKeyVault');
 
 const router = express.Router();
 
@@ -164,14 +165,24 @@ router.get('/:partnerProfileId/api-keys', async (req, res) => {
 
         const { data: keys, error: kErr } = await supabase
             .from('partner_api_keys')
-            .select('id, key_prefix, label, is_active, last_used_at, expires_at, created_at')
+            .select('id, key_prefix, label, is_active, last_used_at, expires_at, created_at, secret_ciphertext, secret_iv, secret_tag')
             .eq('partner_id', partnerProfileId)
             .order('created_at', { ascending: false });
 
         if (kErr) {
             return res.status(500).json({ ok: false, error: 'keys_list_failed', detail: kErr.message });
         }
-        return res.json({ ok: true, keys: keys || [] });
+        const out = (keys || []).map((k) => ({
+            id: k.id,
+            key_prefix: k.key_prefix,
+            label: k.label,
+            is_active: k.is_active,
+            last_used_at: k.last_used_at,
+            expires_at: k.expires_at,
+            created_at: k.created_at,
+            api_key_plain: decryptPartnerApiKeySecret(k) || null
+        }));
+        return res.json({ ok: true, keys: out });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
     }

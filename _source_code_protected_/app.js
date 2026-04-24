@@ -776,6 +776,7 @@ const BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.inc
 let initialBalance = 0;
 
 let _partnerApiKeyPlainCache = '';
+let _partnerApiKeysListCache = [];
 let _partnerMarginPercent = 60;
 let _partnerBootstrapPartner = null;
 let _partnerBootstrapUserEmail = '';
@@ -797,11 +798,14 @@ async function loadPartnerAutonomyStrip() {
     const dl = document.getElementById('partner-strip-download');
     const keyField = document.getElementById('partner-api-key-field');
     const keyHint = document.getElementById('partner-key-hint');
+    const keysListWrap = document.getElementById('partner-api-keys-list');
     if (keyField) {
         keyField.value = '';
         keyField.type = 'text';
         keyField.placeholder = 'A carregar…';
     }
+    _partnerApiKeysListCache = [];
+    if (keysListWrap) keysListWrap.innerHTML = '';
     if (finLine) finLine.textContent = '…';
     try {
         const { data: { session } } = await db.auth.getSession();
@@ -817,7 +821,8 @@ async function loadPartnerAutonomyStrip() {
         _partnerBootstrapUserEmail = (j.user_email && String(j.user_email).trim()) || '';
         _partnerBootstrapUserName = (j.user_name && String(j.user_name).trim()) || '';
         _partnerBootstrapKeyStatus = (j.api_key_status && String(j.api_key_status).trim()) || '';
-        _partnerApiKeyPlainCache = j.api_key_plain || '';
+        _partnerApiKeysListCache = Array.isArray(j.api_keys_active) ? j.api_keys_active.filter((k) => !!k.api_key_plain) : [];
+        _partnerApiKeyPlainCache = _partnerApiKeysListCache[0]?.api_key_plain || j.api_key_plain || '';
         if (j.partner && j.partner.repasse_percent != null) {
             _partnerMarginPercent = Number(j.partner.repasse_percent);
         } else if (j.finance && j.finance.rules && j.finance.rules.repasse_percent != null) {
@@ -836,11 +841,28 @@ async function loadPartnerAutonomyStrip() {
         }
         if (keyHint) {
             if (_partnerApiKeyPlainCache) {
-                keyHint.textContent = 'Guarde esta chave em local seguro. Cada perfil tem uma chave de integração associada à sua conta.';
+                const n = _partnerApiKeysListCache.length || Number(j.api_keys_active_count || 1);
+                keyHint.textContent = `Chaves ativas nesta conta: ${n}. Pode copiar qualquer uma abaixo para trocar de PC quando precisar.`;
             } else if (_partnerBootstrapKeyStatus === 'decrypt_failed') {
                 keyHint.textContent = 'Não foi possível carregar a chave de integração. Contacte a FluxSMS.';
             } else {
                 keyHint.textContent = 'Peça à equipa FluxSMS para ativar a chave de integração do seu perfil.';
+            }
+        }
+        if (keysListWrap) {
+            if (_partnerApiKeysListCache.length) {
+                keysListWrap.innerHTML = _partnerApiKeysListCache.map((k, idx) => {
+                    const label = k.label ? escapeHtml(String(k.label)) : `Chave ${idx + 1}`;
+                    const key = escapeHtml(String(k.api_key_plain || ''));
+                    const keyJson = JSON.stringify(String(k.api_key_plain || ''));
+                    return `<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:8px;border-radius:8px;">
+                        <span style="font-size:11px;opacity:0.75;min-width:92px;">${label}</span>
+                        <code style="flex:1;overflow:auto;white-space:nowrap;">${key}</code>
+                        <button type="button" class="btn-partner-lux" style="padding:6px 10px;font-size:10px;" onclick='copyPartnerApiKeyAt(${keyJson})'>Copiar</button>
+                    </div>`;
+                }).join('');
+            } else {
+                keysListWrap.innerHTML = '';
             }
         }
         const t = (j.finance && j.finance.totals) ? j.finance.totals : {};
@@ -958,6 +980,17 @@ window.copyPartnerApiKey = async function () {
         window.prompt('Copie manualmente:', _partnerApiKeyPlainCache);
     }
     updatePartnerProfileApiPreview();
+};
+
+window.copyPartnerApiKeyAt = async function (key) {
+    const k = key ? String(key) : '';
+    if (!k) return;
+    try {
+        await navigator.clipboard.writeText(k);
+        alert('Chave copiada com sucesso.');
+    } catch {
+        window.prompt('Copie manualmente:', k);
+    }
 };
 
 window.togglePartnerAccessBox = function (ev) {
