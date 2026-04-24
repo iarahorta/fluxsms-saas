@@ -613,7 +613,20 @@ async function handleAuth(type) {
 }
 
 async function handleLogout() {
-    await db.auth.signOut();
+    try {
+        if (db && db.auth) {
+            await db.auth.signOut();
+        }
+    } catch (_e) {
+        // Mesmo com falha de rede no logout remoto, força saída local de UI.
+    } finally {
+        currentUser = null;
+        currentUserIsAdmin = false;
+        currentUserIsPartner = false;
+        profileCompletionShown = false;
+        const target = IS_PARTNER_PORTAL ? PARTNER_LOGIN_PATH : '/';
+        window.location.replace(target);
+    }
 }
 
 function openProfileCompletionModal(initialWhatsapp) {
