@@ -240,6 +240,15 @@ async function init() {
         });
     }
 
+    // Fidelidade institucional: no dashboard, o botão deve abrir a página pública dedicada.
+    const fidelityNav = document.getElementById('nav-fidelity');
+    if (fidelityNav) {
+        fidelityNav.onclick = function (ev) {
+            if (ev) ev.preventDefault();
+            window.location.href = '/fidelidade';
+        };
+    }
+
     const partnerWithdrawAmt = document.getElementById('partner-withdraw-amount');
     if (partnerWithdrawAmt) {
         partnerWithdrawAmt.addEventListener('input', () => {
