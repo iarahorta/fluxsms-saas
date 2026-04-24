@@ -8,8 +8,6 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
-let chipTab = 'on';
-let chipPanelCollapsed = true;
 
 const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
     ? '__BACKEND_URL__'
@@ -45,11 +43,9 @@ async function init() {
     // 3. Carrega Dados Iniciais
     loadStats();
     loadUsers();
-    loadChips();
     loadPolos();
     loadGlobalPrices();
     loadPartnerApiAdmin();
-    applyChipPanelState();
 
     // 4. Inicia Listeners Realtime
     setupRealtime();
@@ -68,7 +64,7 @@ async function loadStats() {
 
     if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = stats.users_count || 0;
     if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${stats.balance_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${stats.chips_online || 0}/${stats.chips_total || 0}`;
+    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${stats.chips_online || 0}`;
     if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = stats.sms_count || 0;
     
     // GATILHO DE SEGURANÇA: Sempre que abrir/atualizar o Admin, roda o Gari para limpar Polos mortos
@@ -137,100 +133,6 @@ async function loadUsers(search = '') {
     }
 }
 
-async function loadChips() {
-    try {
-        const { data: chips, error } = await db.from('chips').select('*').order('updated_at', { ascending: false });
-        const tbodyOn = document.querySelector('#table-chips tbody');
-        const tbodyOff = document.querySelector('#table-chips-off tbody');
-        if (!tbodyOn || !tbodyOff || error) return;
-        tbodyOn.innerHTML = '';
-        tbodyOff.innerHTML = '';
-
-        const allRows = dedupeChipRows(chips || []);
-        const onRows = allRows.filter((c) => isChipOn(c.status));
-        const offRows = allRows.filter((c) => !isChipOn(c.status));
-
-        const renderRow = (c) => {
-            const st = String(c.status || '');
-            const stNorm = st.toLowerCase();
-            const badgeClass = isChipOn(stNorm) ? 'status-online' : ((stNorm === 'offline' || stNorm === 'off') ? 'status-offline' : 'status-busy');
-            const waUntil = c.disponivel_em ? new Date(c.disponivel_em).toLocaleString('pt-BR') : '—';
-            return `
-                <td>Porta ${c.porta}</td>
-                <td style="font-family: monospace;">${c.numero || 'Vazio'}</td>
-                <td><span class="status-badge ${badgeClass}">${st.toUpperCase()}</span></td>
-                <td style="font-size:11px;color:rgba(255,255,255,0.55);">${st === 'quarentena' && c.disponivel_em ? 'WA até ' + waUntil : waUntil}</td>
-            `;
-        };
-
-        if (onRows.length === 0) {
-            tbodyOn.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.55;">Nenhum modem ON no momento.</td></tr>';
-        } else {
-            onRows.forEach((c) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = renderRow(c);
-                tbodyOn.appendChild(tr);
-            });
-        }
-
-        if (offRows.length === 0) {
-            tbodyOff.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.55;">Nenhum modem OFF/quarentena.</td></tr>';
-        } else {
-            offRows.forEach((c) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = renderRow(c);
-                tbodyOff.appendChild(tr);
-            });
-        }
-        setChipTab(chipTab);
-    } catch (err) {
-        console.error("Erro ao carregar chips:", err);
-    }
-}
-
-function dedupeChipRows(rows) {
-    const seen = new Set();
-    const unique = [];
-    for (const row of rows) {
-        const numero = String(row.numero || '').trim();
-        const porta = String(row.porta || '').trim();
-        const status = String(row.status || '').trim().toLowerCase();
-        const key = `${porta}|${numero}|${status}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(row);
-    }
-    return unique;
-}
-
-function isChipOn(status) {
-    const s = String(status || '').toLowerCase();
-    return s === 'idle' || s === 'on' || s === 'online';
-}
-
-window.setChipTab = function (tab) {
-    chipTab = tab === 'off' ? 'off' : 'on';
-    const onBtn = document.getElementById('chip-tab-on');
-    const offBtn = document.getElementById('chip-tab-off');
-    const onWrap = document.getElementById('table-chips')?.parentElement;
-    const offWrap = document.getElementById('chips-off-wrapper');
-    if (onWrap) onWrap.style.display = chipTab === 'on' ? 'block' : 'none';
-    if (offWrap) offWrap.style.display = chipTab === 'off' ? 'block' : 'none';
-    if (onBtn) onBtn.style.opacity = chipTab === 'on' ? '1' : '0.65';
-    if (offBtn) offBtn.style.opacity = chipTab === 'off' ? '1' : '0.65';
-};
-
-function applyChipPanelState() {
-    const panel = document.getElementById('chip-panel-content');
-    const btn = document.getElementById('btn-toggle-chip-panel');
-    if (panel) panel.style.display = chipPanelCollapsed ? 'none' : 'block';
-    if (btn) btn.textContent = chipPanelCollapsed ? '☰' : '✕';
-}
-
-window.toggleChipPanel = function () {
-    chipPanelCollapsed = !chipPanelCollapsed;
-    applyChipPanelState();
-};
 
 async function loadGlobalPrices() {
     const { data: services, error } = await db.from('services_config').select('*').order('name');
@@ -355,7 +257,6 @@ document.getElementById('user-search').oninput = (e) => loadUsers(e.target.value
 function setupRealtime() {
     db.channel('admin-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, loadStats)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'chips' }, loadChips)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'polos' }, loadPolos)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'services_config' }, loadGlobalPrices)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activations' }, loadStats)
@@ -581,6 +482,7 @@ async function loadPartnerApiAdmin() {
                 <td>
                     <button type="button" class="btn-action" onclick="generateAdminPartnerKey('${p.id}')">Gerar API Key</button>
                     <button type="button" class="btn-action" style="margin-left:6px;border-color:#ff7a7a;color:#ff7a7a;" onclick="forcePartnerOfflineNow('${p.id}')">Limpar Chips</button>
+                    <button type="button" class="btn-action" style="margin-left:6px;border-color:#ff3b3b;color:#ff3b3b;" onclick="deletePartnerProfile('${p.id}','${(p.partner_code || '—')}')">Excluir parceiro</button>
                 </td>
             </tr>`;
         }
@@ -702,7 +604,31 @@ window.forcePartnerOfflineNow = async function (partnerProfileId) {
         }
         alert(`Limpeza concluída: ${j.chips_offline || 0} chips OFFLINE.`);
         loadPolos();
-        loadChips();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
+
+window.deletePartnerProfile = async function (partnerProfileId, partnerCode) {
+    if (!confirm(`Excluir parceiro ${partnerCode} e limpar polos/chips/chaves vinculadas?\n\nEssa ação é irreversível.`)) return;
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro ao excluir parceiro: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        alert('Parceiro removido com sucesso.');
+        loadPartnerApiAdmin();
+        loadStats();
     } catch (e) {
         alert('Falha: ' + (e.message || e));
     }

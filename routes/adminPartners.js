@@ -264,6 +264,72 @@ router.post('/:partnerProfileId/chips/force-offline', async (req, res) => {
 });
 
 /**
+ * DELETE /api/admin/partners/:partnerProfileId
+ * Limpeza completa para recomeçar base de parceiros.
+ */
+router.delete('/:partnerProfileId', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    try {
+        const { data: partner, error: pErr } = await supabase
+            .from('partner_profiles')
+            .select('id, partner_code')
+            .eq('id', partnerProfileId)
+            .maybeSingle();
+        if (pErr || !partner) {
+            return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        }
+
+        const { data: polos } = await supabase
+            .from('polos')
+            .select('id')
+            .eq('partner_profile_id', partnerProfileId);
+        const poloIds = (polos || []).map((p) => p.id).filter(Boolean);
+
+        if (poloIds.length) {
+            const delChips = await supabase
+                .from('chips')
+                .delete()
+                .in('polo_id', poloIds);
+            if (delChips.error) {
+                return res.status(500).json({ ok: false, error: 'chips_delete_failed', detail: delChips.error.message });
+            }
+            const delPolos = await supabase
+                .from('polos')
+                .delete()
+                .in('id', poloIds);
+            if (delPolos.error) {
+                return res.status(500).json({ ok: false, error: 'polos_delete_failed', detail: delPolos.error.message });
+            }
+        }
+
+        const optionalDeletes = [
+            supabase.from('partner_api_keys').delete().eq('partner_id', partnerProfileId),
+            supabase.from('partner_withdrawal_requests').delete().eq('partner_id', partnerProfileId),
+            supabase.from('partner_service_toggles').delete().eq('partner_id', partnerProfileId)
+        ];
+        for (const op of optionalDeletes) {
+            const r = await op;
+            if (r.error && !String(r.error.message || '').toLowerCase().includes('does not exist')) {
+                return res.status(500).json({ ok: false, error: 'related_delete_failed', detail: r.error.message });
+            }
+        }
+
+        const delPartner = await supabase
+            .from('partner_profiles')
+            .delete()
+            .eq('id', partnerProfileId);
+        if (delPartner.error) {
+            return res.status(500).json({ ok: false, error: 'partner_delete_failed', detail: delPartner.error.message });
+        }
+
+        return res.json({ ok: true, partner_code: partner.partner_code, polos_removed: poloIds.length });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
+/**
  * GET /api/admin/partners
  * Lista partner_profiles com dados básicos do perfil (somente admin).
  */

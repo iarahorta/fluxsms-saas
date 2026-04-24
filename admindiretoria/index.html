@@ -296,6 +296,7 @@
             <div id="admin-user-info" style="text-align: right;">
                 <p id="admin-mail" style="font-weight: 700; color: var(--gold);"></p>
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+                    <button onclick="window.location.href='/modems'" class="btn-action" style="border-color: #7f5cff; color: #b9a8ff;">📡 Modems (/modems)</button>
                     <button onclick="limpezaForcadaAdmin(event)" class="btn-action" style="border-color: #00ff00; color: #00ff00;">🧹 LIMPEZA FORÇADA</button>
                     <button onclick="window.location.href='index.html'" class="btn-action">Sair do Admin</button>
                 </div>
@@ -312,8 +313,8 @@
                 <p id="stat-balance">R$ 0,00</p>
             </div>
             <div class="stat-card">
-                <h3>Chips Ativos</h3>
-                <p id="stat-chips">0/0</p>
+                <h3>Chips ON</h3>
+                <p id="stat-chips">0</p>
             </div>
             <div class="stat-card">
                 <h3>SMS Hoje</h3>
@@ -400,46 +401,13 @@
                 </div>
             </section>
 
-            <!-- Monitoramento de Chips -->
+            <!-- Modems movidos para rota dedicada -->
             <section class="admin-section">
-                <div class="section-head-toggle">
-                    <h2>Status dos Modems</h2>
-                    <button class="btn-action" type="button" id="btn-toggle-chip-panel" onclick="toggleChipPanel()" title="Mostrar/Ocultar seção">☰</button>
-                </div>
-                <div id="chip-panel-content">
-                    <div style="display:flex; gap:8px; margin-bottom:10px;">
-                        <button class="btn-action" type="button" onclick="setChipTab('on')" id="chip-tab-on">Somente ON</button>
-                        <button class="btn-action" type="button" onclick="setChipTab('off')" id="chip-tab-off" style="border-color:#666;color:#bbb;">OFF / quarentena</button>
-                    </div>
-                    <div style="overflow-x: auto;">
-                        <table id="table-chips">
-                            <thead>
-                                <tr>
-                                    <th>Porta</th>
-                                    <th>Número</th>
-                                    <th>Status</th>
-                                    <th>WhatsApp / disponível</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Preenchido via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="chips-off-wrapper" style="overflow-x:auto; margin-top:12px; display:none;">
-                        <table id="table-chips-off">
-                            <thead>
-                                <tr>
-                                    <th>Porta</th>
-                                    <th>Número</th>
-                                    <th>Status</th>
-                                    <th>WhatsApp / disponível</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
+                <h2>Status dos Modems</h2>
+                <p style="font-size:0.85rem;color:rgba(255,255,255,0.55);margin-bottom:14px;">
+                    Para reduzir poluição visual no admin principal, o monitor de ON/OFF foi movido para a rota dedicada.
+                </p>
+                <button type="button" class="btn-action" onclick="window.location.href='/modems'">Abrir monitor em /modems</button>
 
                 <h2 style="margin-top: 30px;">Preço VIP / Revendedor</h2>
                 <p style="font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-bottom: 15px;">Defina um preço exclusivo para um e-mail específico.</p>

@@ -367,6 +367,7 @@ app.get('/partner/register', (_req, res) => res.redirect(301, '/portal/register'
 app.get('/partner/register/', (_req, res) => res.redirect(301, '/portal/register'));
 app.get('/portal/register', sendPartnerRegister);
 app.get('/partner-register.html', (_req, res) => res.redirect(301, '/portal/register'));
+app.get('/modems', (_req, res) => res.sendFile(path.join(__dirname, 'admindiretoria', 'modems.html')));
 app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
 
