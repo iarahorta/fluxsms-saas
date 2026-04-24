@@ -110,6 +110,10 @@ function bootChatWidget() {
                         }
                     }
                 };
+                // Mantém o chat recolhido por padrão; usuário abre manualmente no balão.
+                if (typeof window.Tawk_API.minimize === 'function') {
+                    window.Tawk_API.minimize();
+                }
             } catch (_e) { }
         };
         const s1 = document.createElement('script');
@@ -144,6 +148,9 @@ function ensureTawkWidgetVisible() {
         try {
             if (window.Tawk_API && typeof window.Tawk_API.showWidget === 'function') {
                 window.Tawk_API.showWidget();
+            }
+            if (window.Tawk_API && typeof window.Tawk_API.minimize === 'function') {
+                window.Tawk_API.minimize();
             }
         } catch (_e) { }
     };
