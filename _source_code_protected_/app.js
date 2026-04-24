@@ -144,7 +144,7 @@ function bootChatWidget() {
 function ensureTawkWidgetVisible() {
     if (tawkVisibilitySyncStarted) return;
     tawkVisibilitySyncStarted = true;
-    const run = () => {
+    const runOnce = () => {
         try {
             if (window.Tawk_API && typeof window.Tawk_API.showWidget === 'function') {
                 window.Tawk_API.showWidget();
@@ -154,15 +154,9 @@ function ensureTawkWidgetVisible() {
             }
         } catch (_e) { }
     };
-    run();
-    setInterval(() => {
-        if (!shouldBootChatWidget()) return;
-        const hasScript = !!document.getElementById('flux-tawk-script');
-        if (!hasScript && !chatWidgetBooted) {
-            bootChatWidget();
-        }
-        run();
-    }, 5000);
+    runOnce();
+    // Sem loop de "showWidget" para evitar autoabertura recorrente.
+    // O usuário abre manualmente clicando no balão quando quiser.
 }
 
 function unscrambleSMS(text) {
