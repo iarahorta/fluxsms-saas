@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS public.partner_profiles (
     partner_code        TEXT NOT NULL UNIQUE,
     status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     margin_percent      NUMERIC(5,2) NOT NULL DEFAULT 0.00 CHECK (margin_percent >= 0 AND margin_percent <= 100),
+    custom_commission   INTEGER,
     notes               TEXT,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -716,6 +717,9 @@ GRANT EXECUTE ON FUNCTION public.rpc_solicitar_sms_v3(UUID, TEXT, TEXT, NUMERIC)
 -- Prioridade admin: ignora prazos de carência nos cálculos do backend
 ALTER TABLE public.partner_profiles
     ADD COLUMN IF NOT EXISTS saque_prioritario BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE public.partner_profiles
+    ADD COLUMN IF NOT EXISTS custom_commission INTEGER;
 
 -- Pedidos de saque (processamento manual / gateway futuro)
 CREATE TABLE IF NOT EXISTS public.partner_withdrawal_requests (

@@ -1,5 +1,6 @@
 const express = require('express');
 const { buildPartnerAuth } = require('../middleware/partnerAuth');
+const { buildFinanceSummary, resolvePartnerCommissionPercent } = require('./partnerFinance');
 
 const router = express.Router();
 
@@ -228,6 +229,35 @@ router.get('/worker/bootstrap', async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ ok: false, error: 'worker_bootstrap_failed', detail: err.message });
+  }
+});
+
+/**
+ * GET /partner-api/worker/summary
+ * Resumo financeiro do parceiro autenticado por API key (desktop).
+ */
+router.get('/worker/summary', async (req, res) => {
+  const supabase = req.app.get('supabase');
+  try {
+    const { data: partnerProfile, error: pErr } = await supabase
+      .from('partner_profiles')
+      .select('id, created_at, saque_prioritario, custom_commission')
+      .eq('id', req.partner.id)
+      .maybeSingle();
+    if (pErr || !partnerProfile) {
+      return res.status(404).json({ ok: false, error: 'partner_not_found' });
+    }
+    const finance = await buildFinanceSummary(supabase, partnerProfile);
+    const totals = finance?.totals || {};
+    const commissionPercent = resolvePartnerCommissionPercent(partnerProfile);
+    return res.json({
+      ok: true,
+      commission_percent: commissionPercent,
+      saldo_total: Number(totals.disponivel_para_solicitar || 0),
+      finance_totals: totals
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'worker_summary_failed', detail: err.message });
   }
 });
 

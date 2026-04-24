@@ -2,12 +2,13 @@
 
 /** URL canónica do instalador (fallback se o JSON não trouxer o campo `url` completo). */
 const FLUXSMS_DOWNLOAD_DIR = 'https://fluxsms.com.br/download';
-const PARTNER_REPASSE_RATE = 0.6;
+let currentPartnerCommissionRate = 0.6;
+let currentPartnerSaldoTotal = 0;
 
 function asPartnerProfit(value) {
   const v = Number(value || 0);
   const safe = Number.isFinite(v) ? v : 0;
-  return Math.round((safe * PARTNER_REPASSE_RATE) * 100) / 100;
+  return Math.round((safe * currentPartnerCommissionRate) * 100) / 100;
 }
 
 function buildInstallerUrlFromUpdateResult(r) {
@@ -237,7 +238,17 @@ function wireCcidImport({ btn, fileInput, statusEl }) {
 
 async function setStatusAndCcid() {
   const status = await poloWorker.appStatus();
-  setStatus(status.workerRunning ? 'CORE ONLINE' : 'CORE OFFLINE', status.workerRunning);
+  const summary = await poloWorker.partnerSummary().catch(() => ({ ok: false }));
+  if (summary && summary.ok) {
+    const pct = Number(summary.commissionPercent || 60);
+    currentPartnerCommissionRate = Math.max(0, Math.min(1, pct / 100));
+    currentPartnerSaldoTotal = Number(summary.saldoTotal || 0);
+  } else {
+    currentPartnerCommissionRate = 0.6;
+    currentPartnerSaldoTotal = 0;
+  }
+  const txt = `SALDO TOTAL: R$ ${currentPartnerSaldoTotal.toFixed(2)}`;
+  setStatus(txt, status.workerRunning);
   updateCcidImportBanner(status);
 }
 
@@ -294,7 +305,7 @@ async function openNumberModal(r) {
     numSideMeta.innerHTML = `
       <div><strong>Operadora</strong> ${(r.operadora && r.operadora !== '—') ? r.operadora : '—'}</div>
       <div><strong>Porta</strong> ${r.porta || '—'}</div>
-      <div><strong>Lucro (monitor)</strong> R$ ${asPartnerProfit(r.profit).toFixed(2)}</div>
+      <div><strong>Comissão</strong> ${(currentPartnerCommissionRate * 100).toFixed(0)}%</div>
     `;
   }
   if (actTbody) actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.7">A carregar…</td></tr>';
@@ -441,7 +452,7 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
   }
   closeNumberModal();
   showLogin(true);
-  setStatus('CORE OFFLINE', false);
+  setStatus('SALDO TOTAL: R$ 0,00', false);
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async () => {
@@ -534,7 +545,7 @@ async function boot() {
   document.getElementById('login-backend').value = 'https://fluxsms.com.br';
   document.getElementById('login-remember').checked = !!saved.rememberMe;
   showLogin(true);
-  setStatus('CORE OFFLINE', false);
+  setStatus('SALDO TOTAL: R$ 0,00', false);
 }
 
 if (typeof poloWorker.onRuntimeRowsUpdated === 'function') {

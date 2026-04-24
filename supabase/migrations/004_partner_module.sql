@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.partner_profiles (
     partner_code        TEXT NOT NULL UNIQUE,
     status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     margin_percent      NUMERIC(5,2) NOT NULL DEFAULT 0.00 CHECK (margin_percent >= 0 AND margin_percent <= 100),
+    custom_commission   INTEGER,
     notes               TEXT,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -498,7 +498,7 @@ async function loadPartnerApiAdmin() {
     const { data: { session } } = await db.auth.getSession();
     if (!session) return;
 
-    tbody.innerHTML = '<tr><td colspan="7">Carregando parceiros...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">Carregando parceiros...</td></tr>';
 
     try {
         const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners`, {
@@ -506,12 +506,12 @@ async function loadPartnerApiAdmin() {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) {
-            tbody.innerHTML = `<tr><td colspan="7" style="color:#f88;">${json.detail || json.error || res.statusText}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="color:#f88;">${json.detail || json.error || res.statusText}</td></tr>`;
             return;
         }
         const partners = json.partners || [];
         if (partners.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">Nenhum <code>partner_profiles</code>. Crie parceiro (RPC / SQL 004) primeiro.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">Nenhum <code>partner_profiles</code>. Crie parceiro (RPC / SQL 004) primeiro.</td></tr>';
             return;
         }
 
@@ -525,6 +525,7 @@ async function loadPartnerApiAdmin() {
             const kJson = await kRes.json().catch(() => ({}));
             const keys = (kJson.keys || []).length;
             const prio = !!p.saque_prioritario;
+            const commission = Number.isFinite(Number(p.custom_commission)) ? Number(p.custom_commission) : 60;
             const hasOnlineChip = Array.isArray(p.chips) && p.chips.some((c) => String(c.status || '').toLowerCase() !== 'offline');
             const statusLabel = hasOnlineChip ? 'ONLINE' : 'OFFLINE';
             const statusClass = hasOnlineChip ? 'status-online' : 'status-offline';
@@ -533,6 +534,10 @@ async function loadPartnerApiAdmin() {
                 <td>${email}</td>
                 <td style="text-align:center;">${keys}</td>
                 <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                <td style="min-width:130px;">
+                    <input type="number" min="1" max="100" step="1" id="commission-${p.id}" value="${commission}" style="width:64px;background:rgba(255,255,255,0.05);border:1px solid rgba(212,175,55,0.35);color:#fff;border-radius:6px;padding:4px 6px;">
+                    <button type="button" class="btn-action" style="padding:3px 8px;font-size:10px;margin-left:6px;" onclick="updatePartnerCommission('${p.id}')">Salvar</button>
+                </td>
                 <td style="text-align:center;">
                     <input type="checkbox" ${prio ? 'checked' : ''} title="Ignora carência 48h/24h nos cálculos de saque"
                         onchange="toggleAdminSaquePrioritario('${p.id}', this.checked)" />
@@ -546,9 +551,42 @@ async function loadPartnerApiAdmin() {
         }
         tbody.innerHTML = rows;
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" style="color:#f88;">${e.message || e}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="color:#f88;">${e.message || e}</td></tr>`;
     }
 }
+
+window.updatePartnerCommission = async function (partnerProfileId) {
+    const input = document.getElementById(`commission-${partnerProfileId}`);
+    const value = input ? Number(input.value) : NaN;
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+        alert('Comissão inválida. Use um inteiro entre 1 e 100.');
+        return;
+    }
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+        alert('Sessão expirada.');
+        return;
+    }
+    try {
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ custom_commission: value })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) {
+            alert('Erro ao atualizar comissão: ' + (j.detail || j.error || res.statusText));
+            return;
+        }
+        alert('Comissão atualizada com sucesso.');
+        loadPartnerApiAdmin();
+    } catch (e) {
+        alert('Falha: ' + (e.message || e));
+    }
+};
 
 window.toggleAdminSaquePrioritario = async function (partnerProfileId, checked) {
     const { data: { session } } = await db.auth.getSession();

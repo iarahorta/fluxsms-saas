@@ -1081,6 +1081,23 @@ ipcMain.handle('partner:rescan', async () => {
   return { ok: true, restarted: true, started: true };
 });
 
+ipcMain.handle('partner:summary', async () => {
+  try {
+    const { data } = await apiClient().get('/partner-api/worker/summary');
+    if (!data || !data.ok) {
+      return { ok: false, error: data?.error || 'summary_failed' };
+    }
+    return {
+      ok: true,
+      commissionPercent: Number(data.commission_percent || 60),
+      saldoTotal: Number(data.saldo_total || 0),
+      totals: data.finance_totals || {}
+    };
+  } catch (err) {
+    return { ok: false, error: err.response?.data?.error || err.message || 'summary_failed' };
+  }
+});
+
 ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
   const port = String(porta || '').trim();
   if (!port) {

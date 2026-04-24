@@ -5,13 +5,19 @@ const router = express.Router();
 
 const MIN_WITHDRAWAL_BRL = 400;
 const WITHDRAWAL_FEE_BRL = 5;
-const PARTNER_REPASSE_RATE = 0.6; /* 60% fixo sobre valor da venda (SMS recebido) */
+const PARTNER_REPASSE_RATE = 0.6; /* fallback padrão */
 const NEW_PARTNER_DAYS = 90;
 const HOLD_HOURS_NOVO = 48;
 const HOLD_HOURS_ANTIGO = 24;
 
 function round2(n) {
     return Math.round(Number(n) * 100) / 100;
+}
+
+function resolvePartnerCommissionPercent(partnerProfile) {
+    const raw = Number(partnerProfile?.custom_commission);
+    if (Number.isFinite(raw) && raw > 0 && raw <= 100) return Math.round(raw);
+    return 60;
 }
 
 router.use(requirePartnerUser);
@@ -78,12 +84,13 @@ function partnerFacingRules(base) {
         hold_hours_antigo: base.hold_hours_antigo,
         novo_period_days: base.novo_period_days,
         is_novo_parceiro: base.is_novo_parceiro,
-        repasse_percent: 60
+        repasse_percent: base.repasse_percent
     };
 }
 
 async function buildFinanceSummary(supabase, partnerProfile) {
-    const margin = PARTNER_REPASSE_RATE;
+    const repassePercent = resolvePartnerCommissionPercent(partnerProfile);
+    const margin = repassePercent / 100;
     const holdHours = effectiveHoldHours(partnerProfile);
     const createdMs = new Date(partnerProfile.created_at).getTime();
     const isNovoParceiro = Date.now() - createdMs < NEW_PARTNER_DAYS * 24 * 60 * 60 * 1000;
@@ -117,7 +124,8 @@ async function buildFinanceSummary(supabase, partnerProfile) {
         hold_hours_novo: HOLD_HOURS_NOVO,
         hold_hours_antigo: HOLD_HOURS_ANTIGO,
         novo_period_days: NEW_PARTNER_DAYS,
-        is_novo_parceiro: isNovoParceiro
+        is_novo_parceiro: isNovoParceiro,
+        repasse_percent: repassePercent
     };
 
     return {
@@ -219,5 +227,6 @@ router.post('/withdraw', async (req, res) => {
 
 module.exports = router;
 module.exports.buildFinanceSummary = buildFinanceSummary;
+module.exports.resolvePartnerCommissionPercent = resolvePartnerCommissionPercent;
 module.exports.MIN_WITHDRAWAL_BRL = MIN_WITHDRAWAL_BRL;
 module.exports.WITHDRAWAL_FEE_BRL = WITHDRAWAL_FEE_BRL;

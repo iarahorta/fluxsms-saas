@@ -87,21 +87,33 @@ router.patch('/:partnerProfileId/withdrawals/:withdrawalId', async (req, res) =>
 
 /**
  * PATCH /api/admin/partners/:partnerProfileId
- * body: { saque_prioritario: boolean } — prioridade financeira (ignora carência 48h/24h nos cálculos).
+ * body: { saque_prioritario?: boolean, custom_commission?: integer }.
  */
 router.patch('/:partnerProfileId', async (req, res) => {
     const supabase = req.app.get('supabase');
     const { partnerProfileId } = req.params;
     const sp = req.body && req.body.saque_prioritario;
-    if (typeof sp !== 'boolean') {
-        return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'saque_prioritario_must_be_boolean' });
+    const ccRaw = req.body && req.body.custom_commission;
+    const patch = {};
+    if (typeof sp === 'boolean') patch.saque_prioritario = sp;
+    if (ccRaw !== undefined && ccRaw !== null && ccRaw !== '') {
+        const n = Number(ccRaw);
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+            return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'custom_commission_must_be_integer_1_100' });
+        }
+        patch.custom_commission = n;
+    } else if (ccRaw === null || ccRaw === '') {
+        patch.custom_commission = null;
+    }
+    if (!Object.keys(patch).length) {
+        return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'provide_saque_prioritario_or_custom_commission' });
     }
     try {
         const { data, error } = await supabase
             .from('partner_profiles')
-            .update({ saque_prioritario: sp })
+            .update(patch)
             .eq('id', partnerProfileId)
-            .select('id, partner_code, saque_prioritario')
+            .select('id, partner_code, saque_prioritario, custom_commission')
             .maybeSingle();
 
         if (error) {
@@ -243,7 +255,7 @@ router.get('/', async (req, res) => {
     try {
         const { data: partners, error: pErr } = await supabase
             .from('partner_profiles')
-            .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario')
+            .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario, custom_commission')
             .order('created_at', { ascending: false });
 
         if (pErr) {
