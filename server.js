@@ -232,6 +232,7 @@ function sendIndexHtml(req, res) {
 
 const sendPartnerLoginPage = (_req, res) => res.sendFile(path.join(__dirname, 'partner-login.html'));
 const sendPartnerLandingPage = (_req, res) => res.sendFile(path.join(__dirname, 'partner-landing.html'));
+const sendFidelityLandingPage = (_req, res) => res.sendFile(path.join(__dirname, 'fidelity-landing.html'));
 
 // ─── Servidor de Arquivos Estáticos (Blindado) ───────────────
 // Negar acesso manual a qualquer arquivo na pasta de fontes originais
@@ -345,7 +346,7 @@ app.get('/robots.txt', (_req, res) => {
 // Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
 app.get('/', sendIndexHtml);
 app.get('/index.html', sendIndexHtml);
-app.get('/fidelidade', sendIndexHtml);
+app.get('/fidelidade', sendFidelityLandingPage);
 app.get('/fidelidade/', (_req, res) => res.redirect(301, '/fidelidade'));
 app.get('/portal', sendIndexHtml);
 app.get('/portal/', (_req, res) => res.redirect(301, '/portal'));

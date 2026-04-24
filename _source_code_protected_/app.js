@@ -17,7 +17,8 @@ const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER
 const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
 const REQUESTED_VIEW = (() => {
     const p = String(window.location.pathname || '').toLowerCase();
-    if (p === '/fidelidade' || p === '/fidelidade/') return 'fidelity';
+    const params = new URLSearchParams(window.location.search || '');
+    if (p === '/fidelidade' || p === '/fidelidade/' || params.get('fidelity') === '1') return 'fidelity';
     return 'dashboard';
 })();
 const ROOT_ADMIN_EMAIL = 'iarachorta@gmail.com';
@@ -560,7 +561,11 @@ async function handleAuth(type) {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
             const { error } = await db.auth.signInWithPassword({ email, password });
-            if (error) alert('Falha no login: ' + error.message);
+            if (error) {
+                alert('Falha no login: ' + error.message);
+                return;
+            }
+            if (authModal) authModal.style.display = 'none';
         } else {
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
@@ -580,6 +585,7 @@ async function handleAuth(type) {
                 currentUser = session.user;
                 await upsertContactProfile({ whatsapp });
             }
+            if (authModal) authModal.style.display = 'none';
         }
     } catch (err) { console.error("Erro no handleAuth:", err); }
 }
@@ -1673,12 +1679,23 @@ function renderActivationCard(act) {
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
-            <div id="actions-${act.id}">${isPendingLike ? `<button id="btn-cancel-${act.id}" class="btn-cancel" onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
+            <div id="actions-${act.id}">${isPendingLike ? `<span id="cancel-wait-${act.id}" style="font-size:10px;opacity:0.65;">Cancelamento disponível em 2 min</span>` : '✓'}</div>
         </div>
     `;
     activeNumbers.insertAdjacentHTML('afterbegin', h);
 
     if (isPendingLike) {
+        const CANCEL_DELAY_MS = 2 * 60 * 1000;
+        const msSinceCreatedForCancel = Date.now() - createdAt;
+        const cancelDelayRemaining = Math.max(0, CANCEL_DELAY_MS - msSinceCreatedForCancel);
+        setTimeout(() => {
+            const actionsEl = document.getElementById(`actions-${act.id}`);
+            const statusEl = document.getElementById(`status-${act.id}`);
+            if (!actionsEl || !statusEl) return;
+            if (statusEl.innerText === 'RECEBIDO') return;
+            actionsEl.innerHTML = `<button id="btn-cancel-${act.id}" class="btn-cancel" onclick="cancelActivation('${act.id}')">CANCELAR</button>`;
+        }, cancelDelayRemaining);
+
         // TRAVA 3: Auto-cancelamento após 10 minutos
         const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
         const msSinceCreated = Date.now() - createdAt;

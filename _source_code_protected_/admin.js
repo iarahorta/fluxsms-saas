@@ -147,12 +147,13 @@ async function loadChips() {
         tbodyOff.innerHTML = '';
 
         const allRows = dedupeChipRows(chips || []);
-        const onRows = allRows.filter((c) => String(c.status || '').toLowerCase() === 'idle');
-        const offRows = allRows.filter((c) => String(c.status || '').toLowerCase() !== 'idle');
+        const onRows = allRows.filter((c) => isChipOn(c.status));
+        const offRows = allRows.filter((c) => !isChipOn(c.status));
 
         const renderRow = (c) => {
-            const st = c.status || '';
-            const badgeClass = st === 'idle' ? 'status-online' : (st === 'offline' ? 'status-offline' : 'status-busy');
+            const st = String(c.status || '');
+            const stNorm = st.toLowerCase();
+            const badgeClass = isChipOn(stNorm) ? 'status-online' : ((stNorm === 'offline' || stNorm === 'off') ? 'status-offline' : 'status-busy');
             const waUntil = c.disponivel_em ? new Date(c.disponivel_em).toLocaleString('pt-BR') : '—';
             return `
                 <td>Porta ${c.porta}</td>
@@ -194,12 +195,17 @@ function dedupeChipRows(rows) {
         const numero = String(row.numero || '').trim();
         const porta = String(row.porta || '').trim();
         const status = String(row.status || '').trim().toLowerCase();
-        const key = numero ? `n:${numero}` : `p:${porta}|s:${status}`;
+        const key = `${porta}|${numero}|${status}`;
         if (seen.has(key)) continue;
         seen.add(key);
         unique.push(row);
     }
     return unique;
+}
+
+function isChipOn(status) {
+    const s = String(status || '').toLowerCase();
+    return s === 'idle' || s === 'on' || s === 'online';
 }
 
 window.setChipTab = function (tab) {

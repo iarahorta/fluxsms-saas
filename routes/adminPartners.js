@@ -109,12 +109,29 @@ router.patch('/:partnerProfileId', async (req, res) => {
         return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'provide_saque_prioritario_or_custom_commission' });
     }
     try {
-        const { data, error } = await supabase
+        let updatePatch = { ...patch };
+        let { data, error } = await supabase
             .from('partner_profiles')
-            .update(patch)
+            .update(updatePatch)
             .eq('id', partnerProfileId)
             .select('id, partner_code, saque_prioritario, custom_commission')
             .maybeSingle();
+
+        // Compatibilidade: ambiente sem coluna custom_commission (migração pendente).
+        if (error && String(error.message || '').includes('custom_commission')) {
+            delete updatePatch.custom_commission;
+            if (!Object.keys(updatePatch).length) {
+                return res.status(400).json({ ok: false, error: 'migration_required', detail: 'custom_commission_column_missing' });
+            }
+            const retry = await supabase
+                .from('partner_profiles')
+                .update(updatePatch)
+                .eq('id', partnerProfileId)
+                .select('id, partner_code, saque_prioritario')
+                .maybeSingle();
+            data = retry.data ? { ...retry.data, custom_commission: null } : null;
+            error = retry.error;
+        }
 
         if (error) {
             return res.status(500).json({ ok: false, error: 'update_failed', detail: error.message });
@@ -253,10 +270,22 @@ router.post('/:partnerProfileId/chips/force-offline', async (req, res) => {
 router.get('/', async (req, res) => {
     const supabase = req.app.get('supabase');
     try {
-        const { data: partners, error: pErr } = await supabase
+        let partners = null;
+        let pErr = null;
+        ({ data: partners, error: pErr } = await supabase
             .from('partner_profiles')
             .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario, custom_commission')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false }));
+
+        // Compatibilidade: ambiente sem coluna custom_commission (migração pendente).
+        if (pErr && String(pErr.message || '').includes('custom_commission')) {
+            const retry = await supabase
+                .from('partner_profiles')
+                .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario')
+                .order('created_at', { ascending: false });
+            partners = (retry.data || []).map((p) => ({ ...p, custom_commission: null }));
+            pErr = retry.error;
+        }
 
         if (pErr) {
             return res.status(500).json({ ok: false, error: 'list_failed', detail: pErr.message });

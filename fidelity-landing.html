@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxSMS | Programa de Fidelidade</title>
+    <meta name="description" content="Programa de Fidelidade FluxSMS: níveis, descontos, metas semanais e nível permanente por high ticket.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --gold: #d4af37;
+            --gold-dim: rgba(212, 175, 55, 0.35);
+            --card: rgba(18, 18, 18, 0.95);
+            --text: #f2f2f2;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .wrap {
+            min-height: 100vh;
+            padding: 40px 20px 56px;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.2), transparent),
+                linear-gradient(180deg, #111 0%, var(--bg) 50%);
+        }
+        .top-bar {
+            max-width: 980px;
+            margin: 0 auto 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem; }
+        .logo-flux { color: #fff; }
+        .logo-sms { color: var(--gold); }
+        .nav-link {
+            color: rgba(255,255,255,0.75);
+            text-decoration: none;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 8px 14px;
+            border-radius: 999px;
+        }
+        .hero { max-width: 760px; margin: 0 auto; text-align: center; }
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            color: var(--gold);
+            border: 1px solid var(--gold-dim);
+            padding: 8px 18px;
+            border-radius: 999px;
+            margin-bottom: 18px;
+        }
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(1.65rem, 4.6vw, 2.55rem);
+            font-weight: 800;
+            line-height: 1.15;
+            margin: 0 0 16px;
+        }
+        h1 span { color: var(--gold); }
+        .lead {
+            font-size: 0.98rem;
+            line-height: 1.65;
+            color: rgba(255,255,255,0.58);
+            margin: 0 auto 30px;
+            max-width: 620px;
+        }
+        .stats {
+            max-width: 980px;
+            margin: 0 auto 22px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .stat {
+            background: var(--card);
+            border: 1px solid rgba(212,175,55,0.2);
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .stat .k { font-size: 10px; text-transform: uppercase; opacity: 0.58; }
+        .stat .v { font-size: 1.05rem; font-weight: 800; color: var(--gold); margin-top: 6px; }
+        .table-wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid rgba(212,175,55,0.22);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 14px; text-align: left; }
+        th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(255,255,255,0.58);
+            background: rgba(255,255,255,0.03);
+        }
+        td { border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.9rem; }
+        .permanent {
+            max-width: 980px;
+            margin: 14px auto 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .permanent .box {
+            background: rgba(255,255,255,0.04);
+            border: 1px dashed rgba(212,175,55,0.35);
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 0.86rem;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin: 30px auto 0;
+            max-width: 980px;
+        }
+        .btn {
+            min-width: 220px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-decoration: none;
+            text-align: center;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #e8c547, var(--gold));
+            color: #111;
+        }
+        .btn-secondary {
+            color: var(--gold);
+            border: 2px solid var(--gold-dim);
+        }
+        .footnote {
+            margin: 34px auto 0;
+            max-width: 720px;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.38);
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top-bar">
+            <div class="logo"><span class="logo-flux">FLUX</span><span class="logo-sms">SMS</span></div>
+            <a class="nav-link" href="/">Voltar ao site</a>
+        </div>
+
+        <div class="hero">
+            <div class="badge">Programa de Fidelidade</div>
+            <h1>Suba de nível por <span>depósito</span> e pague menos</h1>
+            <p class="lead">No FluxSMS, sua progressão é por recarga semanal. Quanto maior o nível, melhor o preço final. Também existe nível permanente por depósito único high ticket.</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat"><div class="k">Entrada no programa</div><div class="v">Bronze com R$ 20</div></div>
+            <div class="stat"><div class="k">Maior benefício</div><div class="v">Diamante: 20% OFF</div></div>
+            <div class="stat"><div class="k">Revisão temporária</div><div class="v">Janela de 7 dias</div></div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nível</th>
+                        <th>Regra semanal por depósito</th>
+                        <th>Benefício</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Bronze</strong></td><td>Entrada com depósito mínimo de R$ 20</td><td>Base de fidelidade ativa</td></tr>
+                    <tr><td><strong>Prata</strong></td><td>Acúmulo semanal a partir de R$ 200</td><td>Nível superior semanal</td></tr>
+                    <tr><td><strong>Ouro</strong></td><td>Acúmulo semanal a partir de R$ 1.000</td><td>Nível superior semanal</td></tr>
+                    <tr><td><strong>Diamante</strong></td><td>Acúmulo semanal a partir de R$ 3.000</td><td>20% OFF + chips premium</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="permanent">
+            <div class="box"><strong>R$ 5.000+</strong><br>Prata permanente</div>
+            <div class="box"><strong>R$ 10.000+</strong><br>Ouro permanente</div>
+            <div class="box"><strong>R$ 30.000+</strong><br>Diamante permanente + 20% OFF</div>
+        </div>
+
+        <div class="actions">
+            <a class="btn btn-primary" href="/?fidelity=1">Entrar e ver meu nível</a>
+            <a class="btn btn-secondary" href="/#passo-a-passo">Como recarregar</a>
+        </div>
+
+        <p class="footnote">Regra operacional: níveis temporários dependem de depósitos recorrentes. Níveis permanentes por high ticket não regridem.</p>
+    </div>
+</body>
+</html>
