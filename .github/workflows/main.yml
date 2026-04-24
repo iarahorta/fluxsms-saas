@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Define Environment Variables
         id: env
@@ -61,7 +61,22 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      # Sem project link, `railway up` falha em CI ("No linked project"). Crie o secret RAILWAY_PROJECT_ID (UUID do projeto no dashboard Railway).
+      - name: Link Railway project (headless)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          if [ -z "${RAILWAY_TOKEN}" ]; then echo "::error::Secret RAILWAY_TOKEN em falta"; exit 1; fi
+          if [ -n "${RAILWAY_PROJECT_ID}" ]; then railway link -p "${RAILWAY_PROJECT_ID}"; else echo "::warning::RAILWAY_PROJECT_ID em falta — configure no GitHub (Settings → Secrets) ou faça deploy manual no Railway"; fi
+
       - name: Deploy to Railway (Dynamic Target)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --detach --service ${{ steps.env.outputs.railway_service }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          if [ ! -d .railway ] && [ -z "${RAILWAY_PROJECT_ID}" ]; then
+            echo "::error::CI: falta RAILWAY_PROJECT_ID no GitHub (Settings → Secrets → Actions). Copie o Project ID no Railway (Project settings)."
+            exit 1
+          fi
+          railway up --detach --service ${{ steps.env.outputs.railway_service }}
