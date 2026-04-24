@@ -549,8 +549,30 @@ async function upsertContactProfile({ whatsapp, preferredOperator }) {
     if (whatsapp) patch.whatsapp = whatsapp;
     if (preferredOperator) patch.preferred_operator = preferredOperator;
     if (!Object.keys(patch).length) return { ok: true };
-    const { error } = await db.from('profiles').update(patch).eq('id', currentUser.id);
-    return error ? { ok: false, error: error.message } : { ok: true };
+    // Primeiro tenta UPDATE direto no perfil atual.
+    const updateRes = await db
+        .from('profiles')
+        .update(patch)
+        .eq('id', currentUser.id)
+        .select('id')
+        .maybeSingle();
+    if (!updateRes.error && updateRes.data?.id) {
+        return { ok: true };
+    }
+
+    // Fallback defensivo: se o update não afetar linha, tenta UPSERT pelo id.
+    const upsertPayload = { id: currentUser.id, ...patch };
+    const upsertRes = await db
+        .from('profiles')
+        .upsert(upsertPayload, { onConflict: 'id' })
+        .select('id')
+        .maybeSingle();
+    if (!upsertRes.error && upsertRes.data?.id) {
+        return { ok: true };
+    }
+
+    const errMsg = upsertRes.error?.message || updateRes.error?.message || 'update_profile_failed';
+    return { ok: false, error: errMsg };
 }
 
 // === AUTHENTICATION ===
@@ -623,6 +645,9 @@ window.submitProfileCompletion = async function () {
         return;
     }
     if (msg) msg.textContent = 'WhatsApp salvo com sucesso.';
+    try {
+        await updateUIForUser();
+    } catch (_e) { }
     setTimeout(() => {
         window.closeProfileCompletionModal();
     }, 700);
