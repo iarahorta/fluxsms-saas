@@ -1297,20 +1297,13 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
 
-    /* Alinhar com rpc_solicitar_sms_v3 (mig. 021): polo vivo nos últimos 15 min; sem exigir polos.status=ONLINE nem 90s. */
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-    const isLab = window.location.hostname.includes('railway.app');
-
-    let query = db.from('chips')
-        .select('id, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
+    /* Contagem mínima: chip existe, disponível p/ venda (idle/quarentena), ignora placeholder CCID. Sem janela de tempo no polo. */
+    const { count, error: chipCountErr } = await db
+        .from('chips')
+        .select('id', { count: 'exact', head: true })
         .in('status', ['idle', 'quarentena'])
         .not('numero', 'ilike', 'CCID%');
 
-    if (!isLab) {
-        query = query.gt('polos.ultima_comunicacao', fifteenMinutesAgo);
-    }
-
-    const { count, error: chipCountErr } = await query;
     if (chipCountErr) {
         console.error('loadChipsCount', chipCountErr);
     }
@@ -1322,7 +1315,7 @@ async function loadChipsCount() {
         renderServices(SERVICES);
     } catch (e) { console.error("Erro stocks:", e); }
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos ${isLab ? '(LAB)' : ''}`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips Ativos`;
 }
 
 let chipsDebounce = null;
@@ -1780,7 +1773,11 @@ async function fetchUserCustomPrices() {
 function renderServices(list) {
     if (!servicesGrid) return;
     servicesGrid.innerHTML = list.map(s => {
-        const stock = serviceStocks[s.id] ?? (chipsDisponiveis > 0 ? 1 : 0);
+        const rpcN = serviceStocks[s.id];
+        const hasGlobal = chipsDisponiveis > 0;
+        const stock = hasGlobal
+            ? Math.max(1, Number(rpcN) || 0)
+            : (rpcN == null || rpcN === undefined ? 0 : Number(rpcN) || 0);
         let finalPrice = userCustomPrices[s.id] || s.price;
         if (s.id === 'whatsapp') {
             finalPrice = getWhatsappBasePriceForCurrentUser();
