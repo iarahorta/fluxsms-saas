@@ -15,6 +15,16 @@ const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL_
         ? window.location.origin
         : 'https://fluxsms-staging-production.up.railway.app');
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Inicialização
 async function init() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
