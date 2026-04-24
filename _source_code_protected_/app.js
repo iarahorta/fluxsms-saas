@@ -36,6 +36,17 @@ const WHATSAPP_LEVELS = [
     { key: 'PRATA', minSpent: 1000.01, price: 6.50, label: 'Prata', badgeClass: 'badge-prata' },
     { key: 'OURO', minSpent: 3000.01, price: 6.10, label: 'Ouro', badgeClass: 'badge-ouro' }
 ];
+const FIDELITY_LEVELS = [
+    { key: 'BRONZE', minWeekly: 20, discount: 0, badgeClass: 'badge-bronze' },
+    { key: 'PRATA', minWeekly: 200, discount: 0, badgeClass: 'badge-prata' },
+    { key: 'OURO', minWeekly: 1000, discount: 0, badgeClass: 'badge-ouro' },
+    { key: 'DIAMANTE', minWeekly: 3000, discount: 0.20, badgeClass: 'badge-diamante' }
+];
+const FIDELITY_PERMANENT_THRESHOLDS = [
+    { minSingle: 30000, level: 'DIAMANTE' },
+    { minSingle: 10000, level: 'OURO' },
+    { minSingle: 5000, level: 'PRATA' }
+];
 
 /** Staging: true = botão/menu Parceiros visíveis para qualquer usuário logado (API /api/admin/partners continua exigindo admin). Coloque false quando is_admin estiver correto no Supabase. */
 const PARTNER_UI_FORCE_VISIBLE = true;
@@ -319,11 +330,11 @@ function toggleViews(session) {
 window.showView = function (viewName) {
     console.log("Exibindo view:", viewName);
 
-    if (IS_PARTNER_PORTAL && (viewName === 'my-numbers' || viewName === 'history')) {
+    if (IS_PARTNER_PORTAL && (viewName === 'my-numbers' || viewName === 'history' || viewName === 'fidelity')) {
         viewName = 'dashboard';
     }
 
-    if (currentUserIsPartner && (viewName === 'my-numbers' || viewName === 'history')) {
+    if (currentUserIsPartner && (viewName === 'my-numbers' || viewName === 'history' || viewName === 'fidelity')) {
         viewName = 'dashboard';
     }
 
@@ -348,11 +359,88 @@ window.showView = function (viewName) {
 
     if (viewName === 'my-numbers') loadMyNumbers();
     if (viewName === 'history') loadTransactionHistory();
+    if (viewName === 'fidelity') renderFidelityPanel();
     if (viewName === 'security') loadSecurityPanel();
     if (viewName === 'partners') loadPartnerProfiles();
     if (viewName === 'dashboard' && currentUserIsPartner) loadPartnerChipsMonitor();
     if (viewName === 'dashboard') bootChatWidget();
 };
+
+function fidelityRank(level) {
+    return ['BRONZE', 'PRATA', 'OURO', 'DIAMANTE'].indexOf(String(level || 'BRONZE').toUpperCase());
+}
+
+function resolveWeeklyLevel(totalWeekly) {
+    let level = FIDELITY_LEVELS[0];
+    for (const item of FIDELITY_LEVELS) {
+        if (totalWeekly >= item.minWeekly) level = item;
+    }
+    return level;
+}
+
+function resolvePermanentLevel(maxSingleDeposit) {
+    for (const row of FIDELITY_PERMANENT_THRESHOLDS) {
+        if (maxSingleDeposit >= row.minSingle) return row.level;
+    }
+    return null;
+}
+
+async function buildFidelityStatus() {
+    if (!db || !currentUser) return null;
+    const now = new Date();
+    const sevenDaysAgoIso = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)).toISOString();
+    const { data: credits, error } = await db
+        .from('transactions')
+        .select('amount,created_at')
+        .eq('user_id', currentUser.id)
+        .eq('type', 'credit')
+        .order('created_at', { ascending: false })
+        .limit(200);
+    if (error) return null;
+    const rows = Array.isArray(credits) ? credits : [];
+    const weeklyTotal = rows
+        .filter((r) => new Date(r.created_at) >= new Date(sevenDaysAgoIso))
+        .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const maxSingleDeposit = rows.reduce((max, r) => Math.max(max, Number(r.amount || 0)), 0);
+    const lastDepositAt = rows.length ? new Date(rows[0].created_at) : null;
+    const weeklyLevel = resolveWeeklyLevel(weeklyTotal).key;
+    const permanentLevel = resolvePermanentLevel(maxSingleDeposit);
+    const effectiveLevel = (permanentLevel && fidelityRank(permanentLevel) > fidelityRank(weeklyLevel))
+        ? permanentLevel
+        : weeklyLevel;
+    const effectiveMeta = FIDELITY_LEVELS.find((x) => x.key === effectiveLevel) || FIDELITY_LEVELS[0];
+    const maintenanceDeadline = lastDepositAt
+        ? new Date(lastDepositAt.getTime() + (7 * 24 * 60 * 60 * 1000))
+        : null;
+    return {
+        weeklyTotal,
+        maxSingleDeposit,
+        weeklyLevel,
+        permanentLevel,
+        effectiveLevel,
+        discount: Number(effectiveMeta.discount || 0),
+        badgeClass: effectiveMeta.badgeClass,
+        maintenanceDeadline
+    };
+}
+
+function renderFidelityPanel() {
+    const statusEl = document.getElementById('fidelity-current-status');
+    const nextEl = document.getElementById('fidelity-next-step');
+    if (!statusEl || !nextEl) return;
+    if (!userFidelityStatus) {
+        statusEl.textContent = 'Não foi possível carregar o status de fidelidade.';
+        nextEl.textContent = 'Atualize a página e tente novamente.';
+        return;
+    }
+    const s = userFidelityStatus;
+    const dl = s.maintenanceDeadline ? s.maintenanceDeadline.toLocaleString('pt-BR') : '—';
+    const fixTip = s.permanentLevel
+        ? `Seu nível permanente é ${s.permanentLevel}. Ele não regride após 7 dias sem depósito.`
+        : 'Deposite R$ 5.000 em uma única recarga para garantir PRATA permanente.';
+    statusEl.textContent = `Você é nível ${s.effectiveLevel}. Desconto atual: ${(s.discount * 100).toFixed(0)}%.`;
+    nextEl.textContent = `Recarga semanal atual: R$ ${s.weeklyTotal.toFixed(2)}. Deposite até ${dl} para manter o nível temporário. ${fixTip}`;
+}
 
 function syncPartnerPanelsVisibility() {
     const finance = document.getElementById('partner-finance-panel');
@@ -1015,6 +1103,7 @@ let userDiscountFactor = 0;
 let userFidelityLevel = 'Bronze';
 let userSpentLast30Days = 0;
 let userWhatsappLevel = WHATSAPP_LEVELS[0];
+let userFidelityStatus = null;
 
 function getLaunchPromoEndDate() {
     const start = new Date(LAUNCH_PROMO_START_ISO);
@@ -1132,14 +1221,15 @@ async function updateUIForUser() {
         updateLaunchTimerBanner();
 
         // --- FIDELIDADE INTELIGENTE ---
-        const total = profile.total_recharged || 0;
         let pClass = 'badge-bronze';
         userFidelityLevel = 'BRONZE';
         userDiscountFactor = 0;
-
-        if (total >= 5000) { userFidelityLevel = 'DIAMANTE'; userDiscountFactor = 0.40; pClass = 'badge-diamante'; }
-        else if (total >= 1000) { userFidelityLevel = 'OURO'; userDiscountFactor = 0.25; pClass = 'badge-ouro'; }
-        else if (total >= 200) { userFidelityLevel = 'PRATA'; userDiscountFactor = 0.10; pClass = 'badge-prata'; }
+        userFidelityStatus = await buildFidelityStatus();
+        if (userFidelityStatus) {
+            userFidelityLevel = userFidelityStatus.effectiveLevel;
+            userDiscountFactor = userFidelityStatus.discount;
+            pClass = userFidelityStatus.badgeClass || pClass;
+        }
 
         const b1 = document.getElementById('fidelity-badge');
         const b2 = document.getElementById('fidelity-badge-mobile');
@@ -1148,6 +1238,7 @@ async function updateUIForUser() {
         userSpentLast30Days = await getUserSpentLast30Days();
         userWhatsappLevel = resolveWhatsappLevel(userSpentLast30Days);
         updateLevelProgressUI();
+        renderFidelityPanel();
         // ------------------------------
     }
 
@@ -1532,6 +1623,7 @@ function renderActivationCard(act) {
 
     const createdAt = act.created_at ? new Date(act.created_at).getTime() : Date.now();
 
+    const isPendingLike = ['waiting', 'pending'].includes(String(act.status || '').toLowerCase());
     const h = `
         <div class="session-card" id="${act.id}">
             <span class="number">${act.phone_number}</span>
@@ -1542,12 +1634,12 @@ function renderActivationCard(act) {
             <span class="status" id="status-${act.id}">${act.status === 'received' ? 'RECEBIDO' : 'Aguardando...'}</span>
             <div style="font-size:10px;">${act.service_name}</div>
             <div class="sms-code-display" id="code-${act.id}">${displayCode || '------'}</div>
-            <div id="actions-${act.id}">${act.status === 'waiting' ? `<button id="btn-cancel-${act.id}" class="btn-cancel" onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
+            <div id="actions-${act.id}">${isPendingLike ? `<button id="btn-cancel-${act.id}" class="btn-cancel" onclick="cancelActivation('${act.id}')">CANCELAR</button>` : '✓'}</div>
         </div>
     `;
     activeNumbers.insertAdjacentHTML('afterbegin', h);
 
-    if (act.status === 'waiting') {
+    if (isPendingLike) {
         // TRAVA 3: Auto-cancelamento após 10 minutos
         const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
         const msSinceCreated = Date.now() - createdAt;
@@ -1577,10 +1669,12 @@ window.cancelActivation = cancelActivation;
 
 async function loadActiveSessions() {
     if (!db || !currentUser || currentUserIsPartner) return;
-    const { data } = await db.from('activations').select('*').eq('user_id', currentUser.id).in('status', ['waiting', 'received']);
+    const { data } = await db.from('activations').select('*').eq('user_id', currentUser.id).in('status', ['waiting', 'pending', 'received']);
     if (data && data.length > 0) {
         activeNumbers.innerHTML = '';
-        data.filter(a => a.status === 'waiting' || (new Date() - new Date(a.updated_at)) < 120000).forEach(renderActivationCard);
+        data
+            .filter(a => ['waiting', 'pending'].includes(String(a.status || '').toLowerCase()) || (new Date() - new Date(a.updated_at)) < 120000)
+            .forEach(renderActivationCard);
     }
 }
 
@@ -1591,6 +1685,9 @@ function setupRealtime() {
         const a = payload.new;
         if (a.user_id !== currentUser.id) return;
         if (a.status === 'received') updateCardWithSMS(a.id, a.sms_code);
+        else if (['waiting', 'pending'].includes(String(a.status || '').toLowerCase())) {
+            if (!document.getElementById(a.id)) renderActivationCard(a);
+        }
         else if (['cancelled', 'expired'].includes(a.status)) document.getElementById(a.id)?.remove();
     }).subscribe();
     db.channel('my-profile').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, updateUIForUser).subscribe();

@@ -621,6 +621,7 @@ AS $$
 DECLARE
     v_balance NUMERIC;
     v_total_recharged NUMERIC;
+    v_fidelity_level TEXT;
     v_chip RECORD;
     v_activation_id UUID;
     v_base_price NUMERIC;
@@ -633,18 +634,16 @@ BEGIN
         p_default_price
     ) INTO v_base_price;
 
-    SELECT balance, COALESCE(total_recharged, 0)
-    INTO v_balance, v_total_recharged
+    PERFORM public.rpc_refresh_fidelity_level(p_user_id);
+
+    SELECT balance, COALESCE(total_recharged, 0), COALESCE(fidelity_level, 'BRONZE')
+    INTO v_balance, v_total_recharged, v_fidelity_level
     FROM public.profiles
     WHERE id = p_user_id
     FOR UPDATE;
 
-    IF v_total_recharged >= 5000 THEN
-        v_discount := 0.40;
-    ELSIF v_total_recharged >= 1000 THEN
-        v_discount := 0.25;
-    ELSIF v_total_recharged >= 200 THEN
-        v_discount := 0.10;
+    IF v_fidelity_level = 'DIAMANTE' THEN
+        v_discount := 0.20;
     END IF;
 
     v_final_price := ROUND(v_base_price * (1.0 - v_discount), 2);

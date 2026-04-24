@@ -201,6 +201,8 @@
                         Recarregar Saldo</a>
                     <a href="javascript:void(0)" onclick="showView('history')" class="nav-item hide-for-partner" id="nav-history"><span
                             class="icon">📊</span> Histórico</a>
+                    <a href="javascript:void(0)" onclick="showView('fidelity')" class="nav-item hide-for-partner" id="nav-fidelity"><span
+                            class="icon">🏆</span> Fidelidade</a>
                     <a href="javascript:void(0)" onclick="showView('security')" class="nav-item hide-for-partner" id="nav-security"><span
                             class="icon">🔐</span> Segurança</a>
                     <a href="/partner" class="nav-item nav-item-fornecedor-mobile"><span class="icon">💰</span>
@@ -404,6 +406,35 @@
                             </thead>
                             <tbody>
                                 <!-- Preenchido via app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="view-fidelity" class="admin-section app-view hide-for-partner" style="display:none; margin: 20px;">
+                    <h2 class="section-title">FIDELIDADE FLUXSMS</h2>
+                    <p style="color: rgba(255,255,255,0.5); margin: 10px 0 16px;">
+                        Nível temporário por recarga semanal e nível permanente por depósito único high ticket.
+                    </p>
+                    <div style="padding:14px; border:1px solid rgba(212,175,55,0.22); border-radius:10px; background:rgba(0,0,0,0.22);">
+                        <p id="fidelity-current-status" style="font-weight:700; color:var(--flux-gold); margin-bottom:10px;">Carregando status...</p>
+                        <p id="fidelity-next-step" style="font-size:12px; color:rgba(255,255,255,0.75); margin-bottom:0;">...</p>
+                    </div>
+                    <div style="margin-top:14px; overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nível</th>
+                                    <th>Regra</th>
+                                    <th>Benefício</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Bronze</td><td>Entrada com depósito mínimo de R$ 20</td><td>Base de fidelidade ativa</td></tr>
+                                <tr><td>Prata (temporário)</td><td>Recargas semanais acumuladas em faixa prata</td><td>Nível superior semanal</td></tr>
+                                <tr><td>Ouro (temporário)</td><td>Recargas semanais acumuladas em faixa ouro</td><td>Nível superior semanal</td></tr>
+                                <tr><td>Diamante</td><td>Faixa máxima semanal ou permanente por ticket único</td><td>20% de desconto + chips premium</td></tr>
+                                <tr><td>Permanente (high ticket)</td><td>Depósito único: +R$ 5k Prata, +R$ 10k Ouro, +R$ 30k Diamante</td><td>Nível não regride</td></tr>
                             </tbody>
                         </table>
                     </div>

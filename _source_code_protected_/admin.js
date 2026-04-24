@@ -8,6 +8,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
+let chipTab = 'on';
 
 const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
     ? '__BACKEND_URL__'
@@ -137,31 +138,64 @@ async function loadUsers(search = '') {
 async function loadChips() {
     try {
         const { data: chips, error } = await db.from('chips').select('*').order('porta');
-        const tbody = document.querySelector('#table-chips tbody');
-        if (!tbody || error) return;
-        tbody.innerHTML = '';
+        const tbodyOn = document.querySelector('#table-chips tbody');
+        const tbodyOff = document.querySelector('#table-chips-off tbody');
+        if (!tbodyOn || !tbodyOff || error) return;
+        tbodyOn.innerHTML = '';
+        tbodyOff.innerHTML = '';
 
-        chips.forEach(c => {
-            const tr = document.createElement('tr');
+        const allRows = chips || [];
+        const onRows = allRows.filter((c) => String(c.status || '').toLowerCase() === 'idle');
+        const offRows = allRows.filter((c) => String(c.status || '').toLowerCase() !== 'idle');
+
+        const renderRow = (c) => {
             const st = c.status || '';
-            const badgeClass = st === 'idle' ? 'status-online' : (st === 'offline' ? 'status-offline' : (st === 'quarentena' ? 'status-busy' : 'status-busy'));
+            const badgeClass = st === 'idle' ? 'status-online' : (st === 'offline' ? 'status-offline' : 'status-busy');
             const waUntil = c.disponivel_em ? new Date(c.disponivel_em).toLocaleString('pt-BR') : '—';
-            tr.innerHTML = `
+            return `
                 <td>Porta ${c.porta}</td>
                 <td style="font-family: monospace;">${c.numero || 'Vazio'}</td>
-                <td>
-                    <span class="status-badge ${badgeClass}">
-                        ${st.toUpperCase()}
-                    </span>
-                </td>
+                <td><span class="status-badge ${badgeClass}">${st.toUpperCase()}</span></td>
                 <td style="font-size:11px;color:rgba(255,255,255,0.55);">${st === 'quarentena' && c.disponivel_em ? 'WA até ' + waUntil : waUntil}</td>
             `;
-            tbody.appendChild(tr);
-        });
+        };
+
+        if (onRows.length === 0) {
+            tbodyOn.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.55;">Nenhum modem ON no momento.</td></tr>';
+        } else {
+            onRows.forEach((c) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = renderRow(c);
+                tbodyOn.appendChild(tr);
+            });
+        }
+
+        if (offRows.length === 0) {
+            tbodyOff.innerHTML = '<tr><td colspan="4" style="text-align:center; opacity:0.55;">Nenhum modem OFF/quarentena.</td></tr>';
+        } else {
+            offRows.forEach((c) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = renderRow(c);
+                tbodyOff.appendChild(tr);
+            });
+        }
+        setChipTab(chipTab);
     } catch (err) {
         console.error("Erro ao carregar chips:", err);
     }
 }
+
+window.setChipTab = function (tab) {
+    chipTab = tab === 'off' ? 'off' : 'on';
+    const onBtn = document.getElementById('chip-tab-on');
+    const offBtn = document.getElementById('chip-tab-off');
+    const onWrap = document.getElementById('table-chips')?.parentElement;
+    const offWrap = document.getElementById('chips-off-wrapper');
+    if (onWrap) onWrap.style.display = chipTab === 'on' ? 'block' : 'none';
+    if (offWrap) offWrap.style.display = chipTab === 'off' ? 'block' : 'none';
+    if (onBtn) onBtn.style.opacity = chipTab === 'on' ? '1' : '0.65';
+    if (offBtn) offBtn.style.opacity = chipTab === 'off' ? '1' : '0.65';
+};
 
 async function loadGlobalPrices() {
     const { data: services, error } = await db.from('services_config').select('*').order('name');
@@ -464,7 +498,7 @@ async function loadPartnerApiAdmin() {
     const { data: { session } } = await db.auth.getSession();
     if (!session) return;
 
-    tbody.innerHTML = '<tr><td colspan="6">Carregando parceiros...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Carregando parceiros...</td></tr>';
 
     try {
         const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners`, {
@@ -472,12 +506,12 @@ async function loadPartnerApiAdmin() {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) {
-            tbody.innerHTML = `<tr><td colspan="6" style="color:#f88;">${json.detail || json.error || res.statusText}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="color:#f88;">${json.detail || json.error || res.statusText}</td></tr>`;
             return;
         }
         const partners = json.partners || [];
         if (partners.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">Nenhum <code>partner_profiles</code>. Crie parceiro (RPC / SQL 004) primeiro.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">Nenhum <code>partner_profiles</code>. Crie parceiro (RPC / SQL 004) primeiro.</td></tr>';
             return;
         }
 
@@ -491,10 +525,14 @@ async function loadPartnerApiAdmin() {
             const kJson = await kRes.json().catch(() => ({}));
             const keys = (kJson.keys || []).length;
             const prio = !!p.saque_prioritario;
+            const hasOnlineChip = Array.isArray(p.chips) && p.chips.some((c) => String(c.status || '').toLowerCase() !== 'offline');
+            const statusLabel = hasOnlineChip ? 'ONLINE' : 'OFFLINE';
+            const statusClass = hasOnlineChip ? 'status-online' : 'status-offline';
             rows += `<tr>
                 <td><code style="font-size:11px;">${p.partner_code || '—'}</code></td>
                 <td>${email}</td>
                 <td style="text-align:center;">${keys}</td>
+                <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
                 <td style="text-align:center;">
                     <input type="checkbox" ${prio ? 'checked' : ''} title="Ignora carência 48h/24h nos cálculos de saque"
                         onchange="toggleAdminSaquePrioritario('${p.id}', this.checked)" />

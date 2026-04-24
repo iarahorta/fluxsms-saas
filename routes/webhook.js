@@ -100,6 +100,11 @@ router.post('/', async (req, res) => {
             return; // Já respondemos 200 no topo
         }
 
+        // Recalcula fidelidade após confirmação de pagamento sem travar o webhook.
+        try {
+            await supabase.rpc('rpc_refresh_fidelity_level', { p_user_id: userId });
+        } catch (_e) { }
+
         console.log(`[WEBHOOK MP] ${paymentId} | ${status} | R$ ${amount} | user: ${userId}`);
 
     } catch (err) {

@@ -314,7 +314,7 @@
         <div class="admin-grid">
 
             <!-- Gerenciamento de Parceiros (Workers Físicos) -->
-            <section class="admin-section" style="grid-column: 1 / -1;">
+            <section id="section-polos-legacy" class="admin-section" style="grid-column: 1 / -1; display:none;">
                 <h2>Gestão de Parceiros (Modem Hubs)</h2>
                 <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                     <input type="text" id="polo-nome-input" placeholder="Nome do Parceiro/Local (Ex: Parceiro SP)" 
@@ -353,6 +353,7 @@
                                 <th>Código parceiro</th>
                                 <th>E-mail</th>
                                 <th>Chaves ativas (contagem)</th>
+                                <th>Status</th>
                                 <th>Saque prioritário</th>
                                 <th>ID perfil</th>
                                 <th>Ação</th>
@@ -391,6 +392,10 @@
             <!-- Monitoramento de Chips -->
             <section class="admin-section">
                 <h2>Status dos Modems</h2>
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button class="btn-action" type="button" onclick="setChipTab('on')" id="chip-tab-on">Somente ON</button>
+                    <button class="btn-action" type="button" onclick="setChipTab('off')" id="chip-tab-off" style="border-color:#666;color:#bbb;">OFF / quarentena</button>
+                </div>
                 <div style="overflow-x: auto;">
                     <table id="table-chips">
                         <thead>
@@ -404,6 +409,19 @@
                         <tbody>
                             <!-- Preenchido via JS -->
                         </tbody>
+                    </table>
+                </div>
+                <div id="chips-off-wrapper" style="overflow-x:auto; margin-top:12px; display:none;">
+                    <table id="table-chips-off">
+                        <thead>
+                            <tr>
+                                <th>Porta</th>
+                                <th>Número</th>
+                                <th>Status</th>
+                                <th>WhatsApp / disponível</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
                     </table>
                 </div>
 
