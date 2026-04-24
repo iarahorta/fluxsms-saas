@@ -11,7 +11,7 @@ function workerDownloadUrl(req) {
         .split(',')[0]
         .trim();
     const host = req.get('host') || 'fluxsms.com.br';
-    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.5.2.exe`;
+    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.5.3.exe`;
 
     const envUrl = (process.env.POLO_WORKER_DOWNLOAD_URL || '').trim();
     if (!envUrl) return sameOrigin;

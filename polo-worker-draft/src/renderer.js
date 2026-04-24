@@ -6,7 +6,7 @@ const FLUXSMS_DOWNLOAD_DIR = 'https://fluxsms.com.br/download';
 function buildInstallerUrlFromUpdateResult(r) {
   const raw = String(r && r.downloadUrl != null ? r.downloadUrl : '').trim();
   const ver = String(r && r.remoteVersion != null ? r.remoteVersion : '').trim();
-  const byVersion = ver ? `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.${ver}.exe` : `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.2.exe`;
+  const byVersion = ver ? `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.${ver}.exe` : `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.3.exe`;
   if (!raw) return byVersion;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('/')) return `https://fluxsms.com.br${raw}`;
@@ -473,7 +473,7 @@ if (btnUpdateDownload) {
         /* */
       }
     }
-    if (!url) url = `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.2.exe`;
+    if (!url) url = `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.3.exe`;
     await poloWorker.updatesOpenDownload(url);
   });
 }

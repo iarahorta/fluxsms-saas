@@ -1,5 +1,5 @@
 {
-  "version": "0.5.2",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.2.exe",
-  "notes": "0.5.2: link «Baixar instalador» com URL canónica de fallback, tooltip com link completo. 0.5.1/0.5.0: manifest em fluxsms.com.br, atalho no ambiente de trabalho, IPC FLUXSMS_JSON e sync API."
+  "version": "0.5.3",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.3.exe",
+  "notes": "0.5.3: core Python no Electron deixa de morrer com input() sem consola; FLUXSMS_HEADLESS. Tabela: números do site marcam ON e runtime. 0.5.2: link instalador; 0.5.0: IPC+sync."
 }

@@ -267,6 +267,7 @@ function buildWorkerEnv() {
   return {
     ...process.env,
     PYTHONUNBUFFERED: '1',
+    FLUXSMS_HEADLESS: '1',
     BACKEND_URL: backendUrl || process.env.BACKEND_URL || '',
     POLO_KEY: poloKey || process.env.POLO_KEY || '',
     FLUXSMS_DATA_DIR: coreDataDir()
@@ -643,7 +644,7 @@ async function fetchUpdateInfo() {
         downloadUrl = downloadUrl.startsWith('/') ? `${origin}${downloadUrl}` : `${origin}/${downloadUrl}`;
       }
       if (!downloadUrl) {
-        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.2'}.exe`;
+        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.3'}.exe`;
       }
       const notes = String(data.notes || '').trim();
       if (!remote) {
@@ -974,15 +975,29 @@ ipcMain.handle('partner:modems', async () => {
             lastActivationAt: null
           };
         }
+        if (c.operadora && String(c.operadora).trim() && map[port].operadora === '—') {
+          map[port].operadora = String(c.operadora);
+        }
         const rawNum = c.numero != null ? String(c.numero).trim() : '';
         if (rawNum && rawNum !== '—') {
           const digits = rawNum.replace(/\D/g, '');
-          if (digits.length >= 8 && (map[port].numero === '—' || !map[port].numero)) {
-            map[port].numero = digits;
+          if (digits.length >= 8) {
+            if (map[port].numero === '—' || !map[port].numero) {
+              map[port].numero = digits;
+            }
+            map[port].status = 'ON';
           }
         }
-        if (c.operadora && String(c.operadora).trim() && map[port].operadora === '—') {
-          map[port].operadora = String(c.operadora);
+        const st = String(c.status || '').toLowerCase();
+        if (['idle', 'ok', 'online', 'active'].includes(st) && map[port].numero && map[port].numero !== '—') {
+          map[port].status = 'ON';
+        }
+        if (map[port].numero && map[port].numero !== '—' && map[port].status === 'ON') {
+          markRuntimePort(port, {
+            numero: map[port].numero,
+            operadora: map[port].operadora,
+            status: 'ON'
+          });
         }
       });
     }

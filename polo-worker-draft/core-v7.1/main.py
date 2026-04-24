@@ -18,6 +18,35 @@ from modems.monitor import monitorar_sms, watch_all
 from db.cloud_sync import set_all_offline, init_polo, heartbeat_polo
 from web.utils_display import exibir_mapa_hub, exibir_resultados
 
+
+def is_flux_headless():
+    return str(os.environ.get("FLUXSMS_HEADLESS", "")).strip().lower() in ("1", "true", "yes")
+
+
+def manter_processo_activo_apos_varredura():
+    """Com o Electron, não há consola/ stdin: input() dá EOF e mata o core. Mantém o processo vivo para «Atualizar monitoramento» reiniciar."""
+    if is_flux_headless():
+        print("  (Modo parceiro: sem consola, o core mantém-se activo. Use «Atualizar monitoramento» no app se trocou chips.)\n", flush=True)
+        e = threading.Event()
+        e.wait()  # infinito; SIGTERM/encerrar via Electron mata o processo
+    else:
+        while True:
+            print(f"\n  Comandos:")
+            print(f"  R       = 🔄 Atualizar lista (Rodar varredura novamente)")
+            print(f"  S       = 🚪 Sair")
+            try:
+                opcao = input("\n  Opção: ").strip().upper()
+            except (EOFError, OSError):
+                while True:
+                    time.sleep(3600)
+            if opcao == 'S':
+                print("  Encerrando...")
+                set_all_offline()
+                break
+            elif opcao == 'R':
+                return rotina_principal()
+
+
 def desabilitar_quickedit():
     try:
         if os.name == 'nt':
@@ -130,20 +159,9 @@ def rotina_principal():
         watch_all(validos)
     else:
         print("\n  ⚠️ Nenhum número válido detectado para monitoramento.")
-
-    while True:
-        # Se chegamos aqui, o watch foi encerrado ou não iniciou
-        print(f"\n  Comandos:")
-        print(f"  R       = 🔄 Atualizar lista (Rodar varredura novamente)")
-        print(f"  S       = 🚪 Sair")
-        opcao = input("\n  Opção: ").strip().upper()
-
-        if opcao == 'S':
-            print("  Encerrando...")
-            set_all_offline()
-            break
-        elif opcao == 'R':
-            return rotina_principal()
+    # Se veio de watch_all com sucesso, a função fica em loop no monitor; se não, mantém o core vivo.
+    if not validos:
+        manter_processo_activo_apos_varredura()
 
 if __name__ == "__main__":
     desabilitar_quickedit()

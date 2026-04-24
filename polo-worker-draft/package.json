@@ -1,6 +1,6 @@
 {
   "name": "fluxsms-polo-worker",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "description": "FluxSMS Desktop — parceiros (Polo Worker + API + COM)",
   "author": "FluxSMS",
