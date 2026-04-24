@@ -15,6 +15,11 @@ db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON);
 const IS_PORTAL_PATH = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
 const IS_PARTNER_PORTAL = typeof window !== 'undefined' && window.__FLUX_PARTNER_PORTAL === true && IS_PORTAL_PATH;
 const PARTNER_LOGIN_PATH = window.location.pathname.startsWith('/portal') ? '/portal/login' : '/p/login';
+const REQUESTED_VIEW = (() => {
+    const p = String(window.location.pathname || '').toLowerCase();
+    if (p === '/fidelidade' || p === '/fidelidade/') return 'fidelity';
+    return 'dashboard';
+})();
 const ROOT_ADMIN_EMAIL = 'iarachorta@gmail.com';
 const SUPPORT_EMAIL = String(window.__FLUX_APP_CONFIG?.supportEmail || 'suporte@fluxsms.com.br').toLowerCase();
 
@@ -186,6 +191,9 @@ async function init() {
     if (!IS_PARTNER_PORTAL && (window.location.pathname === '/' || window.location.pathname === '/index.html')) {
         forceClientHomeButtons();
     }
+    if (!session && REQUESTED_VIEW === 'fidelity' && authModal) {
+        authModal.style.display = 'flex';
+    }
 
     setupRealtimeChips();
 
@@ -319,7 +327,7 @@ function toggleViews(session) {
     if (session) {
         landingView.style.display = 'none';
         dashboardView.style.display = 'block';
-        showView('dashboard');
+        showView(REQUESTED_VIEW === 'fidelity' ? 'fidelity' : 'dashboard');
     } else {
         landingView.style.display = 'block';
         dashboardView.style.display = 'none';
@@ -437,7 +445,7 @@ function renderFidelityPanel() {
     const dl = s.maintenanceDeadline ? s.maintenanceDeadline.toLocaleString('pt-BR') : '—';
     const fixTip = s.permanentLevel
         ? `Seu nível permanente é ${s.permanentLevel}. Ele não regride após 7 dias sem depósito.`
-        : 'Deposite R$ 5.000 em uma única recarga para garantir PRATA permanente.';
+        : 'Depósito permanente: R$ 5.000 (Prata), R$ 10.000 (Ouro), R$ 30.000 (Diamante + 20% off).';
     statusEl.textContent = `Você é nível ${s.effectiveLevel}. Desconto atual: ${(s.discount * 100).toFixed(0)}%.`;
     nextEl.textContent = `Recarga semanal atual: R$ ${s.weeklyTotal.toFixed(2)}. Deposite até ${dl} para manter o nível temporário. ${fixTip}`;
 }
@@ -453,48 +461,78 @@ async function loadMyNumbers() {
     const tbody = document.querySelector('#table-my-numbers tbody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Carregando histórico...</td></tr>';
-
-    const { data, error } = await db.from('activations').select('*').eq('user_id', currentUser.id).eq('status', 'received').order('created_at', { ascending: false });
-
-    if (error || !data) {
-        console.error("Erro ao carregar sessões:", error);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum código recebido ainda.</td></tr>';
+    if (!db || !currentUser?.id) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Faça login para visualizar seus números.</td></tr>';
         return;
     }
+    try {
+        const { data, error } = await db
+            .from('activations')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .eq('status', 'received')
+            .order('created_at', { ascending: false });
 
-    tbody.innerHTML = data.map(a => `
-        <tr>
-            <td>${new Date(a.created_at).toLocaleString('pt-BR')}</td>
-            <td><strong>${a.service_name}</strong></td>
-            <td style="font-family: monospace;">${a.phone_number}</td>
-            <td style="color: var(--flux-gold); font-weight: 800;">${a.sms_code}</td>
-        </tr>
-    `).join('');
+        if (error) throw error;
+        const rows = Array.isArray(data) ? data : [];
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum código recebido ainda.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(a => `
+            <tr>
+                <td>${new Date(a.created_at).toLocaleString('pt-BR')}</td>
+                <td><strong>${a.service_name || '—'}</strong></td>
+                <td style="font-family: monospace;">${a.phone_number || '—'}</td>
+                <td style="color: var(--flux-gold); font-weight: 800;">${a.sms_code || '—'}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error("Erro ao carregar sessões:", err);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Falha ao carregar seus números. Tente novamente.</td></tr>';
+    }
 }
 
 async function loadTransactionHistory() {
     const tbody = document.querySelector('#table-user-history tbody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Carregando extrato...</td></tr>';
-
-    const { data, error } = await db.from('transactions').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-
-    if (error || !data) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhuma transação encontrada.</td></tr>';
+    if (!db || !currentUser?.id) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Faça login para visualizar seu extrato.</td></tr>';
         return;
     }
+    try {
+        const { data, error } = await db
+            .from('transactions')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false });
 
-    tbody.innerHTML = data.map(t => {
-        const typeLabel = t.type === 'credit' ? '📈 CRÉDITO' : (t.type === 'debit' ? '📉 DÉBITO' : '🔄 REEMBOLSO');
-        const typeColor = t.type === 'credit' ? '#00ff00' : (t.type === 'debit' ? '#ffffff' : '#D4AF37');
-        return `
-        <tr>
-            <td>${new Date(t.created_at).toLocaleString('pt-BR')}</td>
-            <td style="color: ${typeColor}; font-weight: bold; font-size: 0.75rem;">${typeLabel}</td>
-            <td style="color: ${typeColor}; font-weight: 800;">R$ ${t.amount.toFixed(2)}</td>
-            <td style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">${t.description}</td>
-        </tr>
-    `}).join('');
+        if (error) throw error;
+        const rows = Array.isArray(data) ? data : [];
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhuma transação encontrada.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(t => {
+            const typeLabel = t.type === 'credit' ? '📈 CRÉDITO' : (t.type === 'debit' ? '📉 DÉBITO' : '🔄 REEMBOLSO');
+            const typeColor = t.type === 'credit' ? '#00ff00' : (t.type === 'debit' ? '#ffffff' : '#D4AF37');
+            const amount = Number(t.amount || 0);
+            return `
+            <tr>
+                <td>${new Date(t.created_at).toLocaleString('pt-BR')}</td>
+                <td style="color: ${typeColor}; font-weight: bold; font-size: 0.75rem;">${typeLabel}</td>
+                <td style="color: ${typeColor}; font-weight: 800;">R$ ${amount.toFixed(2)}</td>
+                <td style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">${t.description || '—'}</td>
+            </tr>
+        `;
+        }).join('');
+    } catch (err) {
+        console.error("Erro ao carregar extrato:", err);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Falha ao carregar extrato. Tente novamente.</td></tr>';
+    }
 }
 
 function normalizeWhatsapp(value) {
@@ -1129,10 +1167,10 @@ async function getUserSpentLast30Days() {
         .from('transactions')
         .select('amount')
         .eq('user_id', currentUser.id)
-        .eq('type', 'debit')
+        .eq('type', 'credit')
         .gte('created_at', thirtyDaysAgo);
     if (error || !Array.isArray(data)) return 0;
-    return data.reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
+    return data.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 }
 
 function resolveWhatsappLevel(spentLast30Days) {
@@ -1186,7 +1224,7 @@ function updateLevelProgressUI() {
     const progress = Math.max(0, Math.min(100, ((userSpentLast30Days - currentMin) / range) * 100));
     const remaining = Math.max(0, nextLevel.minSpent - userSpentLast30Days);
     fill.style.width = `${progress}%`;
-    text.textContent = `Gaste mais R$ ${remaining.toFixed(2)} para atingir o Nível ${nextLevel.label} e pagar R$ ${nextLevel.price.toFixed(2)}.`;
+    text.textContent = `Deposite mais R$ ${remaining.toFixed(2)} para atingir o Nível ${nextLevel.label} e pagar R$ ${nextLevel.price.toFixed(2)}.`;
 }
 
 async function updateUIForUser() {
@@ -1233,8 +1271,9 @@ async function updateUIForUser() {
 
         const b1 = document.getElementById('fidelity-badge');
         const b2 = document.getElementById('fidelity-badge-mobile');
-        if (b1) { b1.innerText = userFidelityLevel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
-        if (b2) { b2.innerText = userFidelityLevel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
+        const fidelityLabel = `${userFidelityLevel} • ${(userDiscountFactor * 100).toFixed(0)}% OFF`;
+        if (b1) { b1.innerText = fidelityLabel; b1.className = 'fidelity-badge ' + pClass; b1.style.display = 'inline-block'; }
+        if (b2) { b2.innerText = fidelityLabel; b2.className = 'fidelity-badge ' + pClass; b2.style.display = 'inline-block'; }
         userSpentLast30Days = await getUserSpentLast30Days();
         userWhatsappLevel = resolveWhatsappLevel(userSpentLast30Days);
         updateLevelProgressUI();

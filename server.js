@@ -345,6 +345,8 @@ app.get('/robots.txt', (_req, res) => {
 // Arquivos individuais na raiz permitidos (links diretos a /index.html são comuns no browser / bookmarks)
 app.get('/', sendIndexHtml);
 app.get('/index.html', sendIndexHtml);
+app.get('/fidelidade', sendIndexHtml);
+app.get('/fidelidade/', (_req, res) => res.redirect(301, '/fidelidade'));
 app.get('/portal', sendIndexHtml);
 app.get('/portal/', (_req, res) => res.redirect(301, '/portal'));
 app.get('/p/login', (req, res) => {

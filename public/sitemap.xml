@@ -11,6 +11,11 @@
     <priority>0.85</priority>
   </url>
   <url>
+    <loc>https://fluxsms.com.br/fidelidade</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://fluxsms.com.br/portal/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

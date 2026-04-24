@@ -130,7 +130,7 @@ router.post('/criar-pix', async (req, res) => {
     if (authErr || !user) return res.status(401).json({ error: 'invalid_token' });
 
     const { amount } = req.body;
-    if (!amount || amount < 5) return res.status(400).json({ error: 'Valor mínimo R$ 5,00' });
+    if (!amount || amount < 20) return res.status(400).json({ error: 'Valor mínimo R$ 20,00' });
 
     try {
         console.log(`[CRIAR PIX] User: ${user.id} | Amount: ${amount}`);

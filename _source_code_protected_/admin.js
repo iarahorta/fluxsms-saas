@@ -9,6 +9,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 let chipTab = 'on';
+let chipPanelCollapsed = true;
 
 const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
     ? '__BACKEND_URL__'
@@ -48,6 +49,7 @@ async function init() {
     loadPolos();
     loadGlobalPrices();
     loadPartnerApiAdmin();
+    applyChipPanelState();
 
     // 4. Inicia Listeners Realtime
     setupRealtime();
@@ -137,14 +139,14 @@ async function loadUsers(search = '') {
 
 async function loadChips() {
     try {
-        const { data: chips, error } = await db.from('chips').select('*').order('porta');
+        const { data: chips, error } = await db.from('chips').select('*').order('updated_at', { ascending: false });
         const tbodyOn = document.querySelector('#table-chips tbody');
         const tbodyOff = document.querySelector('#table-chips-off tbody');
         if (!tbodyOn || !tbodyOff || error) return;
         tbodyOn.innerHTML = '';
         tbodyOff.innerHTML = '';
 
-        const allRows = chips || [];
+        const allRows = dedupeChipRows(chips || []);
         const onRows = allRows.filter((c) => String(c.status || '').toLowerCase() === 'idle');
         const offRows = allRows.filter((c) => String(c.status || '').toLowerCase() !== 'idle');
 
@@ -185,6 +187,21 @@ async function loadChips() {
     }
 }
 
+function dedupeChipRows(rows) {
+    const seen = new Set();
+    const unique = [];
+    for (const row of rows) {
+        const numero = String(row.numero || '').trim();
+        const porta = String(row.porta || '').trim();
+        const status = String(row.status || '').trim().toLowerCase();
+        const key = numero ? `n:${numero}` : `p:${porta}|s:${status}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(row);
+    }
+    return unique;
+}
+
 window.setChipTab = function (tab) {
     chipTab = tab === 'off' ? 'off' : 'on';
     const onBtn = document.getElementById('chip-tab-on');
@@ -195,6 +212,18 @@ window.setChipTab = function (tab) {
     if (offWrap) offWrap.style.display = chipTab === 'off' ? 'block' : 'none';
     if (onBtn) onBtn.style.opacity = chipTab === 'on' ? '1' : '0.65';
     if (offBtn) offBtn.style.opacity = chipTab === 'off' ? '1' : '0.65';
+};
+
+function applyChipPanelState() {
+    const panel = document.getElementById('chip-panel-content');
+    const btn = document.getElementById('btn-toggle-chip-panel');
+    if (panel) panel.style.display = chipPanelCollapsed ? 'none' : 'block';
+    if (btn) btn.textContent = chipPanelCollapsed ? '☰' : '✕';
+}
+
+window.toggleChipPanel = function () {
+    chipPanelCollapsed = !chipPanelCollapsed;
+    applyChipPanelState();
 };
 
 async function loadGlobalPrices() {
