@@ -9,11 +9,19 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 let db = null;
 const ADMIN_EMAIL = 'iarachorta@gmail.com';
 
-const ADMIN_BACKEND_URL = '__BACKEND_URL__'.includes('http') && !'__BACKEND_URL__'.includes('localhost')
-    ? '__BACKEND_URL__'
-    : (typeof window !== 'undefined' && window.location.hostname.includes('railway.app')
-        ? window.location.origin
-        : 'https://fluxsms-staging-production.up.railway.app');
+const ADMIN_BACKEND_URL = (() => {
+    const ph = '__BACKEND_URL__';
+    if (typeof ph === 'string' && ph.startsWith('http') && !ph.includes('localhost')) {
+        return ph.replace(/\/$/, '');
+    }
+    try {
+        return (typeof window !== 'undefined' && window.location && window.location.origin)
+            ? window.location.origin.replace(/\/$/, '')
+            : 'https://fluxsms.com.br';
+    } catch {
+        return 'https://fluxsms.com.br';
+    }
+})();
 
 function escapeHtml(str) {
     if (str == null) return '';
@@ -23,6 +31,20 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+/** Chip "ativo" no painel: alinha com o worker/RLS; offline com last_ping recente ainda conta como ON. */
+function chipSeemsActiveForAdmin(c) {
+    if (!c) return false;
+    const s = String(c.status || '').toLowerCase();
+    if (s === 'idle' || s === 'online' || s === 'on' || s === 'busy' || s === 'active' || s === 'quarentena') {
+        return true;
+    }
+    if (s === 'offline') {
+        const lp = c.last_ping ? new Date(c.last_ping).getTime() : 0;
+        return lp > 0 && (Date.now() - lp) < 5 * 60 * 1000;
+    }
+    return false;
 }
 
 // Inicialização
@@ -282,19 +304,19 @@ async function loadPolos() {
     }
 
     // Busca contagem de chips ativos por polo para o resumo individual
-    const { data: chips } = await db.from('chips').select('polo_id, status');
+    const { data: chips } = await db.from('chips').select('polo_id, status, last_ping');
     
     const tbody = document.querySelector('#table-polos tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
 
     polos.forEach(p => {
-        // Regra de 180 segundos para o Badge de Status entrar em OFFLINE automaticamente na tela
         const lastSeenDate = p.ultima_comunicacao ? new Date(p.ultima_comunicacao) : null;
-        const isOnline = lastSeenDate && (new Date() - lastSeenDate < 180000); 
+        const poloAliveMs = 15 * 60 * 1000;
+        const isOnline = lastSeenDate && (new Date() - lastSeenDate < poloAliveMs);
         
         const lastSeenStr = lastSeenDate ? lastSeenDate.toLocaleString('pt-BR') : 'Sem Conexão';
-        const activeChips = chips ? chips.filter(c => c.polo_id === p.id && c.status === 'idle').length : 0;
+        const activeChips = chips ? chips.filter(c => c.polo_id === p.id && chipSeemsActiveForAdmin(c)).length : 0;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -471,8 +493,12 @@ async function loadPartnerApiAdmin() {
             const kJson = await kRes.json().catch(() => ({}));
             const keys = (kJson.keys || []).length;
             const prio = !!p.saque_prioritario;
-            const commission = Number.isFinite(Number(p.custom_commission)) ? Number(p.custom_commission) : 60;
-            const hasOnlineChip = Array.isArray(p.chips) && p.chips.some((c) => String(c.status || '').toLowerCase() !== 'offline');
+            const rawCommission = Number(p.custom_commission);
+            const rawMarginLegacy = Number(p.margin_percent);
+            const commission = (Number.isInteger(rawCommission) && rawCommission >= 1 && rawCommission <= 100)
+                ? rawCommission
+                : ((Number.isInteger(rawMarginLegacy) && rawMarginLegacy >= 1 && rawMarginLegacy <= 100) ? rawMarginLegacy : 60);
+            const hasOnlineChip = Array.isArray(p.chips) && p.chips.some((c) => chipSeemsActiveForAdmin(c));
             const statusLabel = hasOnlineChip ? 'ONLINE' : 'OFFLINE';
             const statusClass = hasOnlineChip ? 'status-online' : 'status-offline';
             const code = escapeHtml(p.partner_code || '—');
@@ -505,6 +531,7 @@ async function loadPartnerApiAdmin() {
 
 window.updatePartnerCommission = async function (partnerProfileId) {
     const input = document.getElementById(`commission-${partnerProfileId}`);
+    const saveBtn = document.querySelector(`button[onclick="updatePartnerCommission('${partnerProfileId}')"]`);
     const prioEl = document.querySelector(`input[onchange*="toggleAdminSaquePrioritario('${partnerProfileId}'"]`);
     const value = input ? Number(input.value) : NaN;
     const prio = !!prioEl?.checked;
@@ -517,24 +544,70 @@ window.updatePartnerCommission = async function (partnerProfileId) {
         alert('Sessão expirada.');
         return;
     }
+    const readPersistedCommission = async () => {
+        const check = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}/commission`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        const cj = await check.json().catch(() => ({}));
+        if (!check.ok || !cj.ok) return NaN;
+        const c = Number(cj.commission);
+        return Number.isInteger(c) && c >= 1 && c <= 100 ? c : NaN;
+    };
     try {
-        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}`, {
-            method: 'PATCH',
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Salvando...';
+        }
+        const res = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}/commission`, {
+            method: 'POST',
             headers: {
                 Authorization: `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ custom_commission: value, saque_prioritario: prio })
+            body: JSON.stringify({ commission: value })
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) {
-            alert('Erro ao atualizar comissão: ' + (j.detail || j.error || res.statusText));
+            // Fallback legado
+            const legacyRes = await fetch(`${ADMIN_BACKEND_URL}/api/admin/partners/${partnerProfileId}`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ custom_commission: value, saque_prioritario: prio })
+            });
+            const legacyJson = await legacyRes.json().catch(() => ({}));
+            if (!legacyRes.ok || !legacyJson.ok) {
+                alert('Erro ao atualizar comissão: ' + (legacyJson.detail || legacyJson.error || j.detail || j.error || res.statusText));
+                return;
+            }
+            await loadPartnerApiAdmin();
+            const refreshedInputLegacy = document.getElementById(`commission-${partnerProfileId}`);
+            const refreshedLegacy = refreshedInputLegacy ? Number(refreshedInputLegacy.value) : NaN;
+            if (Number.isInteger(refreshedLegacy) && refreshedLegacy === value) {
+                alert(`Comissão atualizada com sucesso: ${refreshedLegacy}%`);
+            } else {
+                if (input) input.value = String(value);
+                alert(`Comissão enviada (${value}%). Se o valor visual divergir, clique em "Atualizar lista".`);
+            }
             return;
         }
-        alert('Comissão atualizada com sucesso.');
-        loadPartnerApiAdmin();
+        const refreshed = await readPersistedCommission();
+        if (Number.isInteger(refreshed) && refreshed === value) {
+            await loadPartnerApiAdmin();
+            alert(`Comissão atualizada com sucesso: ${refreshed}%`);
+        } else {
+            if (input) input.value = String(value);
+            alert(`Falha ao persistir comissão. Esperado ${value}% e servidor retornou ${Number.isInteger(refreshed) ? `${refreshed}%` : 'sem valor'}.`);
+        }
     } catch (e) {
         alert('Falha: ' + (e.message || e));
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Salvar';
+        }
     }
 };
 

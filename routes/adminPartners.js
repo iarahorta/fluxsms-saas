@@ -4,6 +4,53 @@ const { decryptPartnerApiKeySecret } = require('../lib/partnerKeyVault');
 
 const router = express.Router();
 
+function normalizeCustomCommission(value) {
+    const n = Number(value);
+    if (Number.isInteger(n) && n >= 1 && n <= 100) return n;
+    return null;
+}
+
+function resolveCommissionForDisplay(row) {
+    const custom = normalizeCustomCommission(row?.custom_commission);
+    if (custom != null) return custom;
+    const legacy = normalizeCustomCommission(row?.margin_percent);
+    if (legacy != null) return legacy;
+    return null;
+}
+
+/**
+ * GET /api/admin/partners/:partnerProfileId/commission
+ * Retorna comissão efetiva do parceiro (fallback para margin_percent).
+ */
+router.get('/:partnerProfileId/commission', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    try {
+        let data = null;
+        let error = null;
+        ({ data, error } = await supabase
+            .from('partner_profiles')
+            .select('id, partner_code, margin_percent, custom_commission')
+            .eq('id', partnerProfileId)
+            .maybeSingle());
+        if (error && String(error.message || '').includes('custom_commission')) {
+            const retry = await supabase
+                .from('partner_profiles')
+                .select('id, partner_code, margin_percent')
+                .eq('id', partnerProfileId)
+                .maybeSingle();
+            data = retry.data ? { ...retry.data, custom_commission: null } : null;
+            error = retry.error;
+        }
+        if (error) return res.status(500).json({ ok: false, error: 'read_failed', detail: error.message });
+        if (!data) return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        const commission = resolveCommissionForDisplay(data) || 60;
+        return res.json({ ok: true, partner_id: data.id, partner_code: data.partner_code, commission });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
+
 /**
  * Valida JWT do usuário e exige profiles.is_admin = true (lista sensível de parceiros).
  */
@@ -39,6 +86,92 @@ async function requireFluxAdmin(req, res, next) {
 }
 
 router.use(requireFluxAdmin);
+
+/**
+ * POST /api/admin/partners/:partnerProfileId/commission
+ * body: { commission: integer 1..100 }
+ * Endpoint dedicado para persistir comissão mesmo sem coluna custom_commission.
+ */
+router.post('/:partnerProfileId/commission', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const { partnerProfileId } = req.params;
+    const raw = req.body && req.body.commission;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 100) {
+        return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'commission_must_be_integer_1_100' });
+    }
+    try {
+        // 1) Sempre salva em margin_percent (coluna legada presente).
+        let { data, error } = await supabase
+            .from('partner_profiles')
+            .update({ margin_percent: n })
+            .eq('id', partnerProfileId)
+            .select('id, partner_code, margin_percent, saque_prioritario')
+            .maybeSingle();
+
+        if (error) {
+            return res.status(500).json({ ok: false, error: 'update_failed', detail: error.message });
+        }
+        if (!data) {
+            return res.status(404).json({ ok: false, error: 'partner_not_found' });
+        }
+
+        // 2) Tenta espelhar em custom_commission quando existir.
+        const customTry = await supabase
+            .from('partner_profiles')
+            .update({ custom_commission: n })
+            .eq('id', partnerProfileId)
+            .select('id, partner_code, margin_percent, custom_commission, saque_prioritario')
+            .maybeSingle();
+
+        if (!customTry.error && customTry.data) {
+            data = customTry.data;
+        }
+
+        // 3) Confirma leitura final no banco (fonte da verdade).
+        let finalRow = null;
+        let finalErr = null;
+        ({ data: finalRow, error: finalErr } = await supabase
+            .from('partner_profiles')
+            .select('id, partner_code, margin_percent, custom_commission, saque_prioritario')
+            .eq('id', partnerProfileId)
+            .maybeSingle());
+        if (finalErr && String(finalErr.message || '').includes('custom_commission')) {
+            const retryRead = await supabase
+                .from('partner_profiles')
+                .select('id, partner_code, margin_percent, saque_prioritario')
+                .eq('id', partnerProfileId)
+                .maybeSingle();
+            finalRow = retryRead.data ? { ...retryRead.data, custom_commission: null } : null;
+            finalErr = retryRead.error;
+        }
+        if (finalErr || !finalRow) {
+            return res.status(500).json({ ok: false, error: 'read_after_write_failed', detail: finalErr?.message || 'partner_not_found_after_write' });
+        }
+        data = finalRow;
+        const persisted = resolveCommissionForDisplay(data);
+        if (!Number.isInteger(persisted) || persisted !== n) {
+            return res.status(409).json({
+                ok: false,
+                error: 'commission_not_persisted',
+                detail: 'commission_mismatch_after_write',
+                expected: n,
+                got: persisted
+            });
+        }
+
+        return res.json({
+            ok: true,
+            commission: persisted,
+            partner: {
+                ...data,
+                custom_commission: resolveCommissionForDisplay(data)
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
+    }
+});
 
 /**
  * PATCH /api/admin/partners/:partnerProfileId/withdrawals/:withdrawalId
@@ -97,12 +230,13 @@ router.patch('/:partnerProfileId', async (req, res) => {
     const ccRaw = req.body && req.body.custom_commission;
     const patch = {};
     if (typeof sp === 'boolean') patch.saque_prioritario = sp;
-    if (ccRaw !== undefined && ccRaw !== null && ccRaw !== '') {
+        if (ccRaw !== undefined && ccRaw !== null && ccRaw !== '') {
         const n = Number(ccRaw);
         if (!Number.isInteger(n) || n < 1 || n > 100) {
             return res.status(400).json({ ok: false, error: 'invalid_body', detail: 'custom_commission_must_be_integer_1_100' });
         }
         patch.custom_commission = n;
+            patch.margin_percent = n;
     } else if (ccRaw === null || ccRaw === '') {
         patch.custom_commission = null;
     }
@@ -115,7 +249,7 @@ router.patch('/:partnerProfileId', async (req, res) => {
             .from('partner_profiles')
             .update(updatePatch)
             .eq('id', partnerProfileId)
-            .select('id, partner_code, saque_prioritario, custom_commission')
+            .select('id, partner_code, saque_prioritario, margin_percent, custom_commission')
             .maybeSingle();
 
         // Compatibilidade: ambiente sem coluna custom_commission (migração pendente).
@@ -124,13 +258,17 @@ router.patch('/:partnerProfileId', async (req, res) => {
             if (!Object.keys(updatePatch).length) {
                 return res.status(400).json({ ok: false, error: 'migration_required', detail: 'custom_commission_column_missing' });
             }
+            if (updatePatch.custom_commission != null) {
+                updatePatch.margin_percent = updatePatch.custom_commission;
+            }
+            delete updatePatch.custom_commission;
             const retry = await supabase
                 .from('partner_profiles')
                 .update(updatePatch)
                 .eq('id', partnerProfileId)
-                .select('id, partner_code, saque_prioritario')
+                .select('id, partner_code, saque_prioritario, margin_percent')
                 .maybeSingle();
-            data = retry.data ? { ...retry.data, custom_commission: null } : null;
+            data = retry.data ? { ...retry.data, custom_commission: retry.data.margin_percent ?? null } : null;
             error = retry.error;
         }
 
@@ -140,7 +278,13 @@ router.patch('/:partnerProfileId', async (req, res) => {
         if (!data) {
             return res.status(404).json({ ok: false, error: 'partner_not_found' });
         }
-        return res.json({ ok: true, partner: data });
+        return res.json({
+            ok: true,
+            partner: {
+                ...data,
+                custom_commission: resolveCommissionForDisplay(data)
+            }
+        });
     } catch (err) {
         return res.status(500).json({ ok: false, error: 'internal', detail: err.message });
     }
@@ -360,7 +504,7 @@ router.get('/', async (req, res) => {
                 .from('partner_profiles')
                 .select('id, user_id, partner_code, status, margin_percent, notes, created_at, updated_at, saque_prioritario')
                 .order('created_at', { ascending: false });
-            partners = (retry.data || []).map((p) => ({ ...p, custom_commission: null }));
+            partners = (retry.data || []).map((p) => ({ ...p, custom_commission: p.margin_percent ?? null }));
             pErr = retry.error;
         }
 
@@ -404,7 +548,7 @@ router.get('/', async (req, res) => {
         if (allPoloIds.length > 0) {
             const { data: chips } = await supabase
                 .from('chips')
-                .select('id, polo_id, numero, porta, status, disponivel_em')
+                .select('id, polo_id, numero, porta, status, disponivel_em, last_ping, registered_by_api_key_id')
                 .in('polo_id', allPoloIds);
             (chips || []).forEach((c) => {
                 if (!chipsByPolo[c.polo_id]) chipsByPolo[c.polo_id] = [];
@@ -441,6 +585,7 @@ router.get('/', async (req, res) => {
             const revenueTotal = chips.reduce((s, c) => s + (c.revenue_total || 0), 0);
             return {
                 ...p,
+                custom_commission: resolveCommissionForDisplay(p),
                 profile: profileMap[p.user_id] || null,
                 chips,
                 chip_count: chips.length,

@@ -33,10 +33,10 @@
         <div class="card">
             <table>
                 <thead>
-                    <tr><th>Porta</th><th>Número</th><th>Status</th><th>WhatsApp / disponível</th></tr>
+                    <tr><th>Porta</th><th>Número</th><th>Chave (registo)</th><th>Status</th><th>WhatsApp / disponível</th></tr>
                 </thead>
                 <tbody id="modems-tbody">
-                    <tr><td colspan="4" style="text-align:center;opacity:0.65;">Carregando...</td></tr>
+                    <tr><td colspan="5" style="text-align:center;opacity:0.65;">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -47,9 +47,16 @@
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
         let currentTab = 'on';
 
-        function isOn(s) {
+        function isOnStatus(s) {
             const v = String(s || '').toLowerCase();
-            return v === 'idle' || v === 'on' || v === 'online';
+            return v === 'idle' || v === 'on' || v === 'online' || v === 'busy' || v === 'active' || v === 'quarentena';
+        }
+        function rowSeemsOn(c) {
+            if (isOnStatus(c.status)) return true;
+            const s = String(c.status || '').toLowerCase();
+            if (s !== 'offline') return false;
+            const lp = c.last_ping ? new Date(c.last_ping).getTime() : 0;
+            return lp > 0 && (Date.now() - lp) < 5 * 60 * 1000;
         }
         function dedupe(rows) {
             const seen = new Set(); const out = [];
@@ -68,25 +75,42 @@
         }
         async function load() {
             const tbody = document.getElementById('modems-tbody');
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;opacity:0.65;">Carregando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.65;">Carregando...</td></tr>';
             const { data: { session } } = await db.auth.getSession();
             if (!session) { window.location.href = '/'; return; }
             const { data: profile } = await db.from('profiles').select('is_admin').eq('id', session.user.id).single();
             if (!profile || !profile.is_admin) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#f88;">Acesso restrito ao admin.</td></tr>'; return;
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f88;">Acesso restrito ao admin.</td></tr>'; return;
             }
-            const { data, error } = await db.from('chips').select('*').order('updated_at', { ascending: false });
+            let data = null;
+            let error = null;
+            // Compatibilidade: alguns ambientes não possuem chips.updated_at.
+            // Tenta updated_at e faz fallback para created_at / sem ordenação.
+            let resp = await db.from('chips').select('*').order('updated_at', { ascending: false });
+            data = resp.data;
+            error = resp.error;
+            if (error && String(error.message || '').toLowerCase().includes('updated_at')) {
+                resp = await db.from('chips').select('*').order('created_at', { ascending: false });
+                data = resp.data;
+                error = resp.error;
+            }
+            if (error && String(error.message || '').toLowerCase().includes('created_at')) {
+                resp = await db.from('chips').select('*');
+                data = resp.data;
+                error = resp.error;
+            }
             if (error) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#f88;">${error.message}</td></tr>`; return;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#f88;">${error.message}</td></tr>`; return;
             }
-            const rows = dedupe(data || []).filter(r => currentTab === 'on' ? isOn(r.status) : !isOn(r.status));
+            const rows = dedupe(data || []).filter((r) => (currentTab === 'on' ? rowSeemsOn(r) : !rowSeemsOn(r)));
             if (!rows.length) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;opacity:0.6;">Nenhum modem ${currentTab === 'on' ? 'ON' : 'OFF/quarentena'}.</td></tr>`; return;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;opacity:0.6;">Nenhum modem ${currentTab === 'on' ? 'ON' : 'OFF/quarentena'}.</td></tr>`; return;
             }
-            tbody.innerHTML = rows.map(c => {
+            tbody.innerHTML = rows.map((c) => {
                 const st = String(c.status || '').toUpperCase();
                 const wa = c.disponivel_em ? new Date(c.disponivel_em).toLocaleString('pt-BR') : '—';
-                return `<tr><td>Porta ${c.porta || '—'}</td><td>${c.numero || 'Vazio'}</td><td>${st}</td><td>${wa}</td></tr>`;
+                const reg = c.registered_by_api_key_id ? String(c.registered_by_api_key_id).slice(0, 8) + '…' : '— (legado)';
+                return `<tr><td>Porta ${c.porta || '—'}</td><td>${c.numero || 'Vazio'}</td><td style="font-family:monospace;font-size:0.8rem;">${reg}</td><td>${st}</td><td>${wa}</td></tr>`;
             }).join('');
         }
         setInterval(load, 15000);

@@ -1297,21 +1297,23 @@ async function fetchGlobalServices() {
 async function loadChipsCount() {
     if (!db) return;
 
-    // Busca chips (no lab, ignoramos a trava de 90s se for a estação de teste)
-    const ninetySecondsAgo = new Date(Date.now() - 90000).toISOString();
+    /* Alinhar com rpc_solicitar_sms_v3 (mig. 021): polo vivo nos últimos 15 min; sem exigir polos.status=ONLINE nem 90s. */
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const isLab = window.location.hostname.includes('railway.app');
 
     let query = db.from('chips')
-        .select('*, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
+        .select('id, polos!inner(ultima_comunicacao)', { count: 'exact', head: true })
         .in('status', ['idle', 'quarentena'])
-        .eq('polos.status', 'ONLINE')
         .not('numero', 'ilike', 'CCID%');
 
     if (!isLab) {
-        query = query.gt('polos.ultima_comunicacao', ninetySecondsAgo);
+        query = query.gt('polos.ultima_comunicacao', fifteenMinutesAgo);
     }
 
-    const { count } = await query;
+    const { count, error: chipCountErr } = await query;
+    if (chipCountErr) {
+        console.error('loadChipsCount', chipCountErr);
+    }
 
     chipsDisponiveis = count || 0;
     try {
