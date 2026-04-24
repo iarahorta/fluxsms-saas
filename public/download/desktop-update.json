@@ -1,5 +1,5 @@
 {
-  "version": "0.5.3",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.3.exe",
-  "notes": "0.5.3: core Python no Electron deixa de morrer com input() sem consola; FLUXSMS_HEADLESS. Tabela: números do site marcam ON e runtime. 0.5.2: link instalador; 0.5.0: IPC+sync."
+  "version": "0.5.4",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.4.exe",
+  "notes": "0.5.4: correção crítica do lucro do fornecedor no desktop (ativação em waiting não soma saldo/lucro e log REQUEST deixa de repetir em loop). 0.5.3: core Python no Electron headless + monitoramento ON."
 }

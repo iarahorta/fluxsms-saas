@@ -29,6 +29,9 @@ let workerStderrCarry = '';
 let runtimeRowsNotifyTimer = null;
 /** Evita spam à API: chave "PORT|numero" → timestamp */
 const lastWorkerSyncSent = new Map();
+/** Evita repetir o mesmo log de REQUEST em loop. */
+const loggedPendingActivationIds = new Set();
+let workerDebugLogPathCache = null;
 
 /** Ícone da app: chip dourado (marketing); fallback logo legado. */
 function getAppIconPath() {
@@ -63,6 +66,38 @@ function pushLog(message) {
   runtimeLogs.unshift(line);
   while (runtimeLogs.length > 300) runtimeLogs.pop();
   /* Log só em memória/diagnóstico; não enviar à janela (parceiro não vê consola) */
+  appendWorkerDebug(`[APP] ${message}`);
+}
+
+function logPendingActivationOnce(activation, port) {
+  const id = String(activation?.id || '').trim();
+  if (!id) {
+    pushLog(`[REQUEST] SMS em processamento: serviço=${activation?.service_name || activation?.service || 'N/A'} porta=${port}...`);
+    return;
+  }
+  if (loggedPendingActivationIds.has(id)) return;
+  loggedPendingActivationIds.add(id);
+  if (loggedPendingActivationIds.size > 5000) {
+    loggedPendingActivationIds.clear();
+    loggedPendingActivationIds.add(id);
+  }
+  pushLog(`[REQUEST] SMS em processamento: serviço=${activation?.service_name || activation?.service || 'N/A'} porta=${port} ativação=${id.slice(0, 8)}...`);
+}
+
+function workerDebugLogPath() {
+  if (workerDebugLogPathCache) return workerDebugLogPathCache;
+  const dir = app.getPath('userData');
+  workerDebugLogPathCache = path.join(dir, 'worker-debug.log');
+  return workerDebugLogPathCache;
+}
+
+function appendWorkerDebug(message) {
+  try {
+    const p = workerDebugLogPath();
+    fs.appendFileSync(p, `${nowIso()} ${message}\n`, 'utf8');
+  } catch {
+    /* ignore diagnostico */
+  }
 }
 
 let cachedFluxHwid = null;
@@ -264,12 +299,16 @@ function safeCorePath() {
 function buildWorkerEnv() {
   const backendUrl = String(store.get('backendUrl') || '').trim();
   const poloKey = String(store.get('poloChave') || '').trim();
+  const partnerApiKey = String(store.get('partnerApiKey') || '').trim();
+  const hwid = getFluxHwid();
   return {
     ...process.env,
     PYTHONUNBUFFERED: '1',
     FLUXSMS_HEADLESS: '1',
     BACKEND_URL: backendUrl || process.env.BACKEND_URL || '',
     POLO_KEY: poloKey || process.env.POLO_KEY || '',
+    PARTNER_API_KEY: partnerApiKey || process.env.PARTNER_API_KEY || '',
+    FLUXSMS_HWID: hwid || process.env.FLUXSMS_HWID || '',
     FLUXSMS_DATA_DIR: coreDataDir()
   };
 }
@@ -401,6 +440,7 @@ function processWorkerStreamChunk(chunk, isStderr) {
     for (const rawLine of parts) {
       const trimmed = String(rawLine || '').trim();
       if (!trimmed) continue;
+      appendWorkerDebug(`[PY-STDERR-RAW] ${trimmed}`);
       if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
       const sanitized = sanitizeWorkerLine(trimmed);
       if (!sanitized) continue;
@@ -416,6 +456,7 @@ function processWorkerStreamChunk(chunk, isStderr) {
   for (const rawLine of parts) {
     const trimmed = String(rawLine || '').trim();
     if (!trimmed) continue;
+    appendWorkerDebug(`[PY-STDOUT-RAW] ${trimmed}`);
     if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
     const sanitized = sanitizeWorkerLine(trimmed);
     if (!sanitized) continue;
@@ -480,9 +521,10 @@ async function pollPendingActivations() {
         numero: r.chip_numero || runtimeRows[port]?.numero || '—',
         status: 'ON',
         lastActivationAt: r.created_at || runtimeRows[port]?.lastActivationAt || null,
-        profit: Number((runtimeRows[port]?.profit || 0) + Number(r.price || 0))
+        // Ativação em waiting NÃO deve compor lucro/saldo do fornecedor.
+        profit: Number(runtimeRows[port]?.profit || 0)
       });
-      pushLog(`[REQUEST] SMS em processamento: serviço=${r.service_name || r.service || 'N/A'} porta=${port} ativação=${String(r.id || '').slice(0, 8)}...`);
+      logPendingActivationOnce(r, port);
     });
   } catch (err) {
     pushLog(`[WARN] Falha no polling de requisições: ${err.message || err}`);
@@ -522,11 +564,12 @@ function stopWorker() {
 }
 
 function spawnWorkerWith(cmd, args, cwd) {
+  const showConsole = String(process.env.FLUXSMS_SHOW_PY_CONSOLE || '').trim() === '1';
   // Um único processo filho (Core V7.1) reutilizado — sem reelevar UAC a cada leitura COM
   return spawn(cmd, args, {
     cwd,
     env: buildWorkerEnv(),
-    windowsHide: true,
+    windowsHide: !showConsole,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
   });
@@ -545,19 +588,35 @@ function startWorker() {
   } catch (err) {
     pushLog(`[WARN] ccid_numeros sync: ${err.message || err}`);
   }
+  const workerEntry = fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py';
+  try {
+    const env = buildWorkerEnv();
+    appendWorkerDebug('[BOOT] ------------------------------');
+    appendWorkerDebug(`[BOOT] coreDir=${coreDir}`);
+    appendWorkerDebug(`[BOOT] entry=${workerEntry}`);
+    appendWorkerDebug(`[BOOT] BACKEND_URL=${env.BACKEND_URL || 'vazio'}`);
+    appendWorkerDebug(`[BOOT] POLO_KEY=${env.POLO_KEY ? `set(${String(env.POLO_KEY).length})` : 'vazio'}`);
+    appendWorkerDebug(`[BOOT] PARTNER_API_KEY=${env.PARTNER_API_KEY ? `set(${String(env.PARTNER_API_KEY).length})` : 'vazio'}`);
+    appendWorkerDebug(`[BOOT] FLUXSMS_HWID=${env.FLUXSMS_HWID ? `set(${String(env.FLUXSMS_HWID).length})` : 'vazio'}`);
+    appendWorkerDebug(`[BOOT] FLUXSMS_DATA_DIR=${env.FLUXSMS_DATA_DIR || 'vazio'}`);
+  } catch {
+    /* ignore */
+  }
   workerShouldRestart = true;
   workerStdoutCarry = '';
   workerStderrCarry = '';
 
   let child = null;
-  const workerEntry = fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py';
   try {
     child = spawnWorkerWith('py', ['-3', '-u', workerEntry], coreDir);
+    appendWorkerDebug('[BOOT] spawn tentativa: py -3 -u');
   } catch (_) { }
   if (!child || child.exitCode != null) {
     try {
       child = spawnWorkerWith('python', ['-u', workerEntry], coreDir);
+      appendWorkerDebug('[BOOT] spawn fallback: python -u');
     } catch (err) {
+      appendWorkerDebug(`[BOOT-FAIL] Falha iniciar Python: ${err.message || err}`);
       return { ok: false, error: `Falha ao iniciar Python: ${err.message || err}` };
     }
   }
@@ -572,6 +631,7 @@ function startWorker() {
   child.stderr.on('data', (buff) => processWorkerStreamChunk(buff, true));
 
   child.on('close', (code) => {
+    appendWorkerDebug(`[BOOT] processo Python encerrou code=${code}`);
     workerRunning = false;
     workerProcess = null;
     clearMonitorPoll();
@@ -953,7 +1013,8 @@ ipcMain.handle('partner:modems', async () => {
       }
       map[port].numero = a.chip_numero || map[port].numero;
       map[port].status = 'ON';
-      map[port].profit = Number(map[port].profit || 0) + Number(a.price || 0);
+      // Endpoint /worker/activations retorna waiting; não somar lucro aqui.
+      map[port].profit = Number(map[port].profit || 0);
       map[port].lastActivationAt = a.created_at || map[port].lastActivationAt;
     });
   } catch (err) {
