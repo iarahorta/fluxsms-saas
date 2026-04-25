@@ -1915,12 +1915,12 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         alert('Entre na sua conta para solicitar o número.');
         return;
     }
+    /* Só 4 parâmetros: PostgREST/Supabase alinha com a função (UUID,TEXT,TEXT,NUMERIC) no teu projecto. */
     const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
         p_user_id: currentUser.id,
         p_service: serviceId,
         p_service_name: serviceName,
-        p_default_price: defaultPrice,
-        p_registered_by_api_key_id: null
+        p_default_price: defaultPrice
     });
 
     if (error || !data || !data.ok) {
