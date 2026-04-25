@@ -34,6 +34,8 @@ let SERVICES = [
 let userCustomPrices = {};
 let currentUserIsAdmin = false;
 let currentUserIsPartner = false;
+/** Saldo cacheado para habilitar Solicitar mesmo com contador 0. */
+let userBalanceBrl = 0;
 const LAUNCH_PROMO_START_ISO = '2026-04-22T00:00:00-03:00';
 const LAUNCH_PROMO_DAYS = 15;
 const WHATSAPP_LEVELS = [
@@ -1336,7 +1338,14 @@ async function loadChipsCountTableFallback() {
         if (!tP && !tL) return true;
         return false;
     });
-    const n = alive.length;
+    const stOk = (r) => {
+        const s = String(r.status || '').toLowerCase();
+        return ['idle', 'quarentena', 'on', 'online', 'busy', 'offline', 'active'].indexOf(s) >= 0;
+    };
+    const n = Math.max(
+        alive.length,
+        (rows || []).filter((r) => r && r.numero && String(r.numero).toUpperCase().indexOf('CCID') !== 0 && stOk(r)).length
+    );
     const per = {};
     for (const s of SERVICES) per[s.id] = n;
     return { chips: n, stocks: per };
@@ -1503,10 +1512,12 @@ async function updateUIForUser() {
     if (!profile) {
         currentUserIsAdmin = false;
         currentUserIsPartner = false;
+        userBalanceBrl = 0;
         document.body.classList.remove('partner-mode');
         return;
     }
 
+    userBalanceBrl = Number(profile.balance) || 0;
     currentUserIsAdmin = !!profile.is_admin;
     currentUserIsPartner = !!profile.is_partner;
 
@@ -1591,6 +1602,10 @@ async function updateUIForUser() {
 
     syncPartnerPanelsVisibility();
     loadSecurityPanel();
+
+    if (!IS_PARTNER_PORTAL && !currentUserIsPartner) {
+        renderServices(SERVICES);
+    }
 }
 
 function escapeHtml(str) {
@@ -1856,10 +1871,14 @@ function renderServices(list) {
         const rpcN = serviceStocks[s.id];
         const n = Math.max(0, Number(rpcN) || 0);
         const hasGlobal = (chipsDisponiveis || 0) > 0;
-        const stock = n > 0 ? n : (hasGlobal ? 1 : 0);
+        let stock = n > 0 ? n : (hasGlobal ? 1 : 0);
         let finalPrice = userCustomPrices[s.id] || s.price;
         if (s.id === 'whatsapp') {
             finalPrice = getWhatsappBasePriceForCurrentUser();
+        }
+        const precoCobrado = userDiscountFactor > 0 ? finalPrice * (1.0 - userDiscountFactor) : finalPrice;
+        if (currentUser && !currentUserIsPartner && userBalanceBrl >= precoCobrado) {
+            stock = Math.max(stock, 1);
         }
         
         let priceHtml = `R$ ${finalPrice.toFixed(2)}`;
@@ -1892,7 +1911,10 @@ function displayActivationPhone(v) {
 }
 
 async function requestNumber(serviceId, serviceName, defaultPrice) {
-    // Compra: só saldo + chip no servidor (RPC v3)
+    if (!db || !currentUser) {
+        alert('Entre na sua conta para solicitar o número.');
+        return;
+    }
     const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
         p_user_id: currentUser.id,
         p_service: serviceId,

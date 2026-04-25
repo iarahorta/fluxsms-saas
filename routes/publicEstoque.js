@@ -69,9 +69,19 @@ router.get('/estoque', async (req, res) => {
         for (const s of SERVICE_IDS) stocks[s] = 0;
 
         for (const c of list) {
-            if (!chipSinalVida60m(c)) continue;
-            chipsVivos += 1;
             const st = String(c.status || '').toLowerCase();
+            if (
+                chipSinalVida60m(c) ||
+                st === 'idle' ||
+                st === 'quarentena' ||
+                st === 'on' ||
+                st === 'online' ||
+                st === 'active' ||
+                st === 'busy' ||
+                st === 'offline'
+            ) {
+                chipsVivos += 1;
+            }
             const poloU =
                 c.polos && (c.polos.ultima_comunicacao || (Array.isArray(c.polos) && c.polos[0] && c.polos[0].ultima_comunicacao));
             const vivoOffline = st === 'offline' && (c.last_ping || poloU);
@@ -80,12 +90,13 @@ router.get('/estoque', async (req, res) => {
             for (const sid of SERVICE_IDS) {
                 if (chipServiceOffTrue(c, sid)) continue;
 
+                const okOn = st === 'on' || st === 'online' || st === 'active';
                 if (sid === 'whatsapp') {
                     const de = c.disponivel_em;
                     if (de && new Date(de) > new Date()) continue;
-                    if (!(st === 'idle' || (vivoOffline && (c.last_ping || 1)))) continue;
+                    if (!(st === 'idle' || okOn || (vivoOffline && (c.last_ping || 1)))) continue;
                 } else {
-                    const can = st === 'idle' || st === 'quarentena' || (vivoOffline && (c.last_ping || 1));
+                    const can = st === 'idle' || st === 'quarentena' || okOn || (vivoOffline && (c.last_ping || 1));
                     if (!can) continue;
                 }
 
