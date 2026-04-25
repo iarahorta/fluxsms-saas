@@ -33,7 +33,13 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
-/** Chip "ativo" no painel: alinha com o worker/RLS; offline com last_ping recente ainda conta como ON. */
+const _ADMIN_CHIP_VIVO_MS = 60 * 60 * 1000; /* 60 min — alinhado ao .exe / linha, não 5 min */
+
+/**
+ * Chip "ON" no admin: alinha com o .exe.
+ * - Estados normais: idle, on, online, busy, active, quarentena
+ * - offline: conta se last_ping **ou** polo.ultima_comunicacao tiver sinal em 60 min (antes só 5 min e sem polo)
+ */
 function chipSeemsActiveForAdmin(c) {
     if (!c) return false;
     const s = String(c.status || '').toLowerCase();
@@ -42,7 +48,15 @@ function chipSeemsActiveForAdmin(c) {
     }
     if (s === 'offline') {
         const lp = c.last_ping ? new Date(c.last_ping).getTime() : 0;
-        return lp > 0 && (Date.now() - lp) < 5 * 60 * 1000;
+        if (lp > 0 && (Date.now() - lp) < _ADMIN_CHIP_VIVO_MS) return true;
+        const p = c.polos;
+        const row = p && (Array.isArray(p) ? p[0] : p);
+        const ult = row && row.ultima_comunicacao;
+        if (ult) {
+            const t = new Date(ult).getTime();
+            if (t > 0 && (Date.now() - t) < _ADMIN_CHIP_VIVO_MS) return true;
+        }
+        return false;
     }
     return false;
 }
@@ -96,7 +110,23 @@ async function loadStats() {
 
     if (document.getElementById('stat-users')) document.getElementById('stat-users').innerText = stats.users_count || 0;
     if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${stats.balance_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${stats.chips_online || 0}`;
+    let chipCount = Number(stats.chips_online) || 0;
+    try {
+        let { data: chRows, error: chErr } = await db
+            .from('chips')
+            .select('status, last_ping, polos(ultima_comunicacao)');
+        if (chErr) {
+            const r2 = await db.from('chips').select('status, last_ping');
+            chRows = r2.data;
+            chErr = r2.error;
+        }
+        if (!chErr && Array.isArray(chRows)) {
+            chipCount = chRows.filter((c) => chipSeemsActiveForAdmin(c)).length;
+        }
+    } catch (e) {
+        console.warn('Admin stat-chips: fallback tabela', e);
+    }
+    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${chipCount}`;
     if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = stats.sms_count || 0;
     
     // GATILHO DE SEGURANÇA: Sempre que abrir/atualizar o Admin, roda o Gari para limpar Polos mortos

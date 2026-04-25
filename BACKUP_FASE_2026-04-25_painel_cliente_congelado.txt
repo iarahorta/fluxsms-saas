@@ -1,0 +1,19 @@
+BACKUP / FASE — 2026-04-25
+===========================
+
+O que fica congelado (NÃO MEXER sem decisão explícita)
+------------------------------------------------------
+- Painel do **cliente** (index, `app.js`, `loadChipsCount`, `requestNumber`, `gerarPix`, `callRpcSolicitarSmsV3ApenasQuatro`, RPC 4 args, etc.) — **validado OK** em produção (compra, Apple ID, saldo, etc.).
+
+O que estamos a corrigir agora
+-----------------------------
+- Só o **admin**: contador **"Chips ON"** (stat-chips) alinhado ao .exe (ex.: 14 chips) — a lógica antiga usava `last_ping` com janela de 5 min e **não** lia `polos.ultima_comunicacao`, por isso contava a menos do que o executável.
+
+Commit / tag de referência
+--------------------------
+- Após commit: ver tag `backup-painel-cliente-ok-2026-04-25` (ou a mais recente com a mesma mensagem).
+- Código: alterações **apenas** em `_source_code_protected_/admin.js` e `dist/admin.shield.js` (ofuscação), mais este ficheiro e `ESTADO_PAINEL_E_NEXUS.txt` actualizado.
+
+Próximo passo após deploy
+-------------------------
+- Recarregar admin, confirmar "Chips ON" ≈ número de linhas ON no .exe.

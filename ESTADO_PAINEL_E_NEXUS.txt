@@ -14,7 +14,11 @@ O que foi entregue nesta fase (técnico)
 - SQL Supabase: migrations/024_rpc_v3_chip_offline_com_sinal_60m.sql — venda/estoque com chip "offline" mas vivo nos últimos 60 min.
 - server.js v2.1.28
 
+Fase actual (2026-04-25)
+-----------------------
+- **Painel cliente: CONGELADO** — não alterar lógica; referência: tag `backup-painel-cliente-ok-2026-04-25` e `BACKUP_FASE_2026-04-25_painel_cliente_congelado.txt`.
+- Trabalho em curso: **só admin** — contador Chips ON alinhado ao .exe (ultima_comunicacao + janela 60 min p/ last_ping em offline).
+
 Próximo passo humano
 --------------------
-- Colar 024 no SQL Editor do Supabase e NOTIFY/reload schema.
-- Validar no site: serviços com contagem e Solicitar com saldo.
+- Após pull/deploy: reabrir admin e comparar "Chips ON" com o .exe.
