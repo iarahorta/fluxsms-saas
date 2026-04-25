@@ -180,7 +180,7 @@ setInterval(runHeartbeatCleaner, HEARTBEAT_INTERVAL_MS);
 setTimeout(runHeartbeatCleaner, 10000);
 
 // Deploy touch 2026-04-22 — performance LCP + imagens WebP/JPEG + scripts ao fim do body
-const VERSION = '2.1.31';
+const VERSION = '2.1.32';
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: VERSION, ts: new Date().toISOString() }));
 

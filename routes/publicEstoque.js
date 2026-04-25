@@ -25,7 +25,7 @@ function chipServiceOffTrue(chip, key) {
     return String(o[key] || o[(key || '').toLowerCase()]).toLowerCase() === 'true';
 }
 
-const SERVICE_IDS = ['whatsapp', 'telegram', 'google', 'instagram'];
+const DEFAULT_SERVICE_IDS = ['whatsapp', 'telegram', 'google', 'instagram'];
 
 /**
  * GET /api/public/estoque
@@ -37,6 +37,21 @@ router.get('/estoque', async (req, res) => {
     try {
         const supabase = req.app.get('supabase');
         if (!supabase) return res.status(500).json({ ok: false, error: 'supabase_ausente' });
+
+        let serviceIds = DEFAULT_SERVICE_IDS;
+        const { data: cfgRows, error: cfgErr } = await supabase
+            .from('services_config')
+            .select('id');
+        if (!cfgErr && Array.isArray(cfgRows) && cfgRows.length) {
+            const u = [
+                ...new Set(
+                    cfgRows
+                        .map((r) => (r && r.id != null ? String(r.id).trim() : ''))
+                        .filter(Boolean)
+                )
+            ];
+            if (u.length) serviceIds = u;
+        }
 
         const { data: chips, error: e1 } = await supabase
             .from('chips')
@@ -66,7 +81,7 @@ router.get('/estoque', async (req, res) => {
         let chipsVivos = 0;
         let chipsComAlgumEstoque = 0;
         const stocks = {};
-        for (const s of SERVICE_IDS) stocks[s] = 0;
+        for (const s of serviceIds) stocks[s] = 0;
 
         for (const c of list) {
             const st = String(c.status || '').toLowerCase();
@@ -87,7 +102,7 @@ router.get('/estoque', async (req, res) => {
             const vivoOffline = st === 'offline' && (c.last_ping || poloU);
 
             let anyService = 0;
-            for (const sid of SERVICE_IDS) {
+            for (const sid of serviceIds) {
                 if (chipServiceOffTrue(c, sid)) continue;
 
                 const okOn = st === 'on' || st === 'online' || st === 'active';

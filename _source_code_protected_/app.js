@@ -1385,12 +1385,14 @@ async function loadChipsCount() {
         console.warn('loadChipsCount rpc_get_service_stocks', e);
     }
 
-    if (Object.values(merged).every((n) => Number(n) <= 0)) {
-        const fb = await loadChipsCountTableFallback();
-        if (fb) {
-            chipsDisponiveis = Math.max(chipsDisponiveis, fb.chips);
-            for (const s of SERVICES) {
-                merged[s.id] = Math.max(merged[s.id] || 0, Number(fb.stocks[s.id] || 0));
+    /* Sempre: plano C reforça total + preenche serviços ainda 0 (RPC/ API podem faltar serviços novos) */
+    const fb = await loadChipsCountTableFallback();
+    if (fb) {
+        chipsDisponiveis = Math.max(chipsDisponiveis || 0, fb.chips);
+        for (const s of SERVICES) {
+            const v = Number(merged[s.id] || 0);
+            if (v <= 0) {
+                merged[s.id] = Math.max(0, Number(fb.stocks[s.id] || 0));
             }
         }
     }
@@ -1902,6 +1904,20 @@ function renderServices(list) {
 }
 
 // === ACTIVATIONS ===
+/**
+ * ÚNICO ponto de chamada a rpc_solicitar_sms_v3 (contrato PostgREST: 4 parâmetros).
+ * NUNCA passar 5+ chaves — quebra o schema cache se a função na base for só (uuid,text,text,numeric).
+ * Ver: scripts/verify-fluxsms-rpc-contract.js
+ */
+function callRpcSolicitarSmsV3ApenasQuatro(supabaseClient, userId, serviceId, serviceName, defaultPrice) {
+    return supabaseClient.rpc('rpc_solicitar_sms_v3', {
+        p_user_id: userId,
+        p_service: serviceId,
+        p_service_name: serviceName,
+        p_default_price: defaultPrice
+    });
+}
+
 /** Evita o texto literal "null" no cartão quando o RPC/devolve MSISDN ainda vazio. */
 function displayActivationPhone(v) {
     if (v == null) return 'AGUARDANDO';
@@ -1915,13 +1931,13 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         alert('Entre na sua conta para solicitar o número.');
         return;
     }
-    /* Só 4 parâmetros: PostgREST/Supabase alinha com a função (UUID,TEXT,TEXT,NUMERIC) no teu projecto. */
-    const { data, error } = await db.rpc('rpc_solicitar_sms_v3', {
-        p_user_id: currentUser.id,
-        p_service: serviceId,
-        p_service_name: serviceName,
-        p_default_price: defaultPrice
-    });
+    const { data, error } = await callRpcSolicitarSmsV3ApenasQuatro(
+        db,
+        currentUser.id,
+        serviceId,
+        serviceName,
+        defaultPrice
+    );
 
     if (error || !data || !data.ok) {
         console.error("ERRO CRÍTICO RPC:", { error, data });
