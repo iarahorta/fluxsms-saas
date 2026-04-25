@@ -1,2 +1,3 @@
-Snapshot de trabalho fim de noite (ver ramo `backup/2026-04-25-noite` e commit correspondente após o push).
-Gerado em: 2026-04-25
+﻿Snapshot de trabalho fim de noite 25/04/2026
+Commit: a21ad7b (branch: backup/2026-04-25-noite)
+Inclui: .gitignore (__pycache__), alterações pendentes no repo, binários public/download, polo-worker, migrações supabase, scripts, libs, etc.
