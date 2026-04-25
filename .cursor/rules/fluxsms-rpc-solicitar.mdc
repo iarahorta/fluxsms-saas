@@ -1,0 +1,11 @@
+---
+description: Contrato fixo da RPC de compra (sem_chips / PostgREST)
+alwaysApply: true
+---
+
+# rpc_solicitar_sms_v3 (site)
+
+- O front **só** chama `callRpcSolicitarSmsV3ApenasQuatro` com **4** chaves: `p_user_id`, `p_service`, `p_service_name`, `p_default_price`. Não adicionar o 5.º par no cliente (quebra o schema cache se a assinatura no Supabase for só de 4).
+- Depois de alterar a função no Postgres, no Supabase: `NOTIFY pgrst, 'reload schema';`
+- O SQL de referência para o editor é `supabase/SQL_PASTE_CANONICAL_rpc_solicitar_v3_4args.sql` (e migração `025_` no repositório).
+- O `npm run build` corre `scripts/verify-fluxsms-rpc-contract.js` antes de ofuscar.
