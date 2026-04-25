@@ -217,6 +217,13 @@ function enrichNumeroFromCoreLogLine(line) {
     }
   }
   if (!port) return;
+
+  const syncNumeroToApi = (digits) => {
+    if (!digits || digits.length < 8) return;
+    markRuntimePort(port, { numero: digits, status: 'ON' });
+    forwardWorkerChipSyncToApi({ port, number: digits, operadora: '' }).catch(() => {});
+  };
+
   const pats = [
     /Número \(via tabela\):\s*([+.\d][\d\s.()\-]*)/i,
     /Número \(phone book\):\s*([+.\d][\d\s.()\-]*)/i,
@@ -227,7 +234,7 @@ function enrichNumeroFromCoreLogLine(line) {
     if (mm && mm[1]) {
       const digits = String(mm[1]).replace(/\D/g, '');
       if (digits.length >= 8) {
-        markRuntimePort(port, { numero: digits, status: 'ON' });
+        syncNumeroToApi(digits);
         return;
       }
     }
@@ -239,8 +246,21 @@ function enrichNumeroFromCoreLogLine(line) {
       const phone = findPhoneInCcidMap(map, m[1]);
       if (phone) {
         const d = String(phone).replace(/\D/g, '');
-        if (d.length >= 8) markRuntimePort(port, { numero: d, status: 'ON' });
+        if (d.length >= 8) {
+          syncNumeroToApi(d);
+          return;
+        }
       }
+    }
+  }
+
+  /* Tabela resumo do core (ex.: "| COM103 | 47984759620 ✅") — antes era ignorado e nunca ia para worker/sync. */
+  const longMsisdns = String(line).match(/\b\d{10,15}\b/g) || [];
+  const best = longMsisdns.sort((a, b) => b.length - a.length)[0];
+  if (best) {
+    const digits = String(best).replace(/\D/g, '');
+    if (digits.length >= 10 && digits.length <= 15) {
+      syncNumeroToApi(digits);
     }
   }
 }
@@ -442,10 +462,10 @@ function processWorkerStreamChunk(chunk, isStderr) {
       if (!trimmed) continue;
       appendWorkerDebug(`[PY-STDERR-RAW] ${trimmed}`);
       if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
+      enrichNumeroFromCoreLogLine(trimmed);
       const sanitized = sanitizeWorkerLine(trimmed);
       if (!sanitized) continue;
       updatePortStatusFromLog(sanitized);
-      enrichNumeroFromCoreLogLine(sanitized);
       pushLog(`[CORE-ERR] ${sanitized}`);
     }
     return;
@@ -458,10 +478,10 @@ function processWorkerStreamChunk(chunk, isStderr) {
     if (!trimmed) continue;
     appendWorkerDebug(`[PY-STDOUT-RAW] ${trimmed}`);
     if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
+    enrichNumeroFromCoreLogLine(trimmed);
     const sanitized = sanitizeWorkerLine(trimmed);
     if (!sanitized) continue;
     updatePortStatusFromLog(sanitized);
-    enrichNumeroFromCoreLogLine(sanitized);
     pushLog(`[CORE] ${sanitized}`);
   }
 }
@@ -575,12 +595,23 @@ function spawnWorkerWith(cmd, args, cwd) {
   });
 }
 
+function pickWorkerEntry(coreDir) {
+  const mainPyc = path.join(coreDir, 'main.pyc');
+  const mainPy = path.join(coreDir, 'main.py');
+  const override = String(process.env.FLUXSMS_CORE_ENTRY || '').trim().toLowerCase();
+  if (override === 'pyc' && fs.existsSync(mainPyc)) return 'main.pyc';
+  if (override === 'py' && fs.existsSync(mainPy)) return 'main.py';
+  // Preferir fonte quando existir: evita incompatibilidade de bytecode entre máquinas.
+  if (fs.existsSync(mainPy)) return 'main.py';
+  if (fs.existsSync(mainPyc)) return 'main.pyc';
+  return null;
+}
+
 function startWorker() {
   if (workerRunning) return { ok: true, alreadyRunning: true };
   const coreDir = safeCorePath();
-  const mainPyc = path.join(coreDir, 'main.pyc');
-  const mainPy = path.join(coreDir, 'main.py');
-  if (!fs.existsSync(mainPyc) && !fs.existsSync(mainPy)) {
+  const workerEntry = pickWorkerEntry(coreDir);
+  if (!workerEntry) {
     return { ok: false, error: 'Core V7.1 não encontrado (main.pyc/main.py ausente).' };
   }
   try {
@@ -588,7 +619,6 @@ function startWorker() {
   } catch (err) {
     pushLog(`[WARN] ccid_numeros sync: ${err.message || err}`);
   }
-  const workerEntry = fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py';
   try {
     const env = buildWorkerEnv();
     appendWorkerDebug('[BOOT] ------------------------------');
@@ -704,7 +734,7 @@ async function fetchUpdateInfo() {
         downloadUrl = downloadUrl.startsWith('/') ? `${origin}${downloadUrl}` : `${origin}/${downloadUrl}`;
       }
       if (!downloadUrl) {
-        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.3'}.exe`;
+        downloadUrl = `${b.replace(/\/$/, '')}/download/FluxSMS.${remote || '0.5.9'}.exe`;
       }
       const notes = String(data.notes || '').trim();
       if (!remote) {
@@ -977,6 +1007,14 @@ ipcMain.handle('serial:list', async () => {
 
 ipcMain.handle('partner:modems', async () => {
   const list = await SerialPort.list();
+  const presentPorts = list.map((p) => String(p.path || '').trim().toUpperCase()).filter(Boolean);
+
+  try {
+    await apiClient().post('/partner-api/worker/sync-com-ports', { portas: presentPorts });
+  } catch (errSync) {
+    pushLog(`[WARN] sync-com-ports: ${errSync.message || errSync}`);
+  }
+
   const mergedCcid = getMergedCcidMap();
   const base = list.map((p) => {
     const up = p.path?.toUpperCase?.() || '';
@@ -1000,20 +1038,9 @@ ipcMain.handle('partner:modems', async () => {
     const { data } = await client.get('/partner-api/worker/activations');
     (data.activations || []).forEach((a) => {
       const port = String(a.chip_porta || '').toUpperCase();
-      if (!port) return;
-      if (!map[port]) {
-        map[port] = {
-          porta: port,
-          numero: a.chip_numero || '—',
-          operadora: '—',
-          status: 'ON',
-          profit: 0,
-          lastActivationAt: a.created_at || null
-        };
-      }
+      if (!port || !map[port]) return;
       map[port].numero = a.chip_numero || map[port].numero;
       map[port].status = 'ON';
-      // Endpoint /worker/activations retorna waiting; não somar lucro aqui.
       map[port].profit = Number(map[port].profit || 0);
       map[port].lastActivationAt = a.created_at || map[port].lastActivationAt;
     });
@@ -1025,17 +1052,7 @@ ipcMain.handle('partner:modems', async () => {
     if (chipPayload && chipPayload.ok) {
       (chipPayload.chips || []).forEach((c) => {
         const port = String(c.porta || '').toUpperCase();
-        if (!port) return;
-        if (!map[port]) {
-          map[port] = {
-            porta: c.porta || port,
-            numero: '—',
-            operadora: c.operadora || '—',
-            status: 'OFF',
-            profit: 0,
-            lastActivationAt: null
-          };
-        }
+        if (!port || !map[port]) return;
         if (c.operadora && String(c.operadora).trim() && map[port].operadora === '—') {
           map[port].operadora = String(c.operadora);
         }

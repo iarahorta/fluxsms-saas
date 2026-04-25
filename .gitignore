@@ -15,6 +15,10 @@ polo-worker-draft/dist-exe/
 *.log
 npm-debug.log*
 
+# Python
+__pycache__/
+*.pyc
+
 # Sistema
 .DS_Store
 Thumbs.db

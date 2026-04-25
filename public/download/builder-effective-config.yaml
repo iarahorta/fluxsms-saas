@@ -1,0 +1,38 @@
+directories:
+  output: ../public/download
+  buildResources: build
+appId: com.fluxsms.poloworker
+productName: FluxSMS Desktop
+artifactName: FluxSMS.${version}.${ext}
+asar: true
+files:
+  - filter:
+      - src/**/*
+      - index.html
+      - package.json
+      - scripts/**/*
+extraResources:
+  - from: core-v7.1-runtime
+    to: core-v7.1
+win:
+  icon: ../marketing/assets/fluxsms-chip-dourado.png
+  executableName: FluxSMS Desktop
+  requestedExecutionLevel: asInvoker
+  target:
+    - target: nsis
+      arch:
+        - x64
+  sign: null
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  allowElevation: true
+  include: build/installer.nsh
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  shortcutName: FluxSMS Desktop
+  uninstallDisplayName: FluxSMS Desktop
+  runAfterFinish: true
+electronVersion: 28.3.3

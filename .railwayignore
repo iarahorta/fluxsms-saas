@@ -13,10 +13,10 @@ public/download/.icon-ico/
 public/download/builder-debug.yml
 public/download/*.blockmap
 # Vários .exe no disco somam >300MB e o upload Railway falha (413) — manter no Git só a versão atual; ignorar restantes no upload
-public/download/FluxSMS.0.4.*.exe
-public/download/FluxSMS.0.5.0.exe
-public/download/FluxSMS.0.5.1.exe
-public/download/FluxSMS.0.5.2.exe
+# Ignore todos os instaladores antigos no upload.
+public/download/FluxSMS.*.exe
+# Mantém apenas a versão atual no deploy web.
+!public/download/FluxSMS.0.5.9.exe
 downloads/
 polo-worker-draft/dist-exe/
 

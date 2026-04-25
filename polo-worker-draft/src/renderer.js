@@ -14,7 +14,7 @@ function asPartnerProfit(value) {
 function buildInstallerUrlFromUpdateResult(r) {
   const raw = String(r && r.downloadUrl != null ? r.downloadUrl : '').trim();
   const ver = String(r && r.remoteVersion != null ? r.remoteVersion : '').trim();
-  const byVersion = ver ? `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.${ver}.exe` : `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.3.exe`;
+  const byVersion = ver ? `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.${ver}.exe` : `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.9.exe`;
   if (!raw) return byVersion;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('/')) return `https://fluxsms.com.br${raw}`;
@@ -65,6 +65,11 @@ function fmtDate(v) {
   } catch {
     return '—';
   }
+}
+
+function isChipOn(statusValue) {
+  const normalized = String(statusValue || '').trim().toUpperCase();
+  return normalized === 'ON' || normalized === 'ONLINE' || normalized === 'IDLE';
 }
 
 function fmtShortId(uuid) {
@@ -254,12 +259,13 @@ async function setStatusAndCcid() {
 
 async function refreshModems() {
   try {
+    modemTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.65;">A sincronizar com o hardware…</td></tr>';
     const rows = await poloWorker.modemRows();
-    const rowsOn = (rows || []).filter((r) => String(r.status || 'OFF').toUpperCase() === 'ON');
+    const rowsList = Array.isArray(rows) ? rows : [];
     modemTableBody.innerHTML = '';
-    rowsOn.forEach((r) => {
+    rowsList.forEach((r) => {
       const tr = document.createElement('tr');
-      const on = String(r.status || 'OFF').toUpperCase() === 'ON';
+      const on = isChipOn(r.status);
       tr.className = on ? 'modem-row--on' : 'modem-row--off';
       tr.dataset.porta = r.porta || '';
       tr.innerHTML = `
@@ -273,9 +279,9 @@ async function refreshModems() {
       tr.addEventListener('click', () => openNumberModal(r));
       modemTableBody.appendChild(tr);
     });
-    if (!rowsOn.length) {
+    if (!rowsList.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem ON no momento.</td>';
+      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem no momento.</td>';
       modemTableBody.appendChild(tr);
     }
     lastSyncEl.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
@@ -288,7 +294,7 @@ async function openNumberModal(r) {
   if (!r || !r.porta) return;
   lastModalPorta = r.porta;
   if (numModalLed) {
-    const on = String(r.status || 'OFF').toUpperCase() === 'ON';
+    const on = isChipOn(r.status);
     numModalLed.className = on ? 'led' : 'led led-off';
   }
   if (numModalHeadline) {
@@ -457,6 +463,7 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 
 document.getElementById('btn-refresh').addEventListener('click', async () => {
   if (lastSyncEl) lastSyncEl.textContent = 'Atualização: reiniciando leitura dos chips...';
+  modemTableBody.innerHTML = '';
   try {
     const r = await poloWorker.forceRescan();
     if (!r || !r.ok) {
@@ -492,7 +499,7 @@ if (btnUpdateDownload) {
         /* */
       }
     }
-    if (!url) url = `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.3.exe`;
+    if (!url) url = `${FLUXSMS_DOWNLOAD_DIR}/FluxSMS.0.5.9.exe`;
     await poloWorker.updatesOpenDownload(url);
   });
 }

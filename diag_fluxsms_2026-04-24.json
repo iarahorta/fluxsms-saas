@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "timestamp": "2026-04-24T15:01:40.143489+00:00",
+    "base_url": "https://fluxsms.com.br",
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "ports_detectadas": [
+      "COM1",
+      "COM4",
+      "COM5"
+    ],
+    "hwid_enviado": true,
+    "hint": "API de health falhou. Verifique URL base, internet ou backend."
+  },
+  "steps": [
+    {
+      "name": "health",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/health",
+      "status": 429,
+      "ok": false,
+      "elapsed_ms": 644,
+      "response_preview": "{\"error\": \"muitas_requisicoes\", \"retry_after\": \"60s\"}",
+      "error": "HTTP 429",
+      "json": {
+        "error": "muitas_requisicoes",
+        "retry_after": "60s"
+      }
+    },
+    {
+      "name": "bootstrap",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/bootstrap",
+      "status": 429,
+      "ok": false,
+      "elapsed_ms": 230,
+      "response_preview": "{\"error\": \"muitas_requisicoes\", \"retry_after\": \"60s\"}",
+      "error": "HTTP 429",
+      "json": {
+        "error": "muitas_requisicoes",
+        "retry_after": "60s"
+      }
+    },
+    {
+      "name": "worker_chips",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chips",
+      "status": 403,
+      "ok": false,
+      "elapsed_ms": 447,
+      "response_preview": "{\"ok\": false, \"error\": \"hwid_mismatch\", \"detail\": \"Esta chave já está vinculada a outro computador.\"}",
+      "error": "HTTP 403",
+      "json": {
+        "ok": false,
+        "error": "hwid_mismatch",
+        "detail": "Esta chave já está vinculada a outro computador."
+      }
+    },
+    {
+      "name": "worker_activations",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/activations",
+      "status": 403,
+      "ok": false,
+      "elapsed_ms": 438,
+      "response_preview": "{\"ok\": false, \"error\": \"hwid_mismatch\", \"detail\": \"Esta chave já está vinculada a outro computador.\"}",
+      "error": "HTTP 403",
+      "json": {
+        "ok": false,
+        "error": "hwid_mismatch",
+        "detail": "Esta chave já está vinculada a outro computador."
+      }
+    },
+    {
+      "name": "chip_activations[COM1]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 403,
+      "ok": false,
+      "elapsed_ms": 419,
+      "response_preview": "{\"ok\": false, \"error\": \"hwid_mismatch\", \"detail\": \"Esta chave já está vinculada a outro computador.\"}",
+      "error": "HTTP 403",
+      "json": {
+        "ok": false,
+        "error": "hwid_mismatch",
+        "detail": "Esta chave já está vinculada a outro computador."
+      }
+    },
+    {
+      "name": "chip_activations[COM4]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 403,
+      "ok": false,
+      "elapsed_ms": 429,
+      "response_preview": "{\"ok\": false, \"error\": \"hwid_mismatch\", \"detail\": \"Esta chave já está vinculada a outro computador.\"}",
+      "error": "HTTP 403",
+      "json": {
+        "ok": false,
+        "error": "hwid_mismatch",
+        "detail": "Esta chave já está vinculada a outro computador."
+      }
+    },
+    {
+      "name": "chip_activations[COM5]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 403,
+      "ok": false,
+      "elapsed_ms": 445,
+      "response_preview": "{\"ok\": false, \"error\": \"hwid_mismatch\", \"detail\": \"Esta chave já está vinculada a outro computador.\"}",
+      "error": "HTTP 403",
+      "json": {
+        "ok": false,
+        "error": "hwid_mismatch",
+        "detail": "Esta chave já está vinculada a outro computador."
+      }
+    }
+  ],
+  "ports": [
+    "COM1",
+    "COM4",
+    "COM5"
+  ]
+}

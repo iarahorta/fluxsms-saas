@@ -1,5 +1,7 @@
 const express = require('express');
 const { requirePartnerUser } = require('../middleware/partnerSession');
+const { isSaoPauloBusinessHours } = require('../lib/businessHoursBr');
+const { logBalanceAudit, clientIp, ua } = require('../lib/auditLog');
 
 const router = express.Router();
 
@@ -17,6 +19,8 @@ function round2(n) {
 function resolvePartnerCommissionPercent(partnerProfile) {
     const raw = Number(partnerProfile?.custom_commission);
     if (Number.isFinite(raw) && raw > 0 && raw <= 100) return Math.round(raw);
+    const legacyMargin = Number(partnerProfile?.margin_percent);
+    if (Number.isFinite(legacyMargin) && legacyMargin > 0 && legacyMargin <= 100) return Math.round(legacyMargin);
     return 60;
 }
 
@@ -160,6 +164,13 @@ router.get('/summary', async (req, res) => {
  */
 router.post('/withdraw', async (req, res) => {
     const supabase = req.app.get('supabase');
+    if (!isSaoPauloBusinessHours()) {
+        return res.status(400).json({
+            ok: false,
+            error: 'outside_business_hours',
+            window: '07h–18h (America/Sao_Paulo)'
+        });
+    }
     const raw = req.body && req.body.amount;
     const amount = round2(typeof raw === 'string' ? parseFloat(raw) : Number(raw));
     const pixDestination = req.body && req.body.pix_destination != null
@@ -214,6 +225,44 @@ router.post('/withdraw', async (req, res) => {
         if (insErr) {
             return res.status(500).json({ ok: false, error: 'insert_failed', detail: insErr.message });
         }
+
+        const nexusCost = round2(Number.parseFloat(String(process.env.NEXUS_WITHDRAWAL_COST_BRL || '2')));
+        const surplus = round2(WITHDRAWAL_FEE_BRL - nexusCost);
+        if (surplus > 0 && row?.id) {
+            const { error: wErr } = await supabase.rpc('rpc_flux_wallet_credit', {
+                p_slug: 'CAIXA_CHIP',
+                p_amount: surplus,
+                p_ref_type: 'withdraw_fee_surplus',
+                p_ref_id: String(row.id),
+                p_meta: {
+                    partner_id: req.partnerProfile.id,
+                    fee_brl: WITHDRAWAL_FEE_BRL,
+                    nexus_cost_brl: nexusCost
+                }
+            });
+            if (wErr) {
+                console.warn('[PARTNER WITHDRAW] Falha ao creditar CAIXA_CHIP:', wErr.message);
+            }
+        }
+
+        await logBalanceAudit(supabase, {
+            event_type: 'partner_withdrawal_requested',
+            gateway: 'internal',
+            external_ref: row?.id ? String(row.id) : null,
+            beneficiary_user_id: req.partnerUserId || null,
+            amount,
+            partner_profile_id: req.partnerProfile.id,
+            partner_api_key_id: null,
+            partner_api_key_prefix: null,
+            actor_ip: clientIp(req),
+            user_agent: ua(req),
+            meta: {
+                partner_code: req.partnerProfile.partner_code,
+                fee_brl: WITHDRAWAL_FEE_BRL,
+                net_amount: netAmount,
+                caixa_surplus_brl: surplus > 0 ? surplus : 0
+            }
+        });
 
         return res.status(201).json({
             ok: true,

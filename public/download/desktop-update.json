@@ -1,5 +1,5 @@
 {
-  "version": "0.5.6",
-  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.6.exe",
-  "notes": "0.5.6: exibição de lucro do parceiro no desktop ajustada para 60% do valor da venda, sem alterar pipeline de conexão/main. Mantida interface limpa com modems OFF ocultos."
+  "version": "0.5.9",
+  "url": "https://fluxsms.com.br/download/FluxSMS.0.5.9.exe",
+  "notes": "0.5.9: core Python compatível — evita Bad magic number (.pyc) usando main.py quando presente; runtime inclui .py de fallback."
 }

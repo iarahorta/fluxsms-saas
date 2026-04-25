@@ -13,7 +13,7 @@ function workerDownloadUrl(req) {
         .split(',')[0]
         .trim();
     const host = req.get('host') || 'fluxsms.com.br';
-    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.5.3.exe`;
+    const sameOrigin = `${rawProto}://${host}/download/FluxSMS.0.5.9.exe`;
 
     const envUrl = (process.env.POLO_WORKER_DOWNLOAD_URL || '').trim();
     if (!envUrl) return sameOrigin;
@@ -137,7 +137,7 @@ router.get('/chips', async (req, res) => {
 
         const { data: chips, error: cErr } = await supabase
             .from('chips')
-            .select('id, polo_id, porta, numero, status, disponivel_em, operadora')
+            .select('id, polo_id, porta, numero, status, disponivel_em, operadora, registered_by_api_key_id')
             .in('polo_id', poloIds)
             .order('porta');
 
@@ -145,8 +145,19 @@ router.get('/chips', async (req, res) => {
             return res.status(500).json({ ok: false, error: 'chips_failed', detail: cErr.message });
         }
 
+        const keyIds = [...new Set((chips || []).map((c) => c.registered_by_api_key_id).filter(Boolean))];
+        let prefixByKeyId = {};
+        if (keyIds.length) {
+            const { data: kRows } = await supabase
+                .from('partner_api_keys')
+                .select('id, key_prefix')
+                .in('id', keyIds);
+            prefixByKeyId = Object.fromEntries((kRows || []).map((k) => [k.id, k.key_prefix]));
+        }
+
         const enriched = (chips || []).map((c) => ({
             ...c,
+            api_key_prefix: c.registered_by_api_key_id ? prefixByKeyId[c.registered_by_api_key_id] || null : null,
             polo_nome: poloById[c.polo_id]?.nome || null,
             polo_status: poloById[c.polo_id]?.status || null,
             polo_ultima: poloById[c.polo_id]?.ultima_comunicacao || null

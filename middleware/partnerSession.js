@@ -25,11 +25,22 @@ async function requirePartnerUser(req, res, next) {
             return res.status(403).json({ ok: false, error: 'forbidden', detail: 'not_a_partner' });
         }
 
-        const { data: partnerProfile, error: ppErr } = await supabase
+        let partnerProfile = null;
+        let ppErr = null;
+        ({ data: partnerProfile, error: ppErr } = await supabase
             .from('partner_profiles')
-            .select('id, user_id, partner_code, status, margin_percent, created_at, saque_prioritario')
+            .select('id, user_id, partner_code, status, margin_percent, custom_commission, created_at, saque_prioritario')
             .eq('user_id', userData.user.id)
-            .maybeSingle();
+            .maybeSingle());
+        if (ppErr && String(ppErr.message || '').includes('custom_commission')) {
+            const retry = await supabase
+                .from('partner_profiles')
+                .select('id, user_id, partner_code, status, margin_percent, created_at, saque_prioritario')
+                .eq('user_id', userData.user.id)
+                .maybeSingle();
+            partnerProfile = retry.data ? { ...retry.data, custom_commission: null } : null;
+            ppErr = retry.error;
+        }
 
         if (ppErr || !partnerProfile || partnerProfile.status !== 'active') {
             return res.status(403).json({ ok: false, error: 'forbidden', detail: 'partner_profile_missing_or_suspended' });

@@ -6,11 +6,16 @@
 function validateInput(req, _res, next) {
     const sanitize = (value) => {
         if (typeof value !== 'string') return value;
-        return value
+        let s = value
+            .replace(/<\/script/gi, '')
+            .replace(/<script/gi, '')
+            .replace(/javascript:/gi, '')
+            .replace(/on\w+\s*=/gi, '')     // handlers inline (onclick=, onerror=)
             .replace(/[<>]/g, '')           // Remove < > (XSS básico)
             .replace(/;|--|\/\*/g, '')       // Remove delimitadores SQL
             .trim()
             .slice(0, 500);                 // Limita tamanho
+        return s;
     };
 
     const sanitizeObj = (obj) => {

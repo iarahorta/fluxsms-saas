@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API FluxSMS — Documentação</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --sidebar: #111;
+      --card: #141414;
+      --border: #1f1f1f;
+      --gold: #d4af37;
+      --gold-dim: #7a6420;
+      --text: #f2f2f2;
+      --muted: #888;
+      --get: #3fb950;
+      --post: #58a6ff;
+      --put: #d29922;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    aside {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 1.25rem 1rem;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      max-height: 100vh;
+      overflow-y: auto;
+    }
+    aside h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--gold);
+      margin-bottom: 0.25rem;
+    }
+    aside .sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 1.25rem; }
+    aside nav a {
+      display: block;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+    }
+    aside nav a:hover { color: var(--text); background: var(--card); }
+    aside .nav-group { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); margin: 1rem 0 0.4rem 0.5rem; }
+    main { flex: 1; padding: 2rem 2.5rem 4rem; max-width: 900px; }
+    .hero {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .hero h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .hero p { color: var(--muted); max-width: 640px; }
+    .base-url {
+      margin-top: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 0.65rem 1rem;
+      border-radius: 6px;
+      color: var(--gold);
+      word-break: break-all;
+    }
+    section { margin-bottom: 2.75rem; scroll-margin-top: 1rem; }
+    section h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    section p, section ul { color: var(--muted); margin-bottom: 0.75rem; }
+    section ul { padding-left: 1.25rem; }
+    section li { margin-bottom: 0.35rem; }
+    .endpoint {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .endpoint-head {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .method {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .method.get { background: rgba(63, 185, 80, 0.2); color: var(--get); }
+    .method.post { background: rgba(88, 166, 255, 0.2); color: var(--post); }
+    .method.put { background: rgba(210, 153, 34, 0.2); color: var(--put); }
+    .path { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text); }
+    .endpoint-body { padding: 1rem; }
+    .endpoint-body p { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      color: #c9d1d9;
+      margin-top: 0.5rem;
+    }
+    .badge { font-size: 0.7rem; color: var(--muted); border: 1px solid var(--border); padding: 0.15rem 0.45rem; border-radius: 4px; }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; }
+      aside {
+        position: relative;
+        max-height: none;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      main { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <h1>FluxSMS API</h1>
+      <div class="sub">Protocolo para integração de parceiros e worker desktop</div>
+      <nav>
+        <a href="#intro">Introdução</a>
+        <a href="#auth">Autenticação</a>
+        <div class="nav-group">Partner API</div>
+        <a href="#partner-health">Health &amp; perfil</a>
+        <a href="#partner-worker">Worker &amp; chips</a>
+        <div class="nav-group">Portal (JWT)</div>
+        <a href="#portal-self">Painel parceiro</a>
+        <a href="#portal-finance">Finanças</a>
+        <div class="nav-group">Outros</div>
+        <a href="#health">Health público</a>
+        <a href="#sms-infra">SMS deliver (infra)</a>
+        <a href="#json-docs">JSON /partner-api/docs</a>
+      </nav>
+    </aside>
+    <main>
+      <div class="hero" id="intro">
+        <h2>Documentação da API</h2>
+        <p>
+          Referência das rotas HTTP expostas pelo backend FluxSMS para o ecossistema de parceiros
+          (chave de API no worker desktop) e para o portal web autenticado com sessão Supabase (JWT).
+          Estrutura inspirada em páginas de referência rápida como a documentação pública de provedores de SMS.
+        </p>
+        <div class="base-url" id="base">https://fluxsms.com.br</div>
+        <p style="margin-top:0.75rem;font-size:0.85rem;">Em staging pode usar o host Railway configurado no CORS. Todas as rotas usam HTTPS em produção.</p>
+      </div>
+
+      <section id="auth">
+        <h3>Autenticação</h3>
+        <p><strong>Partner API</strong> (<code>/partner-api/*</code> exceto <code>/docs</code>): envie a chave em um dos formatos:</p>
+        <ul>
+          <li>Cabeçalho <code>x-api-key: &lt;sua_chave&gt;</code></li>
+          <li>Ou <code>Authorization: Bearer &lt;sua_chave&gt;</code></li>
+          <li>Opcional: <code>X-Flux-Hwid</code> — na primeira chamada com HWID válido a chave pode ficar vinculada à máquina; depois é obrigatório.</li>
+        </ul>
+        <p><strong>Portal parceiro</strong> (<code>/api/partner/*</code>): <code>Authorization: Bearer &lt;access_token Supabase&gt;</code> do utilizador com perfil de parceiro.</p>
+        <p><strong>Admin</strong> (<code>/api/admin/*</code>): JWT de utilizador com <code>is_admin</code> — não documentado aqui em detalhe.</p>
+      </section>
+
+      <section id="partner-health">
+        <h3>Partner API — visão geral</h3>
+        <p>Prefixo: <code>/partner-api</code>. A rota <code>GET /partner-api/docs</code> devolve JSON com a lista de endpoints (máquinas e integrações).</p>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/docs</span>
+            <span class="badge">público</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Índice JSON da API (sem autenticação).</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/health</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Confirma chave válida, IP permitido e devolve <code>partner_code</code> e timestamp.</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/me</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Perfil do parceiro (<code>id</code>, <code>partner_code</code>, <code>margin_percent</code>, etc.) e custos de serviço (<code>costs</code>).</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/worker/bootstrap</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Resolve a estação (polo) preferencial e devolve <code>polo.chave_acesso</code> para configurar o worker local (<code>POLO_KEY</code>).</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/worker/summary</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Resumo financeiro: <code>commission_percent</code>, <code>saldo_total</code> (disponível para solicitar saque), <code>finance_totals</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="partner-worker">
+        <h3>Partner API — chips e fila</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method post">POST</span>
+            <span class="path">/partner-api/chips</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Regista ou atualiza um chip no polo do parceiro. Corpo (aliases aceites):</p>
+            <pre>{
+  "porta": "COM3",
+  "numero": "+5511999990000",
+  "operadora": "Vivo"
+}</pre>
+            <p>Alternativas: <code>port</code>, <code>number</code>, <code>operator</code>. Respostas: <code>201</code> com <code>chip</code>, ou erros como <code>em_quarentena</code> (423).</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method post">POST</span>
+            <span class="path">/partner-api/worker/sync</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Mesmo contrato que <code>POST /partner-api/chips</code> — canal usado pelo desktop após sync com o core.</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/worker/activations</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Lista ativações em <code>waiting</code> para os chips do parceiro, enriquecidas com <code>chip_porta</code> / <code>chip_numero</code>. Respeita serviços desativados no painel.</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/worker/chips</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Lista chips (<code>id</code>, <code>porta</code>, <code>numero</code>, <code>status</code>, …) e polos associados.</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method get">GET</span>
+            <span class="path">/partner-api/worker/chip-activations?porta=COM3</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Histórico de ativações do chip identificado pela porta (query obrigatória <code>porta</code>).</p>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method post">POST</span>
+            <span class="path">/partner-api/worker/heartbeat</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Mantém polos do parceiro como <code>ONLINE</code> e atualiza <code>last_ping</code> em chips.</p>
+            <pre>curl -s -X POST "https://fluxsms.com.br/partner-api/worker/heartbeat" \
+  -H "x-api-key: SUA_CHAVE"</pre>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-head">
+            <span class="method post">POST</span>
+            <span class="path">/partner-api/worker/shutdown</span>
+            <span class="badge">API key</span>
+          </div>
+          <div class="endpoint-body">
+            <p>Fecho controlado do worker: polo e chips passam a estado offline no servidor.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="portal-self">
+        <h3>Portal parceiro (JWT)</h3>
+        <p>Prefixo: <code>/api/partner/self</code>. Sessão do painel em <code>parceiros.fluxsms.com.br</code> (ou portal forçado por env).</p>
+
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/partner/self/bootstrap</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body"><p>Dados iniciais: utilizador, parceiro, chaves API ativas (plaintext só para chaves desencriptáveis), resumo financeiro, URL de download do worker.</p></div>
+        </div>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/partner/self/chips</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body"><p>Chips e polos do parceiro com metadados de polo.</p></div>
+        </div>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/partner/self/service-toggles</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body"><p>Serviços (WhatsApp, Telegram, etc.) e flags <code>enabled</code>.</p></div>
+        </div>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method put">PUT</span><span class="path">/api/partner/self/service-toggles</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body">
+            <p>Corpo: <code>{ "services": [ { "service": "whatsapp", "enabled": false } ] }</code></p>
+          </div>
+        </div>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/partner/self/api-keys</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body">
+            <p>Cria nova chave (opcional <code>label</code>). Limite de 3 chaves ativas por parceiro. Resposta inclui <code>api_key</code> em texto claro uma única vez.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="portal-finance">
+        <h3>Finanças parceiro (JWT)</h3>
+        <p>Prefixo: <code>/api/partner/finance</code>.</p>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/partner/finance/summary</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body"><p>Regras públicas (mínimo saque, taxa, carência, repasse %) e totais (<code>repasse_liberado</code>, <code>disponivel_para_solicitar</code>, …).</p></div>
+        </div>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/partner/finance/withdraw</span><span class="badge">JWT</span></div>
+          <div class="endpoint-body">
+            <p>Pedido de saque em horário comercial. Corpo exemplo:</p>
+            <pre>{ "amount": 400, "pix_destination": "chave@email.com" }</pre>
+            <p>Taxa fixa e janela horária podem devolver <code>outside_business_hours</code> ou validação de valor.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="health">
+        <h3>Health público</h3>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method get">GET</span><span class="path">/health</span><span class="badge">público</span></div>
+          <div class="endpoint-body"><p><code>{ "status", "version", "ts" }</code> — monitorização e load balancers.</p></div>
+        </div>
+      </section>
+
+      <section id="sms-infra">
+        <h3>SMS deliver (infraestrutura)</h3>
+        <div class="endpoint">
+          <div class="endpoint-head"><span class="method post">POST</span><span class="path">/sms/deliver</span><span class="badge">HARDWARE_API_KEY</span></div>
+          <div class="endpoint-body">
+            <p>Uso interno do pipeline de modem / software autorizado — não é a Partner API Key. Autenticação com o mesmo padrão de cabeçalho, valor igual a <code>HARDWARE_API_KEY</code> no ambiente do servidor.</p>
+            <pre>{ "activation_id": "uuid", "sms_code": "123456", "chip_porta": "COM3" }</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="json-docs">
+        <h3>JSON programático</h3>
+        <p>Integrações podem consumir <code>GET https://fluxsms.com.br/partner-api/docs</code> para descoberta automática da lista de rotas e versão do módulo.</p>
+      </section>
+
+      <footer>
+        FluxSMS — documentação v1. Páginas de recarga PIX e webhooks de gateway são consumidas pelo painel e pelos provedores de pagamento; não fazem parte desta referência de parceiro.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

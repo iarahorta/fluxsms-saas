@@ -1,0 +1,2 @@
+Snapshot de trabalho fim de noite (ver ramo `backup/2026-04-25-noite` e commit correspondente após o push).
+Gerado em: 2026-04-25

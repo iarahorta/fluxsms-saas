@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "timestamp": "2026-04-24T15:03:42.286136+00:00",
+    "base_url": "https://fluxsms.com.br",
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "ports_detectadas": [
+      "COM1",
+      "COM4",
+      "COM5"
+    ],
+    "hwid_enviado": true,
+    "hint": "PC ve portas COM, mas backend nao retornou chips. Possivel falha no sync /worker/sync ou no core."
+  },
+  "steps": [
+    {
+      "name": "health",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/health",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1673,
+      "response_preview": "{\"ok\": true, \"module\": \"partner-api\", \"partner_code\": \"testes01_b17f0611\", \"ip\": \"2804:2488:5083:5590:f0c2:d6ef:233c:a36b\", \"ts\": \"2026-04-24T15:03:30.682Z\"}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "module": "partner-api",
+        "partner_code": "testes01_b17f0611",
+        "ip": "2804:2488:5083:5590:f0c2:d6ef:233c:a36b",
+        "ts": "2026-04-24T15:03:30.682Z"
+      }
+    },
+    {
+      "name": "bootstrap",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/bootstrap",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1686,
+      "response_preview": "{\"ok\": true, \"partner_id\": \"b88dde8e-557f-409d-a557-f1e9bd52ee9b\", \"polo\": {\"id\": \"5ba11d1b-36b7-4987-834d-6c129ba1084b\", \"chave_acesso\": \"testes01_b17f0611\", \"nome\": \"Estacao principal\", \"status\": \"ONLINE\"}}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "partner_id": "b88dde8e-557f-409d-a557-f1e9bd52ee9b",
+        "polo": {
+          "id": "5ba11d1b-36b7-4987-834d-6c129ba1084b",
+          "chave_acesso": "testes01_b17f0611",
+          "nome": "Estacao principal",
+          "status": "ONLINE"
+        }
+      }
+    },
+    {
+      "name": "worker_chips",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chips",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1460,
+      "response_preview": "{\"ok\": true, \"chips\": [], \"polos\": [{\"id\": \"5ba11d1b-36b7-4987-834d-6c129ba1084b\", \"partner_profile_id\": \"b88dde8e-557f-409d-a557-f1e9bd52ee9b\", \"nome\": \"Estacao principal\", \"status\": \"ONLINE\", \"ultima_comunicacao\": null}]}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "chips": [],
+        "polos": [
+          {
+            "id": "5ba11d1b-36b7-4987-834d-6c129ba1084b",
+            "partner_profile_id": "b88dde8e-557f-409d-a557-f1e9bd52ee9b",
+            "nome": "Estacao principal",
+            "status": "ONLINE",
+            "ultima_comunicacao": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "worker_activations",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/activations",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1488,
+      "response_preview": "{\"ok\": true, \"activations\": [], \"chips\": []}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "activations": [],
+        "chips": []
+      }
+    },
+    {
+      "name": "chip_activations[COM1]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1499,
+      "response_preview": "{\"ok\": true, \"activations\": [], \"chip\": null, \"polo\": null}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "activations": [],
+        "chip": null,
+        "polo": null
+      }
+    },
+    {
+      "name": "chip_activations[COM4]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1492,
+      "response_preview": "{\"ok\": true, \"activations\": [], \"chip\": null, \"polo\": null}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "activations": [],
+        "chip": null,
+        "polo": null
+      }
+    },
+    {
+      "name": "chip_activations[COM5]",
+      "method": "GET",
+      "url": "https://fluxsms.com.br/partner-api/worker/chip-activations",
+      "status": 200,
+      "ok": true,
+      "elapsed_ms": 1484,
+      "response_preview": "{\"ok\": true, \"activations\": [], \"chip\": null, \"polo\": null}",
+      "error": null,
+      "json": {
+        "ok": true,
+        "activations": [],
+        "chip": null,
+        "polo": null
+      }
+    }
+  ],
+  "ports": [
+    "COM1",
+    "COM4",
+    "COM5"
+  ]
+}
