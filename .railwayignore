@@ -29,6 +29,10 @@ polo-worker-draft/dist-exe/
 **/*.mov
 **/*.webm
 **/*.mkv
+**/*.zip
+backups/
+video_frames/
+video_frames_*/
 
 # Artefatos temporários de teste
 **/test_failure.png

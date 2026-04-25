@@ -7,7 +7,7 @@ const router = express.Router();
 async function listPolosFromPartner(supabase, partnerId) {
   const { data, error } = await supabase
     .from('polos')
-    .select('id, partner_profile_id, nome, status, ultima_comunicacao')
+    .select('id, partner_profile_id, nome, status, ultima_comunicacao, chave_acesso')
     .eq('partner_profile_id', partnerId);
   if (error) {
     return { ok: false, status: 500, body: { ok: false, error: 'polos_list_failed', detail: error.message } };
@@ -40,7 +40,38 @@ async function ensurePartnerPolo(supabase, partnerId) {
   const polosScope = await listPolosFromPartner(supabase, partnerId);
   if (!polosScope.ok) return { ok: false, status: polosScope.status, body: polosScope.body };
   let polo = pickPreferredPolo(polosScope.polos);
-  if (polo) return { ok: true, polo, polos: polosScope.polos };
+  if (polo) {
+    // Auto-cura: alguns polos legados ficaram sem chave_acesso.
+    if (!String(polo.chave_acesso || '').trim()) {
+      const fallbackKeyBase = `partner-${String(partnerId).slice(0, 8)}`;
+      const attempts = [
+        fallbackKeyBase,
+        `${fallbackKeyBase}-${Date.now().toString().slice(-6)}`,
+        `${fallbackKeyBase}-${Math.random().toString(36).slice(2, 8)}`
+      ];
+      let healed = null;
+      for (const k of attempts) {
+        const upd = await supabase
+          .from('polos')
+          .update({ chave_acesso: k })
+          .eq('id', polo.id)
+          .select('id, partner_profile_id, chave_acesso, nome, status, ultima_comunicacao')
+          .maybeSingle();
+        if (!upd.error && upd.data && String(upd.data.chave_acesso || '').trim()) {
+          healed = upd.data;
+          break;
+        }
+        const msg = String(upd.error?.message || '').toLowerCase();
+        if (!(msg.includes('duplicate key value') && msg.includes('polos_chave_acesso_key'))) {
+          break;
+        }
+      }
+      if (healed) {
+        polo = healed;
+      }
+    }
+    return { ok: true, polo, polos: polosScope.polos };
+  }
 
   const { data: partnerProfile, error: pErr } = await supabase
     .from('partner_profiles')

@@ -1,3 +1,43 @@
 ﻿Snapshot de trabalho fim de noite 25/04/2026
 Commit: a21ad7b (branch: backup/2026-04-25-noite)
 Inclui: .gitignore (__pycache__), alterações pendentes no repo, binários public/download, polo-worker, migrações supabase, scripts, libs, etc.
+
+---
+Atualização operacional (25/04/2026 13:10 BRT)
+---
+- Deploy de estabilização web em produção: SUCCESS
+  - deployment: `21d2006b-680d-4966-a49a-4007b302ca6e`
+- Hotfixes de runtime (502/host error) aplicados antes do deploy final:
+  - módulo `lib/auditLog.js` restaurado
+  - rota `routes/adminFinancasFlux.js` restaurada em modo compatibilidade
+  - `middleware/rateLimit.js` com exports usados em produção (`paymentWebhookLimiter`, `pixCreateLimiter`, `adminSensitiveLimiter`)
+- Estoque cliente endurecido para cenário real:
+  - `GET /api/public/estoque` agora considera apenas chip ONLINE com `last_ping <= 3 min`
+  - front cliente passou a confiar no estoque público estrito (sem fusão otimista por fallback)
+  - validação em produção com HUB desligado: `chips_vivos=0` e stocks zerados
+- Heartbeat cleaner:
+  - fallback atualizado para `created_at` (evita referência quebrada a `updated_at`)
+- SQL RPC:
+  - removida referência `c.updated_at` que causava erro de compra em alguns ambientes
+  - `rpc_solicitar_sms_v3` mantém uso de `auth.uid()` + validação de mismatch de user
+- Worker shutdown:
+  - adicionada rota `POST /sms/shutdown` para forçar OFFLINE por estação (`polo_key`)
+- Diagnóstico do timeout no app desktop:
+  - backend saudável: `health` e `worker/bootstrap` com 200
+  - causa observada em teste manual: chamadas sem `x-flux-hwid` em rotas worker retornam 400
+  - chave de teste teve `bound_hwid` resetado para novo pareamento controlado
+
+---
+Checkpoint redundante (25/04/2026 20:48 BRT)
+---
+- Estado em campo (PC Iara):
+  - partner-api autenticado e operacional (`health/bootstrap/chips/activations` em 200).
+  - `hwid_mismatch` tratado via pareamento do HWID local.
+- Sintoma restante:
+  - número aparece no cliente, mas SMS nem sempre retorna como `received`.
+- Evidência operacional:
+  - teste em `/sms/mock` respondeu com `muitas_requisicoes` (rate limit), indicando endpoint ativo.
+- Próximo passo da operação:
+  1) repetir teste após 60s (janela do rate limit),
+  2) executar compra real,
+  3) confirmar ciclo completo `waiting -> received`.

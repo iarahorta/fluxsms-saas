@@ -1,22 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
-const SIXTY_MIN_MS = 60 * 60 * 1000;
+const THREE_MIN_MS = 3 * 60 * 1000;
 
-/**
- * Sinal de vida: last_ping ou polo.ultima nos últimos 60 min, ou totalmente sem dado = assume vivo (prioridade: números visíveis no painel).
- */
-function chipSinalVida60m(row) {
+/** Estoque estrito do cliente: ONLINE + ping recente (3 min). */
+function chipOnline3m(row) {
     const p = row.polos;
     const u = p && (Array.isArray(p) ? p[0] : p);
-    const ult = u && u.ultima_comunicacao;
-    const lp = row.last_ping;
-    const tUlt = ult ? new Date(ult).getTime() : 0;
+    const poloStatus = String((u && u.status) || '').toLowerCase();
+    const status = String(row.status || '').toLowerCase();
+    if (status !== 'online') return false;
+    if (poloStatus && poloStatus !== 'online') return false;
+    const lp = row.last_ping ? new Date(row.last_ping).getTime() : 0;
     const tLp = lp ? new Date(lp).getTime() : 0;
-    if (tUlt && Date.now() - tUlt <= SIXTY_MIN_MS) return true;
-    if (tLp && Date.now() - tLp <= SIXTY_MIN_MS) return true;
-    if (!tUlt && !tLp) return true;
-    return false;
+    return !!(tLp && Date.now() - tLp <= THREE_MIN_MS);
 }
 
 function chipServiceOffTrue(chip, key) {
@@ -29,8 +26,7 @@ const DEFAULT_SERVICE_IDS = ['whatsapp', 'telegram', 'google', 'instagram'];
 
 /**
  * GET /api/public/estoque
- * Plano B: contagens reais (service role), sem exigir polo status ONLINE, nem chip estritamente “idle”
- * se houver sinal de vida 60m e ainda estiver mapeado como “offline” pelo heartbeat.
+ * Estoque estrito para painel cliente: somente chips ONLINE com ping <= 3 min.
  */
 router.get('/estoque', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=5, s-maxage=5');
@@ -85,34 +81,18 @@ router.get('/estoque', async (req, res) => {
 
         for (const c of list) {
             const st = String(c.status || '').toLowerCase();
-            if (
-                chipSinalVida60m(c) ||
-                st === 'idle' ||
-                st === 'quarentena' ||
-                st === 'on' ||
-                st === 'online' ||
-                st === 'active' ||
-                st === 'busy' ||
-                st === 'offline'
-            ) {
+            if (chipOnline3m(c)) {
                 chipsVivos += 1;
             }
-            const poloU =
-                c.polos && (c.polos.ultima_comunicacao || (Array.isArray(c.polos) && c.polos[0] && c.polos[0].ultima_comunicacao));
-            const vivoOffline = st === 'offline' && (c.last_ping || poloU);
+            if (!chipOnline3m(c)) continue;
 
             let anyService = 0;
             for (const sid of serviceIds) {
                 if (chipServiceOffTrue(c, sid)) continue;
 
-                const okOn = st === 'on' || st === 'online' || st === 'active';
                 if (sid === 'whatsapp') {
                     const de = c.disponivel_em;
                     if (de && new Date(de) > new Date()) continue;
-                    if (!(st === 'idle' || okOn || (vivoOffline && (c.last_ping || 1)))) continue;
-                } else {
-                    const can = st === 'idle' || st === 'quarentena' || okOn || (vivoOffline && (c.last_ping || 1));
-                    if (!can) continue;
                 }
 
                 if (receivedSet.has(String(c.id) + '|' + sid)) continue;

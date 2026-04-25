@@ -95,4 +95,49 @@ router.post('/mock', async (req, res) => {
     return res.status(200).json({ ok: true, mock_code: fakeCode, msg: 'Usado apenas para testes' });
 });
 
+/**
+ * POST /sms/shutdown
+ * Força OFFLINE de todos os chips de uma estação (chave_acesso) no desligamento do app desktop.
+ * Header: x-api-key (ou Authorization: Bearer)
+ * Body opcional: { polo_key?: string }
+ */
+router.post('/shutdown', async (req, res) => {
+    const supabase = req.app.get('supabase');
+    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+    if (!apiKey || apiKey !== process.env.HARDWARE_API_KEY) {
+        return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const poloKey = String(req.body?.polo_key || req.headers['x-polo-key'] || '').trim();
+    if (!poloKey) {
+        return res.status(400).json({ ok: false, error: 'polo_key_obrigatoria' });
+    }
+
+    try {
+        const { data: polo, error: poloErr } = await supabase
+            .from('polos')
+            .select('id')
+            .eq('chave_acesso', poloKey)
+            .maybeSingle();
+
+        if (poloErr || !polo?.id) {
+            return res.status(404).json({ ok: false, error: 'polo_nao_encontrado' });
+        }
+
+        await supabase
+            .from('polos')
+            .update({ status: 'OFFLINE', chips_ativos: 0, ultima_comunicacao: new Date().toISOString() })
+            .eq('id', polo.id);
+
+        await supabase
+            .from('chips')
+            .update({ status: 'offline' })
+            .eq('polo_id', polo.id);
+
+        return res.status(200).json({ ok: true, polo_id: polo.id, forced_offline: true });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: 'shutdown_failed', detail: err.message });
+    }
+});
+
 module.exports = router;

@@ -713,11 +713,6 @@ window.submitProfileCompletion = async function () {
     }, 700);
 };
 
-window.saveOperatorPreference = async function (operator) {
-    const val = ['any', 'vivo', 'claro', 'tim', 'oi'].includes(operator) ? operator : 'any';
-    await upsertContactProfile({ preferredOperator: val });
-};
-
 function loadSecurityPanel() {
     const adminBlock = document.getElementById('security-admin-block');
     if (adminBlock) {
@@ -1319,94 +1314,31 @@ function mergeStockMaps(a, b) {
     return out;
 }
 
-/** Plano C: se API e RPC falham, contagem mínima na tabela chips (anon). */
-async function loadChipsCountTableFallback() {
-    const SIXTY_MS = 60 * 60 * 1000;
-    const { data: rows, error } = await db
-        .from('chips')
-        .select('id, status, last_ping, polos(ultima_comunicacao)')
-        .not('numero', 'ilike', 'CCID%');
-    if (error || !rows) return null;
-    const alive = rows.filter((row) => {
-        const p = row.polos;
-        const t = p && (Array.isArray(p) ? p[0] : p).ultima_comunicacao;
-        const lp = row.last_ping;
-        const tP = t ? new Date(t).getTime() : 0;
-        const tL = lp ? new Date(lp).getTime() : 0;
-        if (tP && Date.now() - tP <= SIXTY_MS) return true;
-        if (tL && Date.now() - tL <= SIXTY_MS) return true;
-        if (!tP && !tL) return true;
-        return false;
-    });
-    const stOk = (r) => {
-        const s = String(r.status || '').toLowerCase();
-        return ['idle', 'quarentena', 'on', 'online', 'busy', 'offline', 'active'].indexOf(s) >= 0;
-    };
-    const n = Math.max(
-        alive.length,
-        (rows || []).filter((r) => r && r.numero && String(r.numero).toUpperCase().indexOf('CCID') !== 0 && stOk(r)).length
-    );
-    const per = {};
-    for (const s of SERVICES) per[s.id] = n;
-    return { chips: n, stocks: per };
-}
-
 async function loadChipsCount() {
     if (!db) return;
 
     const merged = {};
     for (const s of SERVICES) merged[s.id] = 0;
 
-    let fromApi = false;
     try {
         const r = await fetch(`${BACKEND_URL}/api/public/estoque`, { method: 'GET' });
         const j = r.ok ? await r.json() : null;
         if (j && j.ok) {
-            fromApi = true;
             chipsDisponiveis = Number(j.chips_vivos) || 0;
             if (j.stocks && typeof j.stocks === 'object') {
                 for (const s of SERVICES) {
-                    merged[s.id] = Math.max(merged[s.id], Number(j.stocks[s.id] || 0));
+                    merged[s.id] = Number(j.stocks[s.id] || 0);
                 }
             }
         }
     } catch (e) {
         console.warn('loadChipsCount API público', e);
     }
-
-    try {
-        const { data, error } = await db.rpc('rpc_get_service_stocks');
-        if (!error && data) {
-            for (const s of SERVICES) {
-                merged[s.id] = Math.max(merged[s.id], Number(data[s.id] || 0));
-            }
-        }
-    } catch (e) {
-        console.warn('loadChipsCount rpc_get_service_stocks', e);
-    }
-
-    /* Sempre: plano C reforça total + preenche serviços ainda 0 (RPC/ API podem faltar serviços novos) */
-    const fb = await loadChipsCountTableFallback();
-    if (fb) {
-        chipsDisponiveis = Math.max(chipsDisponiveis || 0, fb.chips);
-        for (const s of SERVICES) {
-            const v = Number(merged[s.id] || 0);
-            if (v <= 0) {
-                merged[s.id] = Math.max(0, Number(fb.stocks[s.id] || 0));
-            }
-        }
-    }
-
-    serviceStocks = mergeStockMaps(merged, serviceStocks);
-
-    if (!chipsDisponiveis) {
-        const mx = Math.max(0, ...SERVICES.map((s) => Number(serviceStocks[s.id] || 0)));
-        if (mx > 0) chipsDisponiveis = mx;
-    }
+    serviceStocks = { ...merged };
 
     renderServices(SERVICES);
     const stockEl = document.getElementById('stock-count');
-    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips (atividade 60 min)`;
+    if (stockEl) stockEl.innerText = `${chipsDisponiveis} Chips (ONLINE em 3 min)`;
 }
 
 let chipsDebounce = null;
@@ -1522,11 +1454,6 @@ async function updateUIForUser() {
     userBalanceBrl = Number(profile.balance) || 0;
     currentUserIsAdmin = !!profile.is_admin;
     currentUserIsPartner = !!profile.is_partner;
-
-    const operatorSelect = document.getElementById('operator-preference');
-    if (operatorSelect) {
-        operatorSelect.value = profile.preferred_operator || 'any';
-    }
 
     if (IS_PARTNER_PORTAL && !currentUserIsPartner) {
         alert('Este portal é exclusivo para fornecedores com perfil parceiro activo.');
@@ -1931,9 +1858,20 @@ async function requestNumber(serviceId, serviceName, defaultPrice) {
         alert('Entre na sua conta para solicitar o número.');
         return;
     }
+    const { data: { session } } = await db.auth.getSession();
+    const sessionUserId = session?.user?.id || null;
+    if (!session || !sessionUserId) {
+        alert('Sessão expirada. Faça login novamente para solicitar números.');
+        await db.auth.signOut();
+        return;
+    }
+    if (currentUser.id !== sessionUserId) {
+        currentUser = session.user;
+    }
+
     const { data, error } = await callRpcSolicitarSmsV3ApenasQuatro(
         db,
-        currentUser.id,
+        sessionUserId,
         serviceId,
         serviceName,
         defaultPrice

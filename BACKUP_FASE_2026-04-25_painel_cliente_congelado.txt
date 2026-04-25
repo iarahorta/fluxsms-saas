@@ -17,3 +17,12 @@ Commit / tag de referência
 Próximo passo após deploy
 -------------------------
 - Recarregar admin, confirmar "Chips ON" ≈ número de linhas ON no .exe.
+
+Extensão de fase (25/04/2026 - hardening)
+-----------------------------------------
+- Escopo ampliado de forma controlada para estabilização global (sem alterar UX de compra base):
+  - correção de runtime de produção (502) para manter site operacional;
+  - correção SQL de compatibilidade (`c.updated_at` removido);
+  - endurecimento de estoque cliente para refletir hardware real (ONLINE + 3 min);
+  - rota de shutdown para derrubar OFFLINE por estação no desligamento.
+- Deploy web desta extensão: SUCCESS (`21d2006b-680d-4966-a49a-4007b302ca6e`).

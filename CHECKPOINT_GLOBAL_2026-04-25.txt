@@ -1,0 +1,108 @@
+CHECKPOINT GLOBAL — FLUXSMS (25/04/2026)
+=========================================
+
+Objetivo deste arquivo
+----------------------
+Guardar estado operacional completo para continuidade sem perda de contexto,
+com instruções simples para operação imediata (especialmente do EXE).
+
+Status atual (confirmado)
+-------------------------
+1) Site/Backend em produção (Railway): OK
+   - Deploy final em SUCCESS:
+     `249b13de-0a27-4160-b890-9aaa60aaa744`
+
+2) API do parceiro (teste real no PC da operação): OK
+   - /partner-api/health = 200
+   - /partner-api/worker/bootstrap = 200
+   - /partner-api/worker/chips = 200
+   - /partner-api/worker/activations = 200
+   Observação importante: nas chamadas de worker, enviar sempre `x-flux-hwid`.
+
+3) Estoque do cliente (modo real): OK
+   - Endpoint público ajustado para só contar chips ONLINE com ping em 3 minutos.
+   - Com HUB desligado, produção já retornou `chips_vivos=0`.
+
+4) Compra/FK do usuário: protegido
+   - Fluxo usa `auth.uid()` na RPC para vincular compra ao usuário logado.
+   - Evita erro `activations_user_id_fkey` por user_id inválido/nulo.
+
+5) NexusPag
+   - API key válida no ambiente Railway (respondeu em teste de autenticação).
+   - Se QR vier vazio, backend já loga resposta exata da Nexus para diagnóstico.
+
+
+O que foi corrigido nesta janela
+--------------------------------
+- 502 de host em produção resolvido (módulos/rotas/exports faltantes restaurados).
+- Correção de SQL com coluna inexistente (`c.updated_at`) removida.
+- Heartbeat cleaner com fallback seguro em coluna existente.
+- Endpoint de shutdown operacional (`/sms/shutdown`) para forçar OFFLINE por estação.
+- Bootstrap do worker corrigido para incluir `chave_acesso` no payload (evita null indevido).
+
+
+Passo a passo (leigo) para rodar o EXE AGORA
+--------------------------------------------
+1) Abrir o EXE FluxSMS Desktop.
+2) Preencher:
+   - E-mail: `pciara@gmail.com`
+   - Senha: `270797`
+   - Chave de integração (API): `flux_partner_6f1e1d762de4661bf1b0d8d68e4272f6d0a8341ee092e101`
+   - Backend: `https://fluxsms.com.br`
+   - Campo "Chave do parceiro (opcional)": pode deixar em branco.
+3) Clicar em "Entrar e iniciar bridge".
+4) Esperado: login sem timeout + monitor iniciando.
+5) Se falhar:
+   - Fechar e abrir o EXE novamente.
+   - Confirmar internet ativa.
+   - Confirmar que não há proxy corporativo bloqueando HTTPS.
+
+
+Checklist rápido de validação operacional
+-----------------------------------------
+- Login do EXE concluído?
+- Painel mostra chips carregando?
+- Heartbeat aparece nos logs do backend?
+- Site cliente mostra estoque coerente com HUB ligado/desligado?
+
+
+Pendência humana ainda necessária (Supabase SQL Editor)
+-------------------------------------------------------
+Para blindar 100% banco + PostgREST:
+1) Rodar `supabase/SQL_PASTE_CANONICAL_rpc_solicitar_v3_4args.sql`
+2) Rodar `supabase/migrations/026_activations_fk_integrity_hardening.sql`
+3) Rodar:
+   NOTIFY pgrst, 'reload schema';
+
+
+Regras de segurança operacional (não quebrar o que funciona)
+-------------------------------------------------------------
+- NÃO alterar a interface do EXE nesta fase.
+- NÃO mexer nas regras de split (60/13/13).
+- Qualquer mudança nova deve passar por build + deploy + validação de logs.
+
+
+Referências de backup da sessão
+-------------------------------
+- `backup cursor.txt` (atualizado com Ajuste 2.1.53)
+- `BACKUP_FIM_2026-04-25_noite.txt` (snapshot operacional da estabilização)
+- `ESTADO_PAINEL_E_NEXUS.txt` (estado corrente com próximos passos)
+- `BACKUP_FASE_2026-04-25_painel_cliente_congelado.txt` (fase e extensão de hardening)
+
+---
+Checkpoint adicional (25/04/2026 20:46 BRT)
+---
+- Testes reais do PC da Iara confirmaram:
+  - `partner-api/health` = 200
+  - `partner-api/worker/bootstrap` = 200
+  - `partner-api/worker/chips` = 200
+  - `partner-api/worker/activations` = 200
+- `hwid_mismatch` identificado e superado via novo pareamento de HWID.
+- Sintoma atual reportado: número sobe no painel cliente, SMS não aparece.
+- Diagnóstico técnico mais provável nesta fase:
+  - fluxo de entrega em `/sms/*` dependente de `HARDWARE_API_KEY`;
+  - teste manual em `/sms/mock` retornou `muitas_requisicoes` (rate limit), sinalizando que a rota respondeu e não houve 401 neste último teste.
+- Próximo passo operacional imediato:
+  1) aguardar janela do rate limit (60s),
+  2) repetir 1 teste de `/sms/mock`,
+  3) executar 1 compra real e validar transição `waiting -> received`.

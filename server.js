@@ -170,7 +170,7 @@ async function runHeartbeatCleaner() {
             .from('chips')
             .update({ status: 'offline' })
             .is('last_ping', null)
-            .lt('updated_at', thresholdIso)
+            .lt('created_at', thresholdIso)
             .neq('status', 'offline');
     } catch (_err) {
         // silencioso por requisito operacional

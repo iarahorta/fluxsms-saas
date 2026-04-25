@@ -22,3 +22,25 @@ Fase actual (2026-04-25)
 Próximo passo humano
 --------------------
 - Após pull/deploy: reabrir admin e comparar "Chips ON" com o .exe.
+
+Atualização (2026-04-25 13:10 BRT)
+----------------------------------
+- Produção estabilizada no Railway (último deploy SUCCESS): `21d2006b-680d-4966-a49a-4007b302ca6e`.
+- Erro 502 de host resolvido (módulos/rotas restaurados e exports de rate limit corrigidos).
+- Estoque cliente mudou para modo estrito operacional:
+  - só conta chips ONLINE com `last_ping <= 3 min`;
+  - endpoint validado em produção com HUB desligado: `chips_vivos=0`.
+- RPC de compra continua com segurança de usuário por sessão (`auth.uid()`) e sem uso de coluna inexistente (`c.updated_at` removido).
+- Novo endpoint de shutdown operacional adicionado: `POST /sms/shutdown` (força OFFLINE por `polo_key`).
+
+Nexus / PIX (status actual)
+---------------------------
+- Chave Nexus no Railway responde (teste de autenticação OK; retorno 400 de validação de payload inválido).
+- Se QR continuar vazio no front, usar logs do backend para inspecionar resposta exata da Nexus (já instrumentado em `lib/nexusPag.js`).
+
+Pendência humana crítica (Supabase SQL Editor)
+----------------------------------------------
+- Aplicar no projeto Supabase correto:
+  1) `supabase/SQL_PASTE_CANONICAL_rpc_solicitar_v3_4args.sql`
+  2) `supabase/migrations/026_activations_fk_integrity_hardening.sql`
+  3) `NOTIFY pgrst, 'reload schema';`

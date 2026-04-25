@@ -13,6 +13,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+    v_auth_user_id UUID := auth.uid();
+    v_effective_user_id UUID;
     v_balance NUMERIC;
     v_total_recharged NUMERIC;
     v_fidelity_level TEXT;
@@ -24,18 +26,32 @@ DECLARE
     v_service_key TEXT := lower(trim(p_service));
     v_phone_display TEXT;
 BEGIN
+    IF v_auth_user_id IS NULL AND p_user_id IS NULL THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'nao_autenticado');
+    END IF;
+
+    IF v_auth_user_id IS NOT NULL AND p_user_id IS NOT NULL AND v_auth_user_id <> p_user_id THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'user_mismatch');
+    END IF;
+
+    v_effective_user_id := COALESCE(v_auth_user_id, p_user_id);
+
     SELECT COALESCE(
-        (SELECT price FROM public.custom_prices WHERE user_id = p_user_id AND service = p_service),
+        (SELECT price FROM public.custom_prices WHERE user_id = v_effective_user_id AND service = p_service),
         p_default_price
     ) INTO v_base_price;
 
-    PERFORM public.rpc_refresh_fidelity_level(p_user_id);
+    PERFORM public.rpc_refresh_fidelity_level(v_effective_user_id);
 
     SELECT balance, COALESCE(total_recharged, 0), COALESCE(fidelity_level, 'BRONZE')
     INTO v_balance, v_total_recharged, v_fidelity_level
     FROM public.profiles
-    WHERE id = p_user_id
+    WHERE id = v_effective_user_id
     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('ok', false, 'error', 'usuario_invalido');
+    END IF;
 
     IF v_fidelity_level = 'DIAMANTE' THEN
         v_discount := 0.20;
@@ -84,13 +100,21 @@ BEGIN
                     AND act.status = 'received'
               ))
       )
-    ORDER BY (
-        SELECT count(*)
-        FROM public.activations a2
-        JOIN public.chips c2 ON a2.chip_id = c2.id
-        WHERE c2.polo_id = p.id
-          AND a2.status IN ('pending', 'waiting')
-    ) ASC, random()
+    ORDER BY
+        CASE WHEN lower(trim(c.status::text)) = 'idle' THEN 0 ELSE 1 END ASC,
+        CASE
+            WHEN lower(trim(c.status::text)) = 'idle' THEN COALESCE(c.disponivel_em, c.created_at)
+            ELSE NULL
+        END ASC NULLS LAST,
+        COALESCE(c.last_ping, p.ultima_comunicacao, to_timestamp(0)) DESC,
+        (
+            SELECT count(*)
+            FROM public.activations a2
+            JOIN public.chips c2 ON a2.chip_id = c2.id
+            WHERE c2.polo_id = p.id
+              AND a2.status IN ('pending', 'waiting')
+        ) ASC,
+        random()
     LIMIT 1
     FOR UPDATE SKIP LOCKED;
 
@@ -101,14 +125,14 @@ BEGIN
     v_phone_display := COALESCE(NULLIF(trim(v_chip.numero::text), ''), 'AGUARDANDO');
 
     UPDATE public.chips SET status = 'busy' WHERE id = v_chip.id;
-    UPDATE public.profiles SET balance = balance - v_final_price WHERE id = p_user_id;
+    UPDATE public.profiles SET balance = balance - v_final_price WHERE id = v_effective_user_id;
 
     INSERT INTO public.activations (user_id, chip_id, service, service_name, price, phone_number, status)
-    VALUES (p_user_id, v_chip.id, p_service, p_service_name, v_final_price, v_phone_display, 'waiting')
+    VALUES (v_effective_user_id, v_chip.id, p_service, p_service_name, v_final_price, v_phone_display, 'waiting')
     RETURNING id INTO v_activation_id;
 
     INSERT INTO public.transactions (user_id, activation_id, type, amount, description)
-    VALUES (p_user_id, v_activation_id, 'debit', v_final_price, 'SMS: ' || p_service_name);
+    VALUES (v_effective_user_id, v_activation_id, 'debit', v_final_price, 'SMS: ' || p_service_name);
 
     RETURN jsonb_build_object(
         'ok', true,
@@ -141,38 +165,8 @@ BEGIN
                 JOIN public.polos p ON c.polo_id = p.id
                 WHERE COALESCE(c.chip_service_off ->> lower(trim(s.id::text)), 'false') <> 'true'
                   AND (c.numero::text IS NULL OR c.numero::text NOT ILIKE 'CCID%')
-                  AND (
-                      (s.id = 'whatsapp'
-                          AND (
-                              lower(trim(c.status::text)) IN ('idle', 'on', 'online', 'active')
-                              OR (
-                                  lower(trim(c.status::text)) = 'offline'
-                                  AND (
-                                      c.last_ping > NOW() - INTERVAL '60 minutes'
-                                      OR p.ultima_comunicacao > NOW() - INTERVAL '60 minutes'
-                                  )
-                              )
-                          )
-                          AND (c.disponivel_em IS NULL OR c.disponivel_em <= NOW()))
-                      OR (s.id <> 'whatsapp'
-                          AND (
-                              lower(trim(c.status::text)) IN ('idle', 'quarentena', 'on', 'online', 'active')
-                              OR (
-                                  lower(trim(c.status::text)) = 'offline'
-                                  AND (
-                                      c.last_ping > NOW() - INTERVAL '60 minutes'
-                                      OR p.ultima_comunicacao > NOW() - INTERVAL '60 minutes'
-                                  )
-                              )
-                          )
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM public.activations a
-                              WHERE a.chip_id = c.id
-                                AND a.service = s.id
-                                AND a.status = 'received'
-                          ))
-                  )
+                  AND lower(trim(c.status::text)) = 'online'
+                  AND c.last_ping > NOW() - INTERVAL '3 minutes'
             ) AS n
         FROM (
             SELECT id FROM public.services_config
