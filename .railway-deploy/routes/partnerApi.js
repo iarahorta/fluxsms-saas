@@ -175,19 +175,13 @@ async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn, apiKeyId) {
     }
 
     const portaNorm = String(portaRaw).trim();
-    const { data: existingRows } = await supabase
+    const { data: existing } = await supabase
       .from('chips')
       .select('id, polo_id, porta, numero, registered_by_api_key_id')
       .in('polo_id', polos.map((p) => p.id))
       .ilike('porta', portaNorm)
-      .limit(20);
-
-    const existingList = Array.isArray(existingRows) ? existingRows : [];
-    const existing =
-      existingList.find((r) => r?.registered_by_api_key_id === apiKeyId) ||
-      existingList.find((r) => !r?.registered_by_api_key_id) ||
-      existingList[0] ||
-      null;
+      .limit(1)
+      .maybeSingle();
 
     if (existing?.registered_by_api_key_id && existing.registered_by_api_key_id !== apiKeyId) {
       return {

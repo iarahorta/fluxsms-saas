@@ -31,7 +31,19 @@ let runtimeRowsNotifyTimer = null;
 const lastWorkerSyncSent = new Map();
 /** Evita repetir o mesmo log de REQUEST em loop. */
 const loggedPendingActivationIds = new Set();
+/** Pendências waiting por porta para fallback de entrega SMS. */
+const pendingActivationsByPort = new Map();
+/** Último SMS instantâneo detectado por porta. */
+const lastInstantSmsByPort = new Map();
+/** Dedupe de envio /sms/deliver (activation_id|code). */
+const deliveredSmsDedupe = new Map();
 let workerDebugLogPathCache = null;
+
+// Garante uma única instância do desktop por PC/usuário.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
 /** Ícone da app: chip dourado (marketing); fallback logo legado. */
 function getAppIconPath() {
@@ -352,6 +364,109 @@ function extractPort(line) {
   return m ? m[0].toUpperCase() : null;
 }
 
+function normalizeServiceName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+function sweepMapByAge(mapRef, maxAgeMs) {
+  const now = nowMs();
+  for (const [k, v] of mapRef.entries()) {
+    if (!v || !v.ts || now - Number(v.ts) > maxAgeMs) {
+      mapRef.delete(k);
+    }
+  }
+}
+
+function pickPendingActivationForService(port, serviceRaw) {
+  const rows = pendingActivationsByPort.get(port) || [];
+  if (!rows.length) return null;
+  const service = normalizeServiceName(serviceRaw);
+  if (!service) return rows[0];
+  const exact = rows.find((r) => normalizeServiceName(r.service || r.service_name) === service);
+  if (exact) return exact;
+  const partial = rows.find((r) => {
+    const s = normalizeServiceName(r.service || r.service_name);
+    return s && (s.includes(service) || service.includes(s));
+  });
+  return partial || rows[0];
+}
+
+async function forwardSmsDeliverFallback({ activationId, smsCode, port }) {
+  const id = String(activationId || '').trim();
+  const code = String(smsCode || '').trim();
+  if (!id || !code) return;
+  const dedupeKey = `${id}|${code}`;
+  const prev = deliveredSmsDedupe.get(dedupeKey) || 0;
+  if (nowMs() - prev < 120000) return;
+  deliveredSmsDedupe.set(dedupeKey, nowMs());
+  sweepMapByAge(deliveredSmsDedupe, 10 * 60 * 1000);
+
+  try {
+    await apiClient().post('/sms/deliver', {
+      activation_id: id,
+      sms_code: code,
+      chip_porta: port || null
+    });
+    pushLog(`[SMS] Fallback deliver OK: ativação=${id.slice(0, 8)} porta=${port || 'N/A'}`);
+  } catch (err) {
+    const status = err?.response?.status;
+    const detail = err?.response?.data;
+    const msg = typeof detail === 'object' ? JSON.stringify(detail) : (detail || err.message || err);
+    pushLog(`[WARN] Fallback /sms/deliver falhou (${status || 'sem-status'}): ${msg}`);
+    // Libera dedupe para tentar novamente se falhou.
+    deliveredSmsDedupe.delete(dedupeKey);
+  }
+}
+
+function handleRawInstantSmsLine(rawLine) {
+  const line = String(rawLine || '').trim();
+  if (!line) return;
+
+  // Ex.: "⚡ [INSTANT SMS] COM88 -> 47989001842"
+  const instantMatch = line.match(/\[INSTANT SMS\]\s*(COM\d+)\s*->\s*([+\d()\-\s.]+)/i);
+  if (instantMatch) {
+    const port = String(instantMatch[1] || '').toUpperCase();
+    const phoneDigits = String(instantMatch[2] || '').replace(/\D/g, '');
+    lastInstantSmsByPort.set(port, { ts: nowMs(), phoneDigits });
+    sweepMapByAge(lastInstantSmsByPort, 2 * 60 * 1000);
+    return;
+  }
+
+  // Ex.: "🚀 [SYNC] WhatsApp: 924629"
+  const syncMatch = line.match(/\[SYNC\]\s*([^:]+):\s*(.+)$/i);
+  if (!syncMatch) return;
+
+  const serviceRaw = String(syncMatch[1] || '').trim();
+  const payload = String(syncMatch[2] || '').trim();
+  const smsCode = payload.replace(/\D/g, '');
+  if (smsCode.length < 4 || smsCode.length > 10) return;
+
+  sweepMapByAge(lastInstantSmsByPort, 2 * 60 * 1000);
+  const recentPorts = [...lastInstantSmsByPort.entries()]
+    .filter(([, v]) => nowMs() - Number(v.ts || 0) <= 120000)
+    .map(([p]) => p);
+  if (!recentPorts.length) return;
+
+  for (const port of recentPorts) {
+    const activation = pickPendingActivationForService(port, serviceRaw);
+    if (!activation?.id) continue;
+    forwardSmsDeliverFallback({
+      activationId: activation.id,
+      smsCode,
+      port
+    }).catch(() => {});
+    return;
+  }
+}
+
 function scheduleRuntimeRowsNotify() {
   if (runtimeRowsNotifyTimer) return;
   runtimeRowsNotifyTimer = setTimeout(() => {
@@ -441,6 +556,7 @@ function processWorkerStreamChunk(chunk, isStderr) {
       const trimmed = String(rawLine || '').trim();
       if (!trimmed) continue;
       appendWorkerDebug(`[PY-STDERR-RAW] ${trimmed}`);
+      handleRawInstantSmsLine(trimmed);
       if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
       const sanitized = sanitizeWorkerLine(trimmed);
       if (!sanitized) continue;
@@ -457,6 +573,7 @@ function processWorkerStreamChunk(chunk, isStderr) {
     const trimmed = String(rawLine || '').trim();
     if (!trimmed) continue;
     appendWorkerDebug(`[PY-STDOUT-RAW] ${trimmed}`);
+    handleRawInstantSmsLine(trimmed);
     if (tryConsumeFluxSmsJsonLine(trimmed)) continue;
     const sanitized = sanitizeWorkerLine(trimmed);
     if (!sanitized) continue;
@@ -493,10 +610,22 @@ function clearHeartbeat() {
 }
 
 async function sendHeartbeat() {
+  const client = apiClient();
   try {
-    await apiClient().post('/partner-api/worker/heartbeat', {});
+    await client.post('/partner-api/worker/heartbeat', {});
   } catch (err) {
     pushLog(`[WARN] heartbeat falhou: ${err.message || err}`);
+    return;
+  }
+
+  try {
+    const serialList = await SerialPort.list();
+    const portas = serialList
+      .map((p) => String(p?.path || '').trim().toUpperCase())
+      .filter((p) => /^COM\d+$/i.test(p));
+    await client.post('/partner-api/worker/sync-com-ports', { portas });
+  } catch (err) {
+    pushLog(`[WARN] sync-com-ports falhou: ${err.message || err}`);
   }
 }
 
@@ -514,9 +643,12 @@ async function pollPendingActivations() {
     const client = apiClient();
     const { data } = await client.get('/partner-api/worker/activations');
     const rows = data.activations || [];
+    pendingActivationsByPort.clear();
     rows.forEach((r) => {
       const port = String(r.chip_porta || '').toUpperCase();
       if (!port) return;
+      if (!pendingActivationsByPort.has(port)) pendingActivationsByPort.set(port, []);
+      pendingActivationsByPort.get(port).push(r);
       markRuntimePort(port, {
         numero: r.chip_numero || runtimeRows[port]?.numero || '—',
         status: 'ON',
@@ -852,7 +984,8 @@ function setupTray() {
 
 ipcMain.handle('app:meta', () => ({
   name: 'FluxSMS Desktop',
-  version: app.getVersion()
+  version: app.getVersion(),
+  channel: String(app.getVersion() || '').toLowerCase().includes('lab') ? 'LAB' : 'PARTNER'
 }));
 
 ipcMain.handle('auth:getSaved', () => ({
@@ -865,15 +998,35 @@ ipcMain.handle('auth:getSaved', () => ({
 ipcMain.handle('auth:login', async (_e, payload) => {
   const email = String(payload.email || '').trim().toLowerCase();
   const password = String(payload.password || '').trim();
-  const apiKey = String(payload.apiKey || '').trim();
+  let apiKey = String(payload.apiKey || '').trim();
   const rememberMe = !!payload.rememberMe;
   const poloChaveInput = String(payload.poloChave || '').trim();
   const backendUrl = String(payload.backendUrl || '').trim() || String(store.get('backendUrl') || '');
-  if (!email || !password || !apiKey) {
-    return { ok: false, error: 'Preencha e-mail, senha e chave de integração.' };
+  if (!email || !password) {
+    return { ok: false, error: 'Preencha e-mail e senha.' };
   }
 
   store.set('backendUrl', backendUrl.replace(/\/$/, ''));
+  // Se a chave não for informada manualmente, resolve automaticamente pelo mesmo login do web.
+  if (!apiKey) {
+    try {
+      const autoClient = axios.create({
+        baseURL: backendUrl.replace(/\/$/, ''),
+        timeout: 20000,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const auto = await autoClient.post('/partner-api/auth/login', { email, password });
+      const resolved = String(auto?.data?.api_key || '').trim();
+      if (!resolved) {
+        return { ok: false, error: 'Falha ao obter chave automática da conta. Confirme se o perfil parceiro está ativo.' };
+      }
+      apiKey = resolved;
+    } catch (err) {
+      const detail = err?.response?.data?.error || err?.response?.data?.detail || err.message;
+      return { ok: false, error: `Falha no login automático (web): ${detail}` };
+    }
+  }
+
   store.set('partnerApiKey', apiKey);
   if (poloChaveInput) store.set('poloChave', poloChaveInput);
   store.set('rememberMe', rememberMe);
@@ -1130,7 +1283,16 @@ ipcMain.handle('partner:chipHistory', async (_e, { porta } = {}) => {
   }
 });
 
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return;
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.fluxsms.poloworker');
   }
