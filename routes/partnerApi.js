@@ -137,7 +137,7 @@ async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn, apiKeyId) {
     const portaNorm = String(portaRaw).trim();
     const { data: existing } = await supabase
       .from('chips')
-      .select('id, polo_id, porta, registered_by_api_key_id')
+      .select('id, polo_id, porta, numero, registered_by_api_key_id')
       .in('polo_id', polos.map((p) => p.id))
       .ilike('porta', portaNorm)
       .limit(1)
@@ -154,10 +154,16 @@ async function upsertPartnerWorkerChip(supabase, partnerId, bodyIn, apiKeyId) {
       };
     }
 
+    const normalizedNumero =
+      numero != null && String(numero).trim()
+        ? String(numero).trim()
+        : (existing?.numero != null ? String(existing.numero).trim() : null);
+
     const row = {
       polo_id: existing?.polo_id || polo.id,
       porta: portaNorm,
-      numero: numero != null ? String(numero) : null,
+      // Não apagar número já conhecido quando o worker enviar sync sem número.
+      numero: normalizedNumero,
       operadora: operadora != null ? String(operadora) : null,
       status: 'idle',
       disponivel_em: null,
