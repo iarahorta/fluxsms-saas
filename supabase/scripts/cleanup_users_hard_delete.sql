@@ -12,14 +12,18 @@
 
 BEGIN;
 
-CREATE TEMP TABLE _flux_cleanup_user (id UUID PRIMARY KEY ON COMMIT DROP);
+CREATE TEMP TABLE _flux_cleanup_user (
+  id UUID PRIMARY KEY
+) ON COMMIT DROP;
 
 INSERT INTO _flux_cleanup_user (id) VALUES
   ('d50489f1-7e25-49ed-8f7a-843f527ea2b1'::uuid),
   ('4399466e-64d0-40ea-a946-84b94f6cac7b'::uuid),
   ('92eaf7c0-3f7e-4866-9ef7-4095393d9b56'::uuid);
 
-CREATE TEMP TABLE _flux_cleanup_partner (id UUID PRIMARY KEY ON COMMIT DROP);
+CREATE TEMP TABLE _flux_cleanup_partner (
+  id UUID PRIMARY KEY
+) ON COMMIT DROP;
 
 INSERT INTO _flux_cleanup_partner (id)
 SELECT pp.id
