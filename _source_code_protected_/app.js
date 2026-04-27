@@ -185,16 +185,15 @@ function ensureTawkWidgetVisible() {
     tawkVisibilitySyncStarted = true;
     const runOnce = () => {
         try {
-            if (window.Tawk_API && typeof window.Tawk_API.showWidget === 'function') {
-                window.Tawk_API.showWidget();
-            }
             if (window.Tawk_API && typeof window.Tawk_API.minimize === 'function') {
                 window.Tawk_API.minimize();
             }
         } catch (_e) { }
     };
     runOnce();
-    // Sem loop de "showWidget" para evitar autoabertura recorrente.
+    // Força recolhido também após restauração do estado do widget (alguns browsers reabrem sessões).
+    setTimeout(runOnce, 800);
+    setTimeout(runOnce, 2500);
     // O usuário abre manualmente clicando no balão quando quiser.
 }
 
