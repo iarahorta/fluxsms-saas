@@ -91,6 +91,16 @@ function rowClassForAct(status) {
   return 'act-pending';
 }
 
+function isClientUsableNumber(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return false;
+  // Cliente final deve enxergar apenas número real.
+  if (/^ccid:/i.test(raw)) return false;
+  if (/^(aguardando|ocupada|sem chip|null|—)$/i.test(raw)) return false;
+  const digits = raw.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 13;
+}
+
 function applyCcidTextToStatusEl(el, status) {
   if (!el) return;
   const n = Number(status?.ccidUserPairsCount || 0);
@@ -256,8 +266,9 @@ async function refreshModems() {
   try {
     const rows = await poloWorker.modemRows();
     const rowsOn = (rows || []).filter((r) => String(r.status || 'OFF').toUpperCase() === 'ON');
+    const rowsVisible = rowsOn.filter((r) => isClientUsableNumber(r.numero));
     modemTableBody.innerHTML = '';
-    rowsOn.forEach((r) => {
+    rowsVisible.forEach((r) => {
       const tr = document.createElement('tr');
       const on = String(r.status || 'OFF').toUpperCase() === 'ON';
       tr.className = on ? 'modem-row--on' : 'modem-row--off';
@@ -273,9 +284,9 @@ async function refreshModems() {
       tr.addEventListener('click', () => openNumberModal(r));
       modemTableBody.appendChild(tr);
     });
-    if (!rowsOn.length) {
+    if (!rowsVisible.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem ON no momento.</td>';
+      tr.innerHTML = '<td colspan="6" style="text-align:center;opacity:.7;">Nenhum modem ON com número válido no momento.</td>';
       modemTableBody.appendChild(tr);
     }
     lastSyncEl.textContent = `Última atualização: ${new Date().toLocaleTimeString('pt-BR')}`;
@@ -287,6 +298,7 @@ async function refreshModems() {
 async function openNumberModal(r) {
   if (!r || !r.porta) return;
   lastModalPorta = r.porta;
+  const hasValidNumber = String(r.numero || '').replace(/\D/g, '').length >= 8;
   if (numModalLed) {
     const on = String(r.status || 'OFF').toUpperCase() === 'ON';
     numModalLed.className = on ? 'led' : 'led led-off';
@@ -294,7 +306,8 @@ async function openNumberModal(r) {
   if (numModalHeadline) {
     const d = String(r.numero || '').replace(/\D/g, '');
     if (d.length >= 8) {
-      const n = d.startsWith('55') ? d : `55${d}`;
+      // Não truncar na apresentação: preserva número completo já sincronizado.
+      const n = d.startsWith('55') ? d : (d.length === 11 ? `55${d}` : d);
       numModalHeadline.textContent = `Brasil +${n}`;
     } else {
       numModalHeadline.textContent = 'Detalhe do modem';
@@ -313,6 +326,15 @@ async function openNumberModal(r) {
   if (actErr) { actErr.style.display = 'none'; actErr.textContent = ''; }
   if (numModalBackdrop) {
     numModalBackdrop.classList.add('open');
+  }
+
+  if (!hasValidNumber) {
+    if (actTbody) {
+      actTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.75">Sem número detectado neste modem. Ativações só são exibidas quando houver número válido.</td></tr>';
+    }
+    if (actCount) actCount.textContent = 'Vendas / ativações (0)';
+    if (actErr) { actErr.style.display = 'none'; actErr.textContent = ''; }
+    return;
   }
 
   try {
@@ -526,8 +548,15 @@ async function boot() {
   try {
     const meta = await poloWorker.appMeta();
     const v = meta && meta.version ? String(meta.version) : '—';
-    if (appVersionLabel) appVersionLabel.textContent = `v${v}`;
-    document.title = `FluxSMS Desktop v${v}`;
+    const channel = String(meta && meta.channel ? meta.channel : '').toUpperCase();
+    const isLab = channel === 'LAB' || v.toLowerCase().includes('lab');
+    if (appVersionLabel) appVersionLabel.textContent = isLab ? `v${v} [LAB]` : `v${v}`;
+    document.title = isLab ? `FluxSMS Desktop LAB v${v}` : `FluxSMS Desktop v${v}`;
+    const brand = document.querySelector('.brand-line1');
+    if (brand && isLab && !brand.textContent.includes('LAB')) {
+      brand.textContent = `FLUXSMS DESKTOP LAB `;
+      if (appVersionLabel) brand.appendChild(appVersionLabel);
+    }
   } catch {
     if (appVersionLabel) appVersionLabel.textContent = 'v?';
   }

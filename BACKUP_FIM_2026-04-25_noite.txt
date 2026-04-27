@@ -41,3 +41,153 @@ Checkpoint redundante (25/04/2026 20:48 BRT)
   1) repetir teste após 60s (janela do rate limit),
   2) executar compra real,
   3) confirmar ciclo completo `waiting -> received`.
+
+---
+Atualização operacional (25/04/2026 22:03 BRT)
+---
+- Deploy de hotfix concluído em produção (Railway) com foco em SMS e UX do painel:
+  - autenticação híbrida nas rotas `/sms/*`:
+    - aceita `HARDWARE_API_KEY` (legado) **ou** chave de parceiro ativa (`partner_api_keys`).
+  - reduz falhas de entrega por 401 em cenários de core/terceiro.
+- Painel cliente:
+  - sanitização da exibição de código (`unscrambleSMS`) para evitar caracteres estranhos;
+  - fallback de refresh de sessões ativas a cada 10s, além do realtime.
+- Evidência de campo:
+  - worker sem 429 em `/partner-api/worker/chips|activations`;
+  - pedido recente ficou `waiting` com chip/número corretos;
+  - quando `/sms/deliver` chega, ativação muda para `received` normalmente.
+
+---
+BACKUP URGENTE (25/04/2026 22:25 BRT)
+---
+- Registro de segurança feito por solicitação direta da operação, antes de novas ações.
+- Estado congelado neste instante:
+  - compra abre ativação e número aparece no painel;
+  - gargalo intermitente permanece no envio do evento de entrega (`POST /sms/deliver`) pelo core.
+- Itens preservados no estado:
+  - autenticação híbrida em `/sms/deliver`, `/sms/mock`, `/sms/shutdown`;
+  - lock de instância única no desktop para evitar disputa de COM;
+  - regra de chip sem número válido -> `offline` para não contaminar venda.
+- Restrição operacional confirmada:
+  - qualquer build "laboratório.exe" deve permanecer exclusiva da operação interna,
+    sem distribuição para parceiros.
+- Continuidade planejada após este backup:
+  1) monitorar logs locais do core no PC ativo,
+  2) confirmar se SMS chega ao modem e onde quebra o forward,
+  3) validar ciclo final `waiting -> received` no painel web.
+
+---
+Atualização operacional (25/04/2026 23:36 BRT)
+---
+- Estado final desta etapa: painel voltou a mostrar SMS entregue com sucesso.
+- Evidência de log:
+  - `INSTANT SMS` detectado no modem;
+  - `[CLOUD] SMS entregue para ativação ...`;
+  - painel refletiu `received`.
+- Publicação oficial:
+  - `https://fluxsms.com.br/download/FluxSMS.0.5.6.exe` = 200 OK;
+  - `desktop-update.json` mantém `version=0.5.6` e URL oficial.
+- Curadoria de releases:
+  - removidos executáveis antigos/ruins da pasta `public/download`;
+  - removidos artefatos LAB problemáticos;
+  - base produtiva preservada no binário 0.5.6 validado.
+
+---
+Fechamento da noite (26/04/2026 00:08 BRT)
+---
+- Backup final atualizado para retomada limpa amanhã.
+- Estado confirmado no fechamento:
+  - entrega SMS operacional no painel;
+  - release oficial travada em `0.5.6` validado.
+- Item planejado para amanhã:
+  - implementar controle rígido por API key:
+    - 1 chave = 1 PC ativo;
+    - novo login com mesma chave deve desconectar a sessão anterior automaticamente.
+
+---
+Atualização operacional (26/04/2026 13:07 BRT)
+---
+- Publicação web corrigida para parceiros:
+  - botão `BAIXAR FLUXSMS DESKTOP` no site voltou para `FluxSMS.0.5.6.exe` (removida referência incorreta a 0.5.9).
+- Validações em produção concluídas:
+  - `https://fluxsms.com.br/` contém `FluxSMS.0.5.6.exe` no link do parceiro.
+  - `https://fluxsms.com.br/download/FluxSMS.0.5.6.exe` retorna 200 (HEAD).
+  - teste de início de download via range retornou 206 com bytes (download funcional).
+- `desktop-update.json` permanece coerente:
+  - `version: 0.5.6`
+  - URL oficial: `https://fluxsms.com.br/download/FluxSMS.0.5.6.exe`
+
+---
+Atualização operacional (26/04/2026 13:08 BRT)
+---
+- Nova rota publicada: `POST /partner-api/auth/login`
+  - objetivo: permitir login no desktop com o mesmo e-mail/senha do web, sem depender de colar API key manualmente.
+  - retorno: `api_key` ativa da conta parceira (ou emissão automática quando necessário).
+- Diagnóstico no terminal agora pode ser feito apenas com e-mail/senha + HWID local.
+
+---
+Atualização operacional (26/04/2026 14:17 BRT)
+---
+- Reset limpo aplicado no usuário parceiro `ju@gmail.com` para subida operacional em outro PC:
+  - senha temporária regenerada via `auth.admin.updateUserById`.
+  - API key rotacionada (chaves anteriores desativadas) via `rotatePartnerApiKey`.
+  - novo vínculo de HWID será feito automaticamente no primeiro login válido do novo PC.
+- Observação de segurança:
+  - credenciais temporárias completas entregues apenas no chat operacional (não gravadas em ficheiro de backup).
+
+---
+Atualização operacional (26/04/2026 14:26 BRT)
+---
+- Diagnóstico fechado no PC remoto (produção):
+  - `LOGIN_OK=True`, porém `HEALTH/BOOT/CHIPS` retornaram `hwid_mismatch`.
+  - causa: API key nova estava vinculada a outro HWID no momento do teste.
+- Ação aplicada imediatamente:
+  - reset de `bound_hwid` da API key ativa no banco (`partner_api_keys`) para novo pareamento limpo.
+  - próximo login válido nesse PC passa a gravar o HWID atual automaticamente.
+
+---
+Atualização operacional (26/04/2026 14:30 BRT)
+---
+- Causa raiz confirmada:
+  - outra instância a usar a mesma conta/chave estava a reaplicar vínculo de HWID antes do login no PC operacional.
+- Mitigação aplicada para operação imediata:
+  - emitida nova API key dedicada ao PC operacional.
+  - chave já vinculada manualmente ao HWID alvo `03000200-0400-0500-0006-000700080009`.
+  - validação remota concluída com `200` em `/partner-api/health` e `/partner-api/worker/bootstrap`.
+
+---
+Atualização operacional (26/04/2026 14:34 BRT)
+---
+- Mitigação forte para eliminar `hwid_mismatch` recorrente:
+  - todas as chaves ativas antigas da conta `ju@gmail.com` foram desativadas.
+  - emitida nova chave exclusiva de operação (rótulo `OPERACAO-PC1-EXCLUSIVA`).
+  - `bound_hwid` da nova chave iniciado em `null` para primeiro bind limpo no PC operacional.
+- Resultado esperado:
+  - ao autenticar no EXE com a nova chave, o backend grava o HWID desse PC e bloqueia outros PCs automaticamente.
+
+---
+Atualização operacional (26/04/2026 20:46 BRT)
+---
+- Objetivo concluído: operação sem precisar abrir PowerShell para cliente final.
+- Causa raiz confirmada no build anterior:
+  - EXE instalado trazia `core-v7.1` incompleto (faltavam `state.py` e pasta `modems`), apesar de `main.py` existir.
+  - efeito: `main.py` iniciava no EXE e quebrava com `ModuleNotFoundError: state`.
+- Correções aplicadas:
+  1) Build/runtime:
+     - `polo-worker-draft/scripts/prepare-core-runtime.js` agora valida core completo (`main.py`, `state.py`, `modems/detection.py`);
+     - fallback automático para fonte completa `FluxSMS_Worker_V7_1_FIX` quando `core-v7.1` local estiver incompleto;
+     - EXE rebuilt com core completo embutido.
+  2) Desktop main:
+     - `polo-worker-draft/src/main.js` mantém entrada preferencial em `main.py` (evita `Bad magic number` com `.pyc` de versão diferente).
+  3) Front (somente UI, backend preservado):
+     - `polo-worker-draft/src/renderer.js` ajustado para abrir histórico de ativações **somente** quando o chip tiver número válido;
+     - chips sem número exibem mensagem de “sem número detectado” e não puxam venda por porta.
+- Evidência operacional:
+  - varredura completa com 14 portas, 12 números válidos e 2 entradas CCID (conforme regra do core);
+  - endpoint `/partner-api/worker/chips` retornando chips `online` com números consistentes nas portas válidas;
+  - problema de “venda sem número” mitigado no front do desktop.
+- Artefato entregue para instalação:
+  - `C:\Users\user\Desktop\FluxSMS.0.5.6-lab1-CLIENTE-FINAL-FIX.exe`
+- Recomendação de rollout:
+  - substituir instalação no PC cliente por este EXE;
+  - validar apenas via app (sem scripts manuais) após login.

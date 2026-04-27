@@ -239,11 +239,21 @@ function enrichNumeroFromCoreLogLine(line) {
     if (mm && mm[1]) {
       const digits = String(mm[1]).replace(/\D/g, '');
       if (digits.length >= 8) {
-        markRuntimePort(port, { numero: digits, status: 'ON' });
+        // Isto vem do mesmo `log()` do core Python; é fonte canónica (Claro/phonebook, TIM/USSD, tabela).
+        const best = normalizeOriginalCoreNumber(digits) || digits;
+        markRuntimePort(port, { numero: best, status: 'ON' });
+        forwardWorkerChipSyncToApi({
+          port,
+          number: best,
+          operadora: runtimeRows[port]?.operadora || null
+        }).catch(() => { });
         return;
       }
     }
   }
+  // Importante: NÃO usar +CNUM bruto como fonte primária.
+  // Mantemos alinhado ao main.py original:
+  // Claro -> phone book; TIM -> USSD; Arqia/outros -> tabela CCID.
   if (/CCID:\s*([0-9A-Fa-f]+)/i.test(line)) {
     const m = String(line).match(/CCID:\s*([0-9A-Fa-f]+)/i);
     if (m) {
@@ -251,7 +261,15 @@ function enrichNumeroFromCoreLogLine(line) {
       const phone = findPhoneInCcidMap(map, m[1]);
       if (phone) {
         const d = String(phone).replace(/\D/g, '');
-        if (d.length >= 8) markRuntimePort(port, { numero: d, status: 'ON' });
+        if (d.length >= 8) {
+          const best = pickBestPhone(runtimeRows[port]?.numero, d);
+          markRuntimePort(port, { numero: best || d, status: 'ON' });
+          forwardWorkerChipSyncToApi({
+            port,
+            number: best || d,
+            operadora: runtimeRows[port]?.operadora || null
+          }).catch(() => { });
+        }
       }
     }
   }
@@ -374,6 +392,42 @@ function normalizeServiceName(value) {
 
 function nowMs() {
   return Date.now();
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function onlyDigits(value) {
+  return String(value == null ? '' : value).replace(/\D/g, '');
+}
+
+/**
+ * Alinha a `modems/detection.py` (`_extrair_numero_phonebook` / Uso em sync):
+ * só aceita 10–11 dígitos nacionais após regras 55/0.
+ */
+function normalizeOriginalCoreNumber(value) {
+  let d = onlyDigits(value);
+  if (!d) return '';
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+  if (d.startsWith('0') && d.length === 12) d = d.slice(1);
+  if (d.length >= 10 && d.length <= 11) return d;
+  return '';
+}
+
+/**
+ * Nunca devolver o *mais curto* quando um valor é prefixo do outro — isso cortava
+ * o último dígito (ex. 10 vs 11 no mesmo MSISDN). Se um estende o outro, preferir o mais longo.
+ */
+function pickBestPhone(currentValue, incomingValue) {
+  const cur = normalizeOriginalCoreNumber(currentValue);
+  const inc = normalizeOriginalCoreNumber(incomingValue);
+  if (!inc || inc.length < 8) return cur || '';
+  if (!cur || cur.length < 8) return inc;
+  if (inc === cur) return inc;
+  if (inc.startsWith(cur) && inc.length > cur.length) return inc;
+  if (cur.startsWith(inc) && cur.length > inc.length) return cur;
+  return inc.length >= cur.length ? inc : cur;
 }
 
 function sweepMapByAge(mapRef, maxAgeMs) {
@@ -510,15 +564,16 @@ function tryConsumeFluxSmsJsonLine(trimmed) {
   const numRaw = obj.number != null ? String(obj.number) : String(obj.numero || '');
   const digits = numRaw.replace(/\D/g, '');
   const operadora = obj.operadora != null ? String(obj.operadora) : String(obj.operator || '');
-  console.log('[DEBUG] Recebi do Python:', JSON.stringify({ port, number: digits, operadora }));
+  const bestDigits = pickBestPhone(runtimeRows[port]?.numero, digits) || normalizeOriginalCoreNumber(digits) || digits;
+  console.log('[DEBUG] Recebi do Python:', JSON.stringify({ port, number: bestDigits, operadora }));
   if (port) {
     markRuntimePort(port, {
-      numero: digits.length >= 8 ? digits : runtimeRows[port]?.numero || '—',
+      numero: bestDigits.length >= 8 ? bestDigits : runtimeRows[port]?.numero || '—',
       operadora: operadora || runtimeRows[port]?.operadora || '—',
       status: 'ON'
     });
   }
-  forwardWorkerChipSyncToApi({ port, number: digits, operadora }).catch(() => {});
+  forwardWorkerChipSyncToApi({ port, number: bestDigits, operadora }).catch(() => {});
   return true;
 }
 
@@ -542,7 +597,29 @@ async function forwardWorkerChipSyncToApi({ port, number, operadora }) {
   } catch (err) {
     const st = err.response?.status;
     const detail = err.response?.data || err.message;
-    console.warn('[DEBUG] worker/sync falhou:', st, typeof detail === 'object' ? JSON.stringify(detail) : detail);
+    const detailText = typeof detail === 'object' ? JSON.stringify(detail) : String(detail || '');
+    if (st === 429 || /muitas_requisicoes|too many requests/i.test(detailText)) {
+      let waitMs = 65000;
+      const retryAfterRaw = err.response?.data?.retry_after;
+      const secMatch = String(retryAfterRaw || '').match(/(\d+)\s*s/i);
+      if (secMatch && secMatch[1]) {
+        waitMs = (Number(secMatch[1]) || 60) * 1000 + 2000;
+      }
+      pushLog(`[WARN] worker/sync 429 para ${port}; retry em ${Math.round(waitMs / 1000)}s.`);
+      await sleep(waitMs);
+      try {
+        await apiClient().post('/partner-api/worker/sync', body);
+        pushLog(`[SYSTEM] worker/sync retry OK (${port}).`);
+        return;
+      } catch (err2) {
+        const st2 = err2.response?.status;
+        const detail2 = err2.response?.data || err2.message;
+        console.warn('[DEBUG] worker/sync retry falhou:', st2, typeof detail2 === 'object' ? JSON.stringify(detail2) : detail2);
+        pushLog(`[WARN] worker/sync retry ${st2 || ''}: ${err2.message || err2}`);
+        return;
+      }
+    }
+    console.warn('[DEBUG] worker/sync falhou:', st, detailText);
     pushLog(`[WARN] worker/sync ${st || ''}: ${err.message || err}`);
   }
 }
@@ -720,7 +797,8 @@ function startWorker() {
   } catch (err) {
     pushLog(`[WARN] ccid_numeros sync: ${err.message || err}`);
   }
-  const workerEntry = fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py';
+  // Preferir main.py: o .pyc exige a mesma versão de Python (Bad magic number entre PCs).
+  const workerEntry = fs.existsSync(mainPy) ? 'main.py' : (fs.existsSync(mainPyc) ? 'main.pyc' : 'main.py');
   try {
     const env = buildWorkerEnv();
     appendWorkerDebug('[BOOT] ------------------------------');
@@ -1164,7 +1242,7 @@ ipcMain.handle('partner:modems', async () => {
           lastActivationAt: a.created_at || null
         };
       }
-      map[port].numero = a.chip_numero || map[port].numero;
+      map[port].numero = pickBestPhone(map[port].numero, a.chip_numero) || map[port].numero;
       map[port].status = 'ON';
       // Endpoint /worker/activations retorna waiting; não somar lucro aqui.
       map[port].profit = Number(map[port].profit || 0);
@@ -1196,9 +1274,7 @@ ipcMain.handle('partner:modems', async () => {
         if (rawNum && rawNum !== '—') {
           const digits = rawNum.replace(/\D/g, '');
           if (digits.length >= 8) {
-            if (map[port].numero === '—' || !map[port].numero) {
-              map[port].numero = digits;
-            }
+            map[port].numero = pickBestPhone(map[port].numero, digits) || map[port].numero;
             map[port].status = 'ON';
           }
         }
