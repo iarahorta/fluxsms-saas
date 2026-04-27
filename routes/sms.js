@@ -41,6 +41,20 @@ async function isAuthorizedSmsSender(supabase, req) {
     if (error || !data) return false;
     if (Object.prototype.hasOwnProperty.call(data, 'is_active') && data.is_active === false) return false;
     if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return false;
+    if (data.status && String(data.status).toUpperCase() !== 'ACTIVE') return false;
+    if (data.id) return true;
+
+    // Fallback legado: chave em texto puro.
+    const legacyPlain = await supabase
+        .from('partner_api_keys')
+        .select('id, expires_at, status, is_active')
+        .eq('api_key', apiKey)
+        .maybeSingle();
+    if (legacyPlain.error || !legacyPlain.data) return false;
+    const row = legacyPlain.data;
+    if (Object.prototype.hasOwnProperty.call(row, 'is_active') && row.is_active === false) return false;
+    if (row.status && String(row.status).toUpperCase() !== 'ACTIVE') return false;
+    if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return false;
     return true;
 }
 
