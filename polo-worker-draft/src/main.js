@@ -1010,16 +1010,6 @@ function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    const key = String(input.key || '').toUpperCase();
-    const blocked = key === 'F12' ||
-      ((input.control || input.meta) && input.shift && ['I', 'J', 'C'].includes(key)) ||
-      ((input.control || input.meta) && key === 'U');
-    if (blocked) {
-      event.preventDefault();
-    }
-  });
-  mainWindow.webContents.on('context-menu', (e) => e.preventDefault());
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
@@ -1076,7 +1066,7 @@ ipcMain.handle('auth:getSaved', () => ({
 ipcMain.handle('auth:login', async (_e, payload) => {
   const email = String(payload.email || '').trim().toLowerCase();
   const password = String(payload.password || '').trim();
-  let apiKey = String(payload.apiKey || '').trim();
+  let apiKey = '';
   const rememberMe = !!payload.rememberMe;
   const poloChaveInput = String(payload.poloChave || '').trim();
   const backendUrl = String(payload.backendUrl || '').trim() || String(store.get('backendUrl') || '');
@@ -1085,24 +1075,23 @@ ipcMain.handle('auth:login', async (_e, payload) => {
   }
 
   store.set('backendUrl', backendUrl.replace(/\/$/, ''));
-  // Se a chave não for informada manualmente, resolve automaticamente pelo mesmo login do web.
-  if (!apiKey) {
-    try {
-      const autoClient = axios.create({
-        baseURL: backendUrl.replace(/\/$/, ''),
-        timeout: 20000,
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const auto = await autoClient.post('/partner-api/auth/login', { email, password });
-      const resolved = String(auto?.data?.api_key || '').trim();
-      if (!resolved) {
-        return { ok: false, error: 'Falha ao obter chave automática da conta. Confirme se o perfil parceiro está ativo.' };
-      }
-      apiKey = resolved;
-    } catch (err) {
-      const detail = err?.response?.data?.error || err?.response?.data?.detail || err.message;
-      return { ok: false, error: `Falha no login automático (web): ${detail}` };
+  // Sempre renovar a chave no servidor quando há e-mail+senha (ignora chave antiga no formulário / Remember me).
+  // Caso contrário, uma chave revogada ou pré-hash antiga no campo fazia saltar o login automático e gerava api_key_invalid.
+  try {
+    const autoClient = axios.create({
+      baseURL: backendUrl.replace(/\/$/, ''),
+      timeout: 20000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const auto = await autoClient.post('/partner-api/auth/login', { email, password });
+    const resolved = String(auto?.data?.api_key || '').trim();
+    if (!resolved) {
+      return { ok: false, error: 'Falha ao obter chave automática da conta. Confirme se o perfil parceiro está ativo.' };
     }
+    apiKey = resolved;
+  } catch (err) {
+    const detail = err?.response?.data?.error || err?.response?.data?.detail || err.message;
+    return { ok: false, error: `Falha no login automático (web): ${detail}` };
   }
 
   store.set('partnerApiKey', apiKey);

@@ -480,6 +480,12 @@ document.getElementById('btn-login').addEventListener('click', async () => {
     return;
   }
   msg.textContent = '';
+  try {
+    const savedAfter = await poloWorker.authGetSaved();
+    document.getElementById('login-api-key').value = savedAfter.apiKey || '';
+  } catch {
+    /* ignore */
+  }
   await startDashboard();
 });
 
