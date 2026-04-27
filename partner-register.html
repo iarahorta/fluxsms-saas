@@ -7,7 +7,6 @@
     <title>FluxSMS | Cadastro de Parceiro</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --bg: #0a0a0a;
@@ -165,138 +164,42 @@
 <body>
     <div class="hero-partner">
         <div class="hero-badge">Parceiro · Infraestrutura</div>
-        <h1>Cadastro <span>autónomo</span> de parceiro FluxSMS</h1>
-        <p class="hero-lead">Crie a sua conta, ative o perfil parceiro e aceda ao painel: chave de integração, FluxSMS Desktop e
-            repasses — sem depender de e-mail manual da equipa.</p>
+        <h1>Cadastro de parceiro <span>FluxSMS</span></h1>
+        <p class="hero-lead">O cadastro público de fornecedores está temporariamente indisponível. Novos acessos são criados internamente pela equipa até abrirmos o programa de parceiros de forma pública.</p>
 
         <div class="card-register">
-            <form id="form-partner-reg" onsubmit="return false;">
-                <label for="pr-name">Nome completo</label>
-                <input id="pr-name" type="text" required autocomplete="name" placeholder="Ex.: João Silva">
-
-                <label for="pr-email">E-mail</label>
-                <input id="pr-email" type="email" required autocomplete="email" placeholder="seu@email.com">
-
-                <label for="pr-whatsapp">WhatsApp (com DDD)</label>
-                <input id="pr-whatsapp" type="text" required autocomplete="tel" placeholder="(11) 99999-9999">
-
-                <label for="pr-pass">Senha</label>
-                <input id="pr-pass" type="password" required minlength="6" autocomplete="new-password"
-                    placeholder="Mínimo 6 caracteres">
-
-                <button type="button" class="btn-hero" id="pr-submit">Criar conta e ativar parceiro</button>
-                <div class="msg" id="pr-msg"></div>
-            </form>
+            <div style="text-align:center;padding:8px 0 4px;">
+                <div class="hero-badge" style="display:inline-block;margin-bottom:18px;">Em breve</div>
+                <p style="margin:0 0 20px;line-height:1.6;color:rgba(255,255,255,0.72);font-size:0.95rem;">
+                    Para pedir acesso ou suporte técnico, utilize o e-mail abaixo. Se já tiver conta, volte ao login do portal.
+                </p>
+                <a class="btn-hero" id="pr-login-portal" href="/portal/login" style="display:block;width:100%;text-align:center;text-decoration:none;box-sizing:border-box;">Voltar ao login</a>
+                <div class="msg" id="pr-msg" style="margin-top:18px;"></div>
+            </div>
         </div>
 
         <div class="footer-links">
-            <a id="pr-login-portal" href="/portal/login">Já tenho conta — entrar</a>
+            <a id="pr-login-footer" href="/portal/login">Já tenho conta — entrar</a>
             <a href="/termos/">Termos</a>
             <div style="margin-top:10px; font-size:11px; opacity:0.75;">Suporte: <a href="mailto:suporte@fluxsms.com.br">suporte@fluxsms.com.br</a></div>
         </div>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://ewwhywbwtqwtuujemtfk.supabase.co';
-        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3d2h5d2J3dHF3dHV1amVtdGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTAzMjYsImV4cCI6MjA5MTY2NjMyNn0.pgv9mkWHlq6wam7-BrN-zmlNDgyf-sDFTc1KT8IjvuU';
-
-        const BACKEND_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:')
-            ? window.location.origin
-            : 'https://fluxsms-staging-production.up.railway.app';
-
-        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-        const msgEl = document.getElementById('pr-msg');
-        const btn = document.getElementById('pr-submit');
-
-        function fluxPartnerPortalBase() {
-            var h = location.hostname;
-            if (location.pathname.startsWith('/portal')) return location.origin + '/portal';
-            if (/railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1') {
-                return location.origin;
-            }
-            return 'https://fluxsms.com.br/portal';
-        }
         function fluxPartnerLoginUrl() {
-            return fluxPartnerPortalBase() + '/login';
+            if (location.pathname.startsWith('/portal')) return location.origin + '/portal/login';
+            if (/railway\.app$/i.test(h) || h === 'localhost' || h === '127.0.0.1') {
+                return location.origin + '/portal/login';
+            }
+            return 'https://fluxsms.com.br/portal/login';
         }
         (function () {
-            var a = document.getElementById('pr-login-portal');
-            if (a) a.setAttribute('href', fluxPartnerLoginUrl());
-        })();
-
-        function setMsg(text, ok) {
-            msgEl.textContent = text || '';
-            msgEl.className = 'msg' + (ok ? ' ok' : '');
-        }
-
-        function normalizeWhatsapp(value) {
-            const digits = String(value || '').replace(/\D/g, '');
-            if (digits.length < 10 || digits.length > 13) return '';
-            if (digits.startsWith('55')) return '+' + digits;
-            return '+55' + digits;
-        }
-
-        async function activatePartner(accessToken) {
-            const res = await fetch(BACKEND_URL + '/api/partner/onboarding/activate', {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: '{}'
+            var u = fluxPartnerLoginUrl();
+            ['pr-login-portal', 'pr-login-footer'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.setAttribute('href', u);
             });
-            const j = await res.json().catch(function () { return {}; });
-            if (!res.ok || !j.ok) {
-                throw new Error(j.detail || j.error || res.statusText);
-            }
-            return j;
-        }
-
-        btn.addEventListener('click', async function () {
-            const name = document.getElementById('pr-name').value.trim();
-            const email = document.getElementById('pr-email').value.trim();
-            const whatsapp = normalizeWhatsapp(document.getElementById('pr-whatsapp').value);
-            const password = document.getElementById('pr-pass').value;
-            if (!name || !email || !password || !whatsapp) {
-                setMsg('Preencha todos os campos, incluindo WhatsApp com DDD.');
-                return;
-            }
-            btn.disabled = true;
-            setMsg('A criar conta…', true);
-            try {
-                const { data, error } = await db.auth.signUp({
-                    email: email,
-                    password: password,
-                    options: { data: { full_name: name, whatsapp: whatsapp } }
-                });
-                if (error) throw error;
-
-                let session = data.session;
-                if (!session && data.user) {
-                    setMsg('Se o projeto exigir confirmação de e-mail, abra o link enviado e depois entre no portal de parceiros em ' + fluxPartnerLoginUrl() + '. A tentar login imediato…');
-                    const login = await db.auth.signInWithPassword({ email: email, password: password });
-                    if (login.error) throw login.error;
-                    session = login.data.session;
-                }
-                if (!session) {
-                    throw new Error('Sem sessão após registo. Confirme o e-mail se solicitado e volte a entrar.');
-                }
-
-                await db.from('profiles').update({ whatsapp: whatsapp }).eq('id', session.user.id);
-
-                setMsg('A ativar perfil parceiro…', true);
-                const act = await activatePartner(session.access_token);
-                if (act.api_key) {
-                    window.prompt('COPIE AGORA a sua chave de integração (única; guarde em local seguro). Use no FluxSMS Desktop com a chave do parceiro do painel:', act.api_key);
-                }
-                setMsg('Conta pronta. A redirecionar para o painel…', true);
-                window.location.href = fluxPartnerPortalBase() + '/';
-            } catch (e) {
-                setMsg(e.message || String(e));
-            } finally {
-                btn.disabled = false;
-            }
-        });
+        })();
     </script>
 </body>
 

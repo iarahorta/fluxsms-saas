@@ -166,7 +166,7 @@
             </div>
         </div>
         <div class="actions">
-            <a class="btn btn-primary" href="/portal/register">Cadastrar</a>
+            <a class="btn btn-primary" href="#" id="pl-register-landing" role="button">Cadastrar</a>
             <a class="btn btn-secondary" id="pl-portal-login" href="https://fluxsms.com.br/portal/login">Fazer login</a>
         </div>
         <p class="footnote">Programa destinado a operadores de infraestrutura (estações e chips). Não inclui compra de números virtuais para consumo próprio — após o login, o painel mostra apenas infraestrutura e financeiro.</p>
@@ -178,6 +178,13 @@
             var portal = isLab ? location.origin : 'https://fluxsms.com.br';
             var el = document.getElementById('pl-portal-login');
             if (el) el.setAttribute('href', portal + '/portal/login');
+            var reg = document.getElementById('pl-register-landing');
+            if (reg) {
+                reg.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    window.alert('Em breve.\n\nO cadastro publico de fornecedores esta fechado. Para acesso, contacte suporte@fluxsms.com.br.');
+                });
+            }
         })();
     </script>
 </body>

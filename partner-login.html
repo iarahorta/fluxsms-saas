@@ -99,7 +99,7 @@
             <div class="msg" id="pl-msg"></div>
         </form>
         <div class="foot">
-            <a id="pl-register" href="/partner/register">Primeiro acesso — cadastrar fornecedor</a>
+            <a id="pl-register" href="#">Primeiro acesso — cadastrar fornecedor</a>
             <div style="margin-top:10px; font-size:11px; opacity:0.75;">Suporte: <a href="mailto:suporte@fluxsms.com.br">suporte@fluxsms.com.br</a></div>
         </div>
     </div>
@@ -111,8 +111,10 @@
         const btn = document.getElementById('pl-btn');
         const isPortalFallback = location.pathname.startsWith('/portal/');
         const portalHomePath = isPortalFallback ? '/portal' : '/';
-        const portalRegisterPath = isPortalFallback ? '/portal/register' : '/partner/register';
-        document.getElementById('pl-register').setAttribute('href', portalRegisterPath);
+        document.getElementById('pl-register').addEventListener('click', function (e) {
+            e.preventDefault();
+            window.alert('Em breve.\n\nO cadastro publico de fornecedores esta fechado. Para acesso, contacte suporte@fluxsms.com.br.');
+        });
 
         (async function checkSession() {
             const { data: { session } } = await db.auth.getSession();

@@ -27,6 +27,15 @@ router.post('/activate', requireAuthUser, async (req, res) => {
     const supabase = req.app.get('supabase');
     const userId = req.authUserId;
 
+    // Cadastro público fechado por defeito. Reabrir: PUBLIC_PARTNER_REGISTER=1 no Railway.
+    if (String(process.env.PUBLIC_PARTNER_REGISTER || '').trim() !== '1') {
+        return res.status(403).json({
+            ok: false,
+            error: 'public_registration_disabled',
+            detail: 'Cadastro publico de parceiros em breve. Contacte suporte@fluxsms.com.br.',
+        });
+    }
+
     try {
         const { data: profile, error: pe } = await supabase
             .from('profiles')

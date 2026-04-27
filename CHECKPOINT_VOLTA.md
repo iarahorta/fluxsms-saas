@@ -1,30 +1,40 @@
 # Checkpoint — retomar depois (2026-04-28)
 
+## Última checagem automática (agente)
+
+- `node --check` em `server.js`, `middleware/partnerAuth.js`, `routes/sms.js`, `routes/partnerApi.js`: **OK**
+- `node scripts/verify-fluxsms-rpc-contract.js`: **OK**
+- `node --check` em `polo-worker-draft/src/main.js` e `renderer.js`: **OK**
+- Produção: `GET https://fluxsms.com.br/partner-api/docs` → `ok: true`; Railway deploy **SUCCESS** no commit da `main`.
+
 ## Onde estávamos (resumo)
 
 - **Login parceiro / EXE:** corrigidos (PostgREST `expires_at` no `partnerAuth`, chave sempre via `/partner-api/auth/login` no desktop, etc.).
-- **SMS entrega (`POST /sms/deliver`):** teste HTTPS no PC do utilizador com **Partner API key** → primeira chamada **`ok: true`** na ativação `ebd2688d-c06c-4757-bcaa-6a59558fb779`; segunda chamada com o **mesmo** `activation_id` → `activation_not_waiting` (normal: já estava `received`).
-- **Script PowerShell (sem porta COM):** `polo-worker-draft/scripts/Test-SmsDeliver.ps1` — instruções no cabeçalho do ficheiro (ExecutionPolicy, one-liner, caminho do PC).
+- **SMS entrega (`POST /sms/deliver`):** teste HTTPS com Partner API key → **`ok: true`** na primeira chamada; segunda com o mesmo `activation_id` → `activation_not_waiting` (esperado após `received`).
+- **Script PowerShell (sem COM):** `polo-worker-draft/scripts/Test-SmsDeliver.ps1`
 
-## Próximos passos quando voltares
+## Pendente só contigo (SMS físico)
 
-1. **Rotação de chave:** a Partner API key foi exposta no chat — **revogar / gerar nova** no fim dos testes (combinado contigo).
-2. **Testes modem / EXE:** novo pedido em `activations.status = 'waiting'` → novo `activation_id` → repetir `Test-SmsDeliver.ps1` ou one-liner; confirmar UI cliente + realtime.
-3. **Opcional pós-testes (não feito ainda):** pop-up **“EM BREVE”** no portal parceiro e bloquear cadastro público (`/partner/register`) — ficou explicitamente **para depois** dos testes.
+- Novo `activation_id` em **`waiting`** → teste real modem / EXE → confirmação no painel cliente + Supabase.
+- **Rotação da Partner API key** após fim dos testes (chave exposta no chat).
+
+## Cadastro público parceiro — FECHADO (2026-04-28)
+
+- **API:** `POST /api/partner/onboarding/activate` devolve **403** `public_registration_disabled` salvo `PUBLIC_PARTNER_REGISTER=1` no Railway.
+- **UI:** `partner-login.html` (link cadastro), `partner-landing.html` (Cadastrar), `partner-register.html` (página “Em breve” + login). Ver `.env.example` para a variável.
 
 ## SQL útil
 
 - Listar `waiting`: `select id, status, service from public.activations where status = 'waiting' order by created_at desc limit 10;`
 - Ver uma ativação: `select id, status, sms_code, updated_at from public.activations where id = '<uuid>';`
-- Limpeza utilizadores (já no repo): `supabase/scripts/cleanup_users_hard_delete.sql`
+- Limpeza utilizadores: `supabase/scripts/cleanup_users_hard_delete.sql`
 
-## Transcript desta conversa (Cursor)
+## Transcript Cursor
 
-`C:\Users\user\.cursor\projects\c-Users-user-Desktop-Export-GSM-Codder\agent-transcripts\` — ficheiros `.jsonl` por sessão (procura por data / “SMS” / “partner”).
+`C:\Users\user\.cursor\projects\c-Users-user-Desktop-Export-GSM-Codder\agent-transcripts\`
 
-## Repo / branch
+## Repo / Git
 
-- Repositório local: `Export_GSM_Codder\FLUXSMS-projeto`
-- **Branch de backup remota:** `backup/checkpoint-2026-04-28-pre-wip` (aponta ao commit do checkpoint no GitHub).
-- **Stash local (tracked):** ao sair foi criado stash com mensagem contendo `WIP 2026-04-28 alteracoes tracked ao sair`. Ao voltar: `git stash list` e, se fizer sentido, `git stash pop` (rever conflitos antes).
-- **Untracked** (ex.: `.railway-deploy/` duplicado, `SMS chegou.txt`, novos `.exe`) **não** entraram no stash — continuam no disco; rever com `git status`.
+- **Stash:** `git stash list` — entrada `WIP 2026-04-28 alteracoes tracked ao sair` (rever antes de `stash pop`).
+- **Branch backup remota:** `backup/checkpoint-2026-04-28-pre-wip`
+- **Untracked** (`.railway-deploy/` duplicado, `.exe`, etc.): não entram no stash; `git status`.
