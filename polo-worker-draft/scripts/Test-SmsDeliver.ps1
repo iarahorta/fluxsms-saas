@@ -9,6 +9,20 @@
   O evento discarded com reason=activation_not_waiting acontece quando o
   activation_id não está em status `waiting` (ex.: teste antigo 39fea275-...).
 
+  CAMINHO DO FICHEIRO
+  O repo pode estar noutro PC/pasta (ex.: C:\Users\notebook\...). Copia este
+  .ps1 para a pasta onde quiseres (ex.: Ambiente de Trabalho) ou usa o
+  one-liner abaixo na consola — não precisas do caminho do Cursor.
+
+  POLÍTICA DE EXECUÇÃO (erro "execução de scripts foi desabilitada")
+  Opção A — só desta vez:
+    powershell -ExecutionPolicy Bypass -File "C:\caminho\completo\Test-SmsDeliver.ps1" -ActivationId '...' -SmsCode '123456'
+  Opção B — utilizador atual (mais cómodo):
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+  SEM FICHEIRO (.ps1) — cola na mesma consola onde já definiste FLUXSMS_API_KEY:
+    $b='https://fluxsms.com.br'; $j='{"activation_id":"ebd2688d-c06c-4757-bcaa-6a59558fb779","sms_code":"123456"}'; Invoke-RestMethod -Uri "$b/sms/deliver" -Method Post -ContentType 'application/json' -Headers @{'x-api-key'=$env:FLUXSMS_API_KEY} -Body $j
+
 .PARAMETER BackendUrl
   Ex.: https://fluxsms.com.br
 
