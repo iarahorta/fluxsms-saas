@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS public.polos (
     criado_em TIMESTAMPTZ DEFAULT now()
 );
 
--- Tabela: Chips por Polo
--- Para gerir cada número físico dentro do Node.
+-- Tabela: Chips por Polo (LEGADO)
+-- ATENÇÃO: esta estrutura foi substituída pelo fluxo principal em public.chips.
+-- Mantida apenas para compatibilidade/histórico; não é a fonte oficial do dashboard.
 CREATE TABLE IF NOT EXISTS public.chips_fisicos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     polo_id UUID REFERENCES public.polos(id) ON DELETE CASCADE,
@@ -47,7 +48,7 @@ CREATE POLICY "Worker pode atualizar dados via Chave"
 ON public.polos FOR UPDATE
 USING (true); -- Controle será feito via backend Python comparando chave_acesso
 
-CREATE POLICY "Todos manipulam chips"
+CREATE POLICY "Todos manipulam chips (legado)"
 ON public.chips_fisicos FOR ALL
 USING (true);
 
