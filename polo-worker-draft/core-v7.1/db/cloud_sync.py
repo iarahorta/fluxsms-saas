@@ -62,6 +62,28 @@ def _deliver_sms_via_backend(activation_id, sms_code):
         print(f"  ⚠️  [SMS API] erro de rede ao entregar SMS: {e}")
         return False
 
+def _log_sms_ingestion_discard(reason, numero_limpo, servico_id=None, extra=None):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        headers = get_headers()
+        payload = {
+            "source": "worker.sync_sms_to_cloud",
+            "outcome": "discarded",
+            "reason": reason,
+            "activation_id": None,
+            "chip_porta": None,
+            "api_key_hash": None,
+            "metadata": {
+                "numero": numero_limpo,
+                "service": servico_id,
+                **(extra or {}),
+            },
+        }
+        requests.post(f"{SUPABASE_URL}/rest/v1/sms_ingestion_events", json=payload, headers=headers, timeout=8)
+    except Exception:
+        pass
+
 def init_polo():
     """Inicializa o polo APENAS se a chave já existir no servidor."""
     global _current_polo_id
@@ -144,6 +166,7 @@ def sync_sms_to_cloud(numero, texto, servico_id=None):
     # Se não houver serviço reconhecido, não envia para a nuvem por privacidade
     if not servico_id:
         print(f"  ☁️  [CLOUD] SMS ignorado (Serviço não reconhecido/proteção de privacidade)")
+        _log_sms_ingestion_discard("unmatched_service", str(numero), None, {"has_text": bool(texto)})
         return False
 
     # Garante que usamos apenas o número, mesmo se vier como CCID:XXXX|55...
@@ -166,6 +189,7 @@ def sync_sms_to_cloud(numero, texto, servico_id=None):
         else:
             # Em vez de erro, logamos como INFO discreto (pode ser spam ou SMS atrasado)
             print(f"  ☁️  [INFO] SMS ignorado para {numero_limpo} [{servico_id}] (Sem ativação pendente)")
+            _log_sms_ingestion_discard("unmatched_activation", numero_limpo, servico_id)
             return False
             
     except Exception as e:

@@ -2,8 +2,25 @@ const express = require('express');
 const router  = express.Router();
 const crypto = require('crypto');
 
+function sha256Hex(value) {
+    return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function getSmsApiKey(req) {
+    return String(req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '') || '').trim();
+}
+
+async function logSmsIngestionEvent(supabase, payload) {
+    if (!supabase || !payload) return;
+    try {
+        await supabase.from('sms_ingestion_events').insert(payload);
+    } catch (_e) {
+        // Nunca bloquear entrega por falha de auditoria.
+    }
+}
+
 async function isAuthorizedSmsSender(supabase, req) {
-    const apiKey = String(req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '') || '').trim();
+    const apiKey = getSmsApiKey(req);
     if (!apiKey) return false;
     if (apiKey === String(process.env.HARDWARE_API_KEY || '').trim()) return true;
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
@@ -36,14 +53,40 @@ async function isAuthorizedSmsSender(supabase, req) {
  */
 router.post('/deliver', async (req, res) => {
     const supabase = req.app.get('supabase');
+    const startedAt = new Date().toISOString();
+    const apiKey = getSmsApiKey(req);
     const authorized = await isAuthorizedSmsSender(supabase, req);
     if (!authorized) {
+        await logSmsIngestionEvent(supabase, {
+            source: 'sms.deliver',
+            outcome: 'unauthorized',
+            reason: 'invalid_api_key',
+            activation_id: req.body?.activation_id || null,
+            chip_porta: req.body?.chip_porta || null,
+            api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+            metadata: {
+                started_at: startedAt,
+                has_sms_code: !!req.body?.sms_code,
+            },
+        });
         return res.status(401).json({ error: 'unauthorized' });
     }
 
     const { activation_id, sms_code, chip_porta } = req.body;
 
     if (!activation_id || !sms_code) {
+        await logSmsIngestionEvent(supabase, {
+            source: 'sms.deliver',
+            outcome: 'discarded',
+            reason: 'invalid_payload',
+            activation_id: activation_id || null,
+            chip_porta: chip_porta || null,
+            api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+            metadata: {
+                started_at: startedAt,
+                has_sms_code: !!sms_code,
+            },
+        });
         return res.status(400).json({ error: 'activation_id e sms_code sao obrigatorios' });
     }
 
@@ -61,11 +104,34 @@ router.post('/deliver', async (req, res) => {
 
         if (actError) {
             console.error('[SMS DELIVER] Erro ao atualizar ativação:', actError.message);
+            await logSmsIngestionEvent(supabase, {
+                source: 'sms.deliver',
+                outcome: 'error',
+                reason: 'activation_update_failed',
+                activation_id,
+                chip_porta: chip_porta || null,
+                api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+                metadata: {
+                    started_at: startedAt,
+                    db_error: actError.message,
+                },
+            });
             return res.status(500).json({ ok: false });
         }
 
         if (!actRow) {
             console.warn('[SMS DELIVER] Ativação não estava em waiting:', activation_id);
+            await logSmsIngestionEvent(supabase, {
+                source: 'sms.deliver',
+                outcome: 'discarded',
+                reason: 'activation_not_waiting',
+                activation_id,
+                chip_porta: chip_porta || null,
+                api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+                metadata: {
+                    started_at: startedAt,
+                },
+            });
             return res.status(409).json({ ok: false, error: 'activation_not_waiting' });
         }
 
@@ -84,10 +150,36 @@ router.post('/deliver', async (req, res) => {
         }
 
         console.log(`[SMS DELIVER] SMS entregue. Ativação: ${activation_id} | Código: ${sms_code}`);
+        await logSmsIngestionEvent(supabase, {
+            source: 'sms.deliver',
+            outcome: 'delivered',
+            reason: 'ok',
+            activation_id,
+            chip_porta: chip_porta || null,
+            api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+            metadata: {
+                started_at: startedAt,
+                service: actRow.service || null,
+                sms_code_len: String(sms_code || '').length,
+                sms_code_tail: String(sms_code || '').slice(-2),
+            },
+        });
         return res.status(200).json({ ok: true });
 
     } catch (err) {
         console.error('[SMS DELIVER] Erro:', err.message);
+        await logSmsIngestionEvent(supabase, {
+            source: 'sms.deliver',
+            outcome: 'error',
+            reason: 'unexpected_exception',
+            activation_id: activation_id || null,
+            chip_porta: chip_porta || null,
+            api_key_hash: apiKey ? sha256Hex(apiKey) : null,
+            metadata: {
+                started_at: startedAt,
+                error: err.message,
+            },
+        });
         return res.status(500).json({ ok: false });
     }
 });
