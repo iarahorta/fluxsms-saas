@@ -47,6 +47,11 @@ const numSideMeta = document.getElementById('num-side-meta');
 
 let refreshTimer = null;
 let lastModalPorta = null;
+let suppressRefreshUntilMs = 0;
+
+function pauseAutoRefresh(ms = 1600) {
+  suppressRefreshUntilMs = Date.now() + Math.max(0, Number(ms) || 0);
+}
 
 function setStatus(text, ok) {
   statusChip.textContent = text;
@@ -262,7 +267,11 @@ async function setStatusAndCcid() {
   updateCcidImportBanner(status);
 }
 
-async function refreshModems() {
+async function refreshModems(force = false) {
+  if (!force) {
+    if (Date.now() < suppressRefreshUntilMs) return;
+    if (numModalBackdrop && numModalBackdrop.classList.contains('open')) return;
+  }
   try {
     const rows = await poloWorker.modemRows();
     const rowsOn = (rows || []).filter((r) => String(r.status || 'OFF').toUpperCase() === 'ON');
@@ -281,7 +290,11 @@ async function refreshModems() {
         <td>R$ ${asPartnerProfit(r.profit).toFixed(2)}</td>
         <td>${fmtDate(r.lastActivationAt)}</td>
       `;
-      tr.addEventListener('click', () => openNumberModal(r));
+      tr.addEventListener('pointerdown', () => pauseAutoRefresh(1800));
+      tr.addEventListener('click', () => {
+        pauseAutoRefresh(2200);
+        openNumberModal(r);
+      });
       modemTableBody.appendChild(tr);
     });
     if (!rowsVisible.length) {
@@ -297,6 +310,7 @@ async function refreshModems() {
 
 async function openNumberModal(r) {
   if (!r || !r.porta) return;
+  pauseAutoRefresh(2500);
   lastModalPorta = r.porta;
   const hasValidNumber = String(r.numero || '').replace(/\D/g, '').length >= 8;
   if (numModalLed) {
@@ -389,6 +403,7 @@ async function openNumberModal(r) {
 function closeNumberModal() {
   if (numModalBackdrop) numModalBackdrop.classList.remove('open');
   lastModalPorta = null;
+  pauseAutoRefresh(1200);
 }
 
 if (numModalClose) numModalClose.addEventListener('click', closeNumberModal);
@@ -442,10 +457,12 @@ async function checkUpdatesQuiet() {
 async function startDashboard() {
   showLogin(false);
   await setStatusAndCcid();
-  await refreshModems();
+  await refreshModems(true);
   checkUpdatesQuiet();
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(refreshModems, 10000);
+  refreshTimer = setInterval(() => {
+    refreshModems(false).catch(() => {});
+  }, 10000);
 }
 
 document.getElementById('btn-login').addEventListener('click', async () => {
@@ -478,6 +495,7 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async () => {
+  pauseAutoRefresh(2000);
   if (lastSyncEl) lastSyncEl.textContent = 'Atualização: reiniciando leitura dos chips...';
   try {
     const r = await poloWorker.forceRescan();
@@ -486,7 +504,7 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
       return;
     }
     await setStatusAndCcid();
-    await refreshModems();
+    await refreshModems(true);
   } catch (err) {
     if (lastSyncEl) lastSyncEl.textContent = `Falha ao atualizar: ${err.message || err}`;
   }
@@ -579,7 +597,7 @@ async function boot() {
 
 if (typeof poloWorker.onRuntimeRowsUpdated === 'function') {
   poloWorker.onRuntimeRowsUpdated(() => {
-    refreshModems().catch(() => {});
+    refreshModems(false).catch(() => {});
   });
 }
 

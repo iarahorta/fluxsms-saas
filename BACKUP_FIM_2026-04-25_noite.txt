@@ -191,3 +191,50 @@ Atualização operacional (26/04/2026 20:46 BRT)
 - Recomendação de rollout:
   - substituir instalação no PC cliente por este EXE;
   - validar apenas via app (sem scripts manuais) após login.
+
+---
+Atualização operacional (26/04/2026 21:08 BRT)
+---
+- Front desktop ajustado para cliente final:
+  - lista mostra apenas modems ON com número válido;
+  - oculta entradas sem número real (`null`, `AGUARDANDO`, `Ocupada`, `CCID:*`).
+- Front web ajustado com o mesmo critério:
+  - monitoramento e cards do parceiro exibem apenas chips com número válido.
+- Lógica de SMS preservada:
+  - não houve mudança no fluxo de detecção/entrega de SMS.
+- Build final gerada e copiada para entrega:
+  - `C:\Users\user\Desktop\FluxSMS.0.5.6-lab1-CLIENTE-FINAL-FIX2.exe`
+- Publicação em GitHub concluída:
+  - branch `main` atualizada com commit `2a67e26`.
+- Observação de deploy direto:
+  - `railway up` falhou por timeout de rede do CLI nesta sessão;
+  - push em `main` mantido para acionar o pipeline automático de publicação.
+
+---
+Atualização operacional (26/04/2026 21:25 BRT)
+---
+- Ajuste UX desktop aplicado:
+  - mitigado problema de clique perdido no modal de modem (pausa de auto-refresh durante interação/abertura do modal).
+- Ajuste de entrega SMS aplicado no core:
+  - ao receber `+CMTI`, o watch agora lê conteúdo real da caixa (`ler_sms_completo`) e processa entrega imediata;
+  - mantém fallback para `+CMT` inline e limpeza pós-processamento.
+- Evidência de campo consolidada:
+  - SMS confirmado no modem (COM107) via `CMGR/CMGL` com conteúdo legível.
+- Novo artefato entregue para teste final:
+  - `C:\Users\user\Desktop\FluxSMS.0.5.6-lab1-CLICK-FIX-SMS-FIX.exe`
+- Publicação:
+  - GitHub `main` atualizado (commit `2a67e26` já em remoto);
+  - deploy Railway direto permanece sujeito a timeout de rede nesta sessão.
+
+---
+Atualização operacional (26/04/2026 21:29 BRT)
+---
+- Ação de publicação repetida nesta rodada:
+  - `npm run deploy:web` executado com sucesso (blindagem `dist/*.shield.js` atualizada).
+  - tentativas de `railway up` em `FLUXSMS-projeto` e `.railway-deploy` repetidas.
+- Resultado Railway:
+  - erro de timeout no upload para Backboard (`operation timed out`) persistiu nas duas tentativas.
+- Ajuste de UX adicional no desktop:
+  - bloqueio de re-render durante interação com a linha/modal para evitar clique perdido.
+- Estado de sincronização:
+  - mudanças locais preparadas para commit/push em `main` nesta etapa.
