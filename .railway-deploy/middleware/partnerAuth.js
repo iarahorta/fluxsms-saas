@@ -24,6 +24,22 @@ function ipInCidr(ip, cidr) {
   return (ipLong & mask) === (rangeLong & mask);
 }
 
+function partnerKeyNotExpired(row) {
+  if (!row || row.expires_at == null) return true;
+  const t = new Date(row.expires_at).getTime();
+  return Number.isFinite(t) && t > Date.now();
+}
+
+function partnerKeyStatusOk(row) {
+  if (!row || row.status == null || row.status === '') return true;
+  return String(row.status).toLowerCase() === 'active';
+}
+
+function pickFirstValidKeyRow(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return list.find((r) => partnerKeyNotExpired(r) && partnerKeyStatusOk(r)) || null;
+}
+
 function buildPartnerAuth({ supabase }) {
   return async function partnerAuth(req, res, next) {
     try {
@@ -33,54 +49,50 @@ function buildPartnerAuth({ supabase }) {
       if (!apiKey) return res.status(401).json({ ok: false, error: 'api_key_required' });
 
       const keyHash = crypto.createHash('sha256').update(String(apiKey)).digest('hex');
-      const nowIso = new Date().toISOString();
       let keyRow = null;
       let keyError = null;
 
-      // Caminho principal: esquema novo (key_hash + is_active).
-      ({ data: keyRow, error: keyError } = await supabase
+      // Esquema novo (key_hash + is_active). NUNCA usar .or(expires_at.gt.<ISO>) no PostgREST:
+      // timestamps ISO têm ":" e quebram o parser do filtro OR → falsos api_key_invalid.
+      const primary = await supabase
         .from('partner_api_keys')
         .select('id, partner_id, is_active, expires_at, bound_hwid')
         .eq('key_hash', keyHash)
         .eq('is_active', true)
-        .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-        .maybeSingle());
+        .limit(10);
+      keyError = primary.error;
+      if (!keyError) keyRow = pickFirstValidKeyRow(primary.data);
 
-      // Fallback 1: coluna is_active ausente (base legada).
-      if (keyError && String(keyError.message || '').toLowerCase().includes('is_active')) {
+      // Fallback 1: coluna is_active ausente ou erro de schema (base legada).
+      if (!keyRow && keyError && String(keyError.message || '').toLowerCase().includes('is_active')) {
         const legacyNoActive = await supabase
           .from('partner_api_keys')
           .select('id, partner_id, expires_at, bound_hwid, status')
           .eq('key_hash', keyHash)
-          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-          .maybeSingle();
-        keyRow = legacyNoActive.data;
+          .limit(10);
         keyError = legacyNoActive.error;
-        if (!keyError && keyRow && keyRow.status && String(keyRow.status).toUpperCase() !== 'ACTIVE') {
-          keyRow = null;
-        }
+        if (!keyError) keyRow = pickFirstValidKeyRow(legacyNoActive.data);
       }
 
       // Fallback 2: chave em texto puro (api_key) em base mais antiga.
-      if ((!keyRow && !keyError) || (keyError && String(keyError.message || '').toLowerCase().includes('key_hash'))) {
+      if (!keyRow && (!keyError || String(keyError.message || '').toLowerCase().includes('key_hash'))) {
         const legacyPlain = await supabase
           .from('partner_api_keys')
           .select('id, partner_id, expires_at, bound_hwid, status, is_active')
           .eq('api_key', String(apiKey))
-          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-          .maybeSingle();
+          .limit(10);
+        keyError = legacyPlain.error || keyError;
         if (!legacyPlain.error && legacyPlain.data) {
-          const row = legacyPlain.data;
-          if (Object.prototype.hasOwnProperty.call(row, 'is_active') && row.is_active === false) {
-            keyRow = null;
-          } else if (row.status && String(row.status).toUpperCase() !== 'ACTIVE') {
-            keyRow = null;
-          } else {
+          const row = pickFirstValidKeyRow(
+            (legacyPlain.data || []).filter((r) => {
+              if (Object.prototype.hasOwnProperty.call(r, 'is_active') && r.is_active === false) return false;
+              return true;
+            })
+          );
+          if (row) {
             keyRow = row;
             keyError = null;
           }
-        } else if (legacyPlain.error && !keyError) {
-          keyError = legacyPlain.error;
         }
       }
 
