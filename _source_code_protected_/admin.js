@@ -34,6 +34,7 @@ function escapeHtml(str) {
 }
 
 const _ADMIN_CHIP_VIVO_MS = 60 * 60 * 1000; /* 60 min — alinhado ao .exe / linha, não 5 min */
+const ADMIN_CHIPS_CARD_MODE = 'strict_online'; // 'strict_online' (Opção A) | 'valid_unique' (Opção B)
 
 /**
  * Chip "ON" no admin: alinha com o .exe.
@@ -59,6 +60,22 @@ function chipSeemsActiveForAdmin(c) {
         return false;
     }
     return false;
+}
+
+function normalizeChipNumber(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const lower = raw.toLowerCase();
+    if (lower === 'aguardando' || lower === 'ocupada') return null;
+    if (lower.startsWith('ccid:')) return null;
+    const digits = raw.replace(/\D+/g, '');
+    if (!digits || digits.length < 10) return null;
+    return digits;
+}
+
+function isCommerciallyActiveStatus(status) {
+    const s = String(status || '').toLowerCase();
+    return s === 'idle' || s === 'on' || s === 'online' || s === 'active' || s === 'quarentena';
 }
 
 // Inicialização
@@ -112,21 +129,40 @@ async function loadStats() {
     if (document.getElementById('stat-balance')) document.getElementById('stat-balance').innerText = `R$ ${stats.balance_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
     let chipCount = Number(stats.chips_online) || 0;
     try {
-        let { data: chRows, error: chErr } = await db
-            .from('chips')
-            .select('status, last_ping, polos(ultima_comunicacao)');
-        if (chErr) {
-            const r2 = await db.from('chips').select('status, last_ping');
-            chRows = r2.data;
-            chErr = r2.error;
-        }
-        if (!chErr && Array.isArray(chRows)) {
-            chipCount = chRows.filter((c) => chipSeemsActiveForAdmin(c)).length;
+        if (ADMIN_CHIPS_CARD_MODE === 'strict_online') {
+            const { data: chRows, error: chErr } = await db
+                .from('chips')
+                .select('id, status')
+                .in('status', ['online', 'on', 'active']);
+
+            if (chErr) {
+                console.error('Erro ao contar chips ativos:', chErr);
+            } else {
+                chipCount = Array.isArray(chRows) ? chRows.length : 0;
+            }
+        } else if (ADMIN_CHIPS_CARD_MODE === 'valid_unique') {
+            const { data: chRows, error: chErr } = await db
+                .from('chips')
+                .select('id, status, numero');
+
+            if (chErr) {
+                console.error('Erro ao contar chips válidos:', chErr);
+            } else if (Array.isArray(chRows)) {
+                const uniqueValidNumbers = new Set();
+                chRows.forEach((row) => {
+                    if (!isCommerciallyActiveStatus(row.status)) return;
+                    const normalized = normalizeChipNumber(row.numero);
+                    if (!normalized) return;
+                    uniqueValidNumbers.add(normalized);
+                });
+                chipCount = uniqueValidNumbers.size;
+            }
         }
     } catch (e) {
         console.warn('Admin stat-chips: fallback tabela', e);
     }
-    if (document.getElementById('stat-chips')) document.getElementById('stat-chips').innerText = `${chipCount}`;
+    const chipsEl = document.getElementById('stat-chips');
+    if (chipsEl) chipsEl.innerText = String(chipCount);
     if (document.getElementById('stat-sms')) document.getElementById('stat-sms').innerText = stats.sms_count || 0;
     
     // GATILHO DE SEGURANÇA: Sempre que abrir/atualizar o Admin, roda o Gari para limpar Polos mortos

@@ -1,5 +1,31 @@
 const express = require('express');
 const router  = express.Router();
+const crypto = require('crypto');
+
+async function isAuthorizedSmsSender(supabase, req) {
+    const apiKey = String(req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '') || '').trim();
+    if (!apiKey) return false;
+    if (apiKey === String(process.env.HARDWARE_API_KEY || '').trim()) return true;
+    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+    let { data, error } = await supabase
+        .from('partner_api_keys')
+        .select('id, is_active, expires_at')
+        .eq('key_hash', keyHash)
+        .maybeSingle();
+    if (error && String(error.message || '').toLowerCase().includes('is_active')) {
+        const legacy = await supabase
+            .from('partner_api_keys')
+            .select('id, expires_at')
+            .eq('key_hash', keyHash)
+            .maybeSingle();
+        data = legacy.data;
+        error = legacy.error;
+    }
+    if (error || !data) return false;
+    if (Object.prototype.hasOwnProperty.call(data, 'is_active') && data.is_active === false) return false;
+    if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return false;
+    return true;
+}
 
 /**
  * POST /sms/deliver
@@ -10,11 +36,8 @@ const router  = express.Router();
  */
 router.post('/deliver', async (req, res) => {
     const supabase = req.app.get('supabase');
-
-    // ─── Autenticação: somente o hardware (seu PC) pode chamar ──
-    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-
-    if (!apiKey || apiKey !== process.env.HARDWARE_API_KEY) {
+    const authorized = await isAuthorizedSmsSender(supabase, req);
+    if (!authorized) {
         return res.status(401).json({ error: 'unauthorized' });
     }
 
@@ -75,9 +98,9 @@ router.post('/deliver', async (req, res) => {
  * Também protegida pela mesma API_KEY.
  */
 router.post('/mock', async (req, res) => {
-    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-
-    if (!apiKey || apiKey !== process.env.HARDWARE_API_KEY) {
+    const supabase = req.app.get('supabase');
+    const authorized = await isAuthorizedSmsSender(supabase, req);
+    if (!authorized) {
         return res.status(401).json({ error: 'unauthorized' });
     }
 
@@ -103,8 +126,8 @@ router.post('/mock', async (req, res) => {
  */
 router.post('/shutdown', async (req, res) => {
     const supabase = req.app.get('supabase');
-    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-    if (!apiKey || apiKey !== process.env.HARDWARE_API_KEY) {
+    const authorized = await isAuthorizedSmsSender(supabase, req);
+    if (!authorized) {
         return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
 

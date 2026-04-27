@@ -11,6 +11,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 if SUPABASE_URL and SUPABASE_URL.endswith('/'):
     SUPABASE_URL = SUPABASE_URL[:-1]
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") # Usamos service_key para bypassar RLS e gerenciar hardware
+BACKEND_URL = (os.getenv("BACKEND_URL") or "").rstrip("/")
+PARTNER_API_KEY = os.getenv("PARTNER_API_KEY") or os.getenv("HARDWARE_API_KEY") or ""
 
 _current_polo_id = None
 
@@ -27,6 +29,38 @@ def scramble_sms(text):
     if not text: return ""
     # Inverte e converte para Base64
     return base64.b64encode(text[::-1].encode()).decode()
+
+def _deliver_sms_via_backend(activation_id, sms_code):
+    """Entrega oficial via backend /sms/deliver (fonte única de ingestão)."""
+    if not BACKEND_URL:
+        print("  ⚠️  [SMS API] BACKEND_URL ausente; entrega via backend desativada.")
+        return False
+    if not PARTNER_API_KEY:
+        print("  ⚠️  [SMS API] PARTNER_API_KEY/HARDWARE_API_KEY ausente; entrega via backend desativada.")
+        return False
+    try:
+        url = f"{BACKEND_URL}/sms/deliver"
+        headers = {
+            "Authorization": f"Bearer {PARTNER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "activation_id": activation_id,
+            "sms_code": sms_code,
+        }
+        resp = requests.post(url, json=payload, headers=headers, timeout=12)
+        if resp.status_code == 200:
+            return True
+        detail = ""
+        try:
+            detail = str(resp.json())
+        except Exception:
+            detail = resp.text[:200]
+        print(f"  ⚠️  [SMS API] /sms/deliver falhou ({resp.status_code}): {detail}")
+        return False
+    except Exception as e:
+        print(f"  ⚠️  [SMS API] erro de rede ao entregar SMS: {e}")
+        return False
 
 def init_polo():
     """Inicializa o polo APENAS se a chave já existir no servidor."""
@@ -104,7 +138,7 @@ def sync_chip_to_cloud(porta, numero, operadora):
         print(f"  ⚠️  [CLOUD] Erro de rede ao sincronizar chip: {e}")
 
 def sync_sms_to_cloud(numero, texto, servico_id=None):
-    """Envia o SMS recebido para a ativação pendente no Supabase."""
+    """Envia o SMS recebido para a ativação pendente (lookup no Supabase + entrega no backend)."""
     if not SUPABASE_URL: return False
     
     # Se não houver serviço reconhecido, não envia para a nuvem por privacidade
@@ -124,17 +158,11 @@ def sync_sms_to_cloud(numero, texto, servico_id=None):
         if resp_act.status_code == 200 and len(resp_act.json()) > 0:
             activation = resp_act.json()[0]
             act_id = activation["id"]
-            chip_id = activation["chip_id"]
-            
-            # 2. Atualiza a ativação com texto ofuscado
-            texto_scrambled = scramble_sms(texto)
-            requests.patch(f"{SUPABASE_URL}/rest/v1/activations?id=eq.{act_id}", json={"sms_code": texto_scrambled, "status": "received", "updated_at": "now()"}, headers=headers)
-            
-            # 3. Libera o chip
-            requests.patch(f"{SUPABASE_URL}/rest/v1/chips?id=eq.{chip_id}", json={"status": "idle"}, headers=headers)
-            
-            print(f"  ☁️  [CLOUD] SMS entregue para ativação {act_id[:8]} ({servico_id})")
-            return True
+            if _deliver_sms_via_backend(act_id, texto):
+                print(f"  ☁️  [CLOUD] SMS entregue via backend para ativação {act_id[:8]} ({servico_id})")
+                return True
+            print(f"  ☁️  [CLOUD] SMS localizado para {act_id[:8]}, mas entrega no backend falhou.")
+            return False
         else:
             # Em vez de erro, logamos como INFO discreto (pode ser spam ou SMS atrasado)
             print(f"  ☁️  [INFO] SMS ignorado para {numero_limpo} [{servico_id}] (Sem ativação pendente)")

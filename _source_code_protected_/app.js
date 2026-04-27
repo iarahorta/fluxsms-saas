@@ -65,6 +65,7 @@ let chipsDisponiveis = 0;
 let serviceStocks = {};
 let isRealtimeActive = false;
 let activeSessionsPollStarted = false;
+const ACTIVE_SESSIONS_RECEIVED_TTL_MS = 24 * 60 * 60 * 1000; // manter recebidos visíveis por 24h
 let chatWidgetBooted = false;
 let tawkVisibilitySyncStarted = false;
 let profileCompletionShown = false;
@@ -2019,7 +2020,12 @@ async function loadActiveSessions() {
     if (data && data.length > 0) {
         activeNumbers.innerHTML = '';
         data
-            .filter(a => ['waiting', 'pending'].includes(String(a.status || '').toLowerCase()) || (new Date() - new Date(a.updated_at)) < 120000)
+            .filter((a) => {
+                const st = String(a.status || '').toLowerCase();
+                if (st === 'waiting' || st === 'pending') return true;
+                if (st === 'received') return (new Date() - new Date(a.updated_at)) < ACTIVE_SESSIONS_RECEIVED_TTL_MS;
+                return false;
+            })
             .forEach(renderActivationCard);
     }
 }
@@ -2044,18 +2050,6 @@ function updateCardWithSMS(id, code) {
     if (el) {
         el.innerText = unscrambleSMS(code);
         document.getElementById(`status-${id}`).innerText = 'RECEBIDO';
-
-        // Proteção: Remove do DOM e limpa vestígios após 2 min
-        setTimeout(() => {
-            const card = document.getElementById(id);
-            if (card) {
-                card.style.opacity = '0';
-                setTimeout(() => {
-                    card.remove();
-                    console.log(`[SEC] Ativação ${id} purgada da memória e do DOM.`);
-                }, 1000);
-            }
-        }, 120000);
     }
 }
 
