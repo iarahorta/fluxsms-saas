@@ -25,4 +25,6 @@
 ## Repo / branch
 
 - Repositório local: `Export_GSM_Codder\FLUXSMS-projeto`
-- Após este checkpoint: ver `git log -1` e, se existir, `git stash list` para entradas `WIP backup 2026-04-28`.
+- **Branch de backup remota:** `backup/checkpoint-2026-04-28-pre-wip` (aponta ao commit do checkpoint no GitHub).
+- **Stash local (tracked):** ao sair foi criado stash com mensagem contendo `WIP 2026-04-28 alteracoes tracked ao sair`. Ao voltar: `git stash list` e, se fizer sentido, `git stash pop` (rever conflitos antes).
+- **Untracked** (ex.: `.railway-deploy/` duplicado, `SMS chegou.txt`, novos `.exe`) **não** entraram no stash — continuam no disco; rever com `git status`.
