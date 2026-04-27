@@ -22,6 +22,16 @@ function chipServiceOffTrue(chip, key) {
     return String(o[key] || o[(key || '').toLowerCase()]).toLowerCase() === 'true';
 }
 
+function normalizeChipPhone(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (/^ccid:/i.test(raw)) return null;
+    if (/^(aguardando|ocupada|sem chip|null|offline|—)$/i.test(raw)) return null;
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 16) return null;
+    return digits;
+}
+
 const DEFAULT_SERVICE_IDS = ['whatsapp', 'telegram', 'google', 'instagram'];
 
 /**
@@ -70,9 +80,30 @@ router.get('/estoque', async (req, res) => {
             (recActs || []).map((a) => String(a.chip_id) + '|' + String(a.service))
         );
 
-        const list = (chips || []).filter(
-            (c) => c && c.numero && String(c.numero).toUpperCase().indexOf('CCID') !== 0
-        );
+        const byNumber = new Map();
+        for (const row of (chips || [])) {
+            if (!row) continue;
+            const normalized = normalizeChipPhone(row.numero);
+            if (!normalized) continue;
+            const current = byNumber.get(normalized);
+            if (!current) {
+                byNumber.set(normalized, row);
+                continue;
+            }
+            // Preferir o registro mais "vivo" quando há duplicidade do mesmo número.
+            const currAlive = chipOnline3m(current) ? 1 : 0;
+            const nextAlive = chipOnline3m(row) ? 1 : 0;
+            if (nextAlive > currAlive) {
+                byNumber.set(normalized, row);
+                continue;
+            }
+            const currPing = current.last_ping ? new Date(current.last_ping).getTime() : 0;
+            const nextPing = row.last_ping ? new Date(row.last_ping).getTime() : 0;
+            if (nextPing > currPing) {
+                byNumber.set(normalized, row);
+            }
+        }
+        const list = [...byNumber.values()];
 
         let chipsVivos = 0;
         let chipsComAlgumEstoque = 0;
@@ -80,7 +111,6 @@ router.get('/estoque', async (req, res) => {
         for (const s of serviceIds) stocks[s] = 0;
 
         for (const c of list) {
-            const st = String(c.status || '').toLowerCase();
             if (chipOnline3m(c)) {
                 chipsVivos += 1;
             }

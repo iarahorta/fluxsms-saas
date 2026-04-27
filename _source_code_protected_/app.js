@@ -1594,8 +1594,21 @@ function hasClientValidNumber(v) {
     return d.length >= 10 && d.length <= 13;
 }
 
+function normalizeClientNumber(v) {
+    if (!hasClientValidNumber(v)) return null;
+    return String(v || '').replace(/\D/g, '');
+}
+
 function formatPartnerChipsCell(chips) {
-    const valid = (chips || []).filter((c) => hasClientValidNumber(c && c.numero));
+    const byNumber = new Map();
+    for (const chip of (chips || [])) {
+        const normalized = normalizeClientNumber(chip && chip.numero);
+        if (!normalized) continue;
+        if (!byNumber.has(normalized)) {
+            byNumber.set(normalized, chip);
+        }
+    }
+    const valid = [...byNumber.values()];
     if (!valid.length) {
         return '<span style="opacity:0.45;font-size:0.78rem;">Sem chips nesta vista; contacte a equipa se precisar de ligação.</span>';
     }
